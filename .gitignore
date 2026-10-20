@@ -1,0 +1,8 @@
+# Source syllabus stays local (school and course identifiers)
+2026-Fall-*.pdf
+# Local tooling and test output
+.DS_Store
+node_modules/
+__pycache__/
+*.pyc
+shots/
