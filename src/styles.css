@@ -498,7 +498,21 @@ dialog .dlg-body { padding: 0.8rem 1rem 1rem; overflow: auto; max-height: calc(m
   .stage { overflow-y: auto; }
   .slide { position: relative; inset: auto; min-height: 100%; overflow: visible; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .slide-head h2 { font-size: 1.4rem; }
-  .split, .split-wide, .split-narrow, .cols-3, .cols-4, .cw, .dp, .pr, .qz, .dp-compare { grid-template-columns: minmax(0, 1fr); }
+  /* Module layouts include inline column widths. Stack those panels too; keep
+     small control grids (bits, matrices, sliders) in their original layout. */
+  body:not(.print-mode) :is(.split, .split-wide, .split-narrow, .cols, .cols-3, .cols-4,
+    .cw, .dp, .pr, .qz, .dp-compare, .m4-relgrid, .m4-db-grid, .nt-sieve, .nt-euclid,
+    .nt-clock, .nt-rsa, .ct-arr, .ct-pas, .ct-bin, .ct-ph, .rc-lab, .gr-lab,
+    .tr-grid, .nf-lab, .nf-seg) { grid-template-columns: minmax(0, 1fr) !important; }
+  body:not(.print-mode) .slide-body { overflow-wrap: anywhere; }
+  body:not(.print-mode) .slide-body table { display: block; max-width: 100%; overflow-x: auto; }
+  body:not(.print-mode) .slide-body .tex { display: inline-block; max-width: 100%; overflow-x: auto; vertical-align: middle; }
+  body:not(.print-mode) .slide-body :not(pre) > code:not(.cw code) { white-space: normal; }
+  body:not(.print-mode) .slide-body .btn { white-space: normal; max-width: 100%; }
+  body:not(.print-mode) .slide-body .row { flex-wrap: wrap !important; }
+  body:not(.print-mode) .slide-body .seg { flex-wrap: wrap; }
+  body:not(.print-mode) .slide-body .m5-cells { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  body:not(.print-mode) .nf-fig > svg { flex: none; height: auto; }
   .cw-main { min-height: 22rem; }
   .crumbs, .brand .full { display: none; }
   .tools .lbl { display: none; }

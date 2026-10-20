@@ -8,13 +8,13 @@
   /** plain-text number: integers exact, others to 4 decimals, huge values in exponent form */
   function fmt(x) {
     if (!Number.isFinite(x)) return x > 0 ? '∞' : x < 0 ? '−∞' : '?';
-    if (Math.abs(x) >= 1e9) return x.toExponential(3).replace('-', '−');
+    if (Math.abs(x) >= 1e9 || (x !== 0 && Math.abs(x) < 1e-4)) return x.toExponential(3).replace('-', '−');
     if (isInt(x)) return (Math.round(x) || 0).toLocaleString('en-US').replace('-', '−');
     return String(+x.toFixed(4) || 0).replace('-', '−');
   }
   /** TeX number: same rules, ASCII minus */
   function tn(x) {
-    if (Math.abs(x) >= 1e9) { const [m, e] = x.toExponential(3).split('e'); return `${m} \\times 10^{${+e}}`; }
+    if (Math.abs(x) >= 1e9 || (x !== 0 && Math.abs(x) < 1e-4)) { const [m, e] = x.toExponential(3).split('e'); return `${m} \\times 10^{${+e}}`; }
     if (isInt(x)) return String(Math.round(x) || 0);
     return String(+x.toFixed(4) || 0);
   }
@@ -33,6 +33,58 @@
   const fibs = [0, 1];
   while (fibs.length < 60) fibs.push(fibs[fibs.length - 1] + fibs[fibs.length - 2]);
   const pow2s = (x) => ({ 0: '1', 0.5: '√n', 1: 'n', 1.5: 'n√n', 2: 'n²', 3: 'n³', 4: 'n⁴' })[x];
+
+  // Compare the entered decimal values exactly before using floating-point roots.
+  // An epsilon would erase deliberately small nonzero contributions as well as noise.
+  function decimalIntegers(values) {
+    const parts = values.map((v) => {
+      const [mantissa, exponent = '0'] = String(v).split('e');
+      const places = (mantissa.split('.')[1] || '').length - Number(exponent);
+      return { value: BigInt(mantissa.replace('.', '')), places };
+    });
+    const places = Math.max(0, ...parts.map((p) => p.places));
+    return { scale: 10n ** BigInt(places), places, values: parts.map((p) => p.value * 10n ** BigInt(places - p.places)) };
+  }
+  function integerRatio(p, q) {
+    if (p === 0n) return 0;
+    const sign = (p < 0n) !== (q < 0n) ? -1 : 1;
+    const a = String(p < 0n ? -p : p), b = String(q < 0n ? -q : q);
+    const mantissa = sign * Number(`${a[0]}.${a.slice(1, 16)}`) / Number(`${b[0]}.${b.slice(1, 16)}`);
+    return Number(`${mantissa}e${a.length - b.length}`);
+  }
+  function decimalSqrt(p, places) {
+    const digits = String(p), leading = digits.slice(0, 16);
+    let mantissa = Number(leading) / 10 ** (leading.length - 1);
+    let exponent = digits.length - 1 - places;
+    if (exponent % 2 !== 0) { mantissa *= 10; exponent--; }
+    return Number(`${Math.sqrt(mantissa)}e${exponent / 2}`);
+  }
+
+  // Growth belongs to the solved sequence: a root with coefficient zero contributes
+  // nothing, and a repeated root can contribute an extra factor of n.
+  function growthText(S) {
+    const contributes = S.active || [S.b !== 0, S.d !== 0];
+    if (!contributes.some(Boolean)) return 'Both constants are 0, so every term is 0. The ratio of consecutive terms is undefined.';
+    if (S.kind === 'complex') {
+      const rho = S.rho;
+      const trend = rho < 1 ? 'The oscillations shrink toward 0.' : rho > 1 ? `The oscillation envelope grows like ${fmt(rho)}ⁿ; individual terms can still be small or zero.` : 'The terms stay bounded and oscillate; they need not repeat periodically.';
+      return `${trend} Both complex roots have the same magnitude, so consecutive-term ratios need not converge.`;
+    }
+    if (S.kind === 'repeated' && contributes[1]) {
+      const r = S.roots[0][0], rho = Math.abs(r);
+      const trend = rho < 1 ? 'The terms still shrink toward 0: exponential decay outweighs the factor n.' : rho > 1 ? `Their magnitude grows on the scale n · ${fmt(rho)}ⁿ.` : 'Their magnitude grows linearly, even though the root has magnitude 1.';
+      return `The repeated root contributes a nonzero n · rⁿ term. ${trend}${r < 0 ? ' The signs eventually alternate.' : ''} The ratio approaches ${fmt(r)}.`;
+    }
+    const active = S.roots.map(([r], i) => ({ r, present: contributes[i] })).filter((x) => x.present).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+    const r = active[0].r, rho = Math.abs(r);
+    const inactive = S.roots.length > active.length ? 'A root with coefficient 0 contributes nothing to this sequence. ' : '';
+    if (active.length === 2 && Math.abs(active[1].r) === rho) {
+      const trend = rho < 1 ? 'Both terms shrink toward 0.' : rho > 1 ? `The terms have an envelope proportional to ${fmt(rho)}ⁿ; cancellation can make one parity of terms zero.` : 'The sequence is bounded: even-index terms have one value and odd-index terms have another.';
+      return `${trend} The active roots have equal magnitudes and opposite signs, so consecutive-term ratios need not converge.`;
+    }
+    const trend = rho < 1 ? 'The terms shrink toward 0.' : rho > 1 ? `Their magnitude eventually grows by a factor approaching ${fmt(rho)} per step.` : r > 0 ? 'The terms approach a nonzero constant.' : 'The terms approach an alternating pair of nonzero values.';
+    return `${inactive}The dominant active root is ${fmt(r)}. ${trend}${r < 0 && rho !== 1 ? ' The signs eventually alternate.' : ''} The ratio approaches ${fmt(r)}.`;
+  }
 
   DM.module({
     id: 'recurrences',
@@ -441,7 +493,7 @@
       {
         title: 'Lab: characteristic-equation solver',
         kind: 'lab',
-        html: String.raw`<p class="muted small">Enter the coefficients and initial conditions of \(a_n = c_1 a_{n-1} + c_2 a_{n-2}\), or pick a preset. The lab solves the characteristic equation, finds the constants, and checks the closed form against the recurrence term by term. The plot shows the roots: a root outside the dashed unit circle makes the sequence grow.</p>`,
+        html: String.raw`<p class="muted small">Enter the coefficients and initial conditions of \(a_n = c_1 a_{n-1} + c_2 a_{n-2}\), or pick a preset. The lab solves the characteristic equation, finds the constants, and checks the closed form against the recurrence term by term. A root outside the dashed unit circle contributes exponential growth only when its term has a nonzero coefficient.</p>`,
         render(body, ctx) {
           const { h, s, rc } = ctx;
           const presets = [
@@ -468,32 +520,48 @@
           const num = (t) => { const x = Number(String(t).trim().replace('−', '-')); return String(t).trim() === '' ? NaN : x; };
           const base = (r) => (r < 0 || !isInt(r) ? `(${tn(r)})` : tn(r));
           function solve(c1, c2, a0, a1) {
-            const D = c1 * c1 + 4 * c2;
-            if (Math.abs(D) < 1e-12) {
-              const r = c1 / 2, b = a0, d = a1 / r - a0;
-              return { kind: 'repeated', D, roots: [[r, 0]], b, d, f: (n) => (b + d * n) * r ** n,
+            const exact = decimalIntegers([c1, c2, a0, a1]);
+            const [C1, C2, A0, A1] = exact.values, scale = exact.scale;
+            const discriminant = C1 * C1 + 4n * C2 * scale;
+            const D = Number(`${discriminant}e-${2 * exact.places}`);
+            const digits = String(discriminant < 0n ? -discriminant : discriminant);
+            const Dtex = D === 0 && discriminant !== 0n ? `${discriminant < 0n ? '-' : ''}${digits[0]}.${digits.slice(1, 5)} \\times 10^{${digits.length - 1 - 2 * exact.places}}` : tn(D);
+            if (discriminant === 0n) {
+              const numerator = 2n * A1 * scale - A0 * C1;
+              const r = c1 / 2, b = a0, d = integerRatio(numerator, C1 * scale);
+              return { kind: 'repeated', D, Dtex, roots: [[r, 0]], b, d, active: [A0 !== 0n, numerator !== 0n], f: (n) => (b + d * n) * r ** n,
                 rootsTex: String.raw`r = \frac{c_1}{2} = ${tn(r)}\ \text{(twice)}`,
                 consTex: String.raw`n=0:\ b = ${tn(a0)} \qquad n=1:\ ${tn(r)}b + ${tn(r)}d = ${tn(a1)}`,
                 solTex: String.raw`b = ${tn(b)},\quad d = ${tn(d)}`,
-                formTex: String.raw`a_n = \left(${combo([[+tn(b), ''], [+tn(d), 'n']])}\right) \cdot ${base(r)}^n` };
+                formTex: String.raw`a_n = \left(${tn(b)} ${d < 0 ? '-' : '+'} ${tn(Math.abs(d))}n\right) \cdot ${base(r)}^n` };
             }
-            if (D > 0) {
-              const sq = Math.sqrt(D), r1 = (c1 + sq) / 2, r2 = (c1 - sq) / 2;
-              const d = (a1 - a0 * r1) / (r2 - r1), b = a0 - d;
+            if (discriminant > 0n) {
+              const sq = decimalSqrt(discriminant, 2 * exact.places);
+              let r1 = (c1 + sq) / 2, r2 = (c1 - sq) / 2;
+              if (c1 >= 0 && Math.abs(c1 - sq) < Math.max(c1, sq) / 2) r2 = -c2 / r1;
+              else if (c1 < 0 && Math.abs(c1 + sq) < Math.max(-c1, sq) / 2) r1 = -c2 / r2;
+              let b = (a1 - a0 * r2) / sq, d = (a0 * r1 - a1) / sq, active = [true, true];
+              if (A0 === 0n && A1 === 0n) { b = 0; d = 0; active = [false, false]; }
+              else if (A0 !== 0n && A1 * A1 * scale - C1 * A0 * A1 - C2 * A0 * A0 === 0n) {
+                const onlyRoot = integerRatio(A1, A0);
+                if ((2n * A1 * scale - C1 * A0) * A0 > 0n) { r1 = onlyRoot; b = a0; d = 0; active = [true, false]; }
+                else { r2 = onlyRoot; b = 0; d = a0; active = [false, true]; }
+              }
               const fib = c1 === 1 && c2 === 1 && a0 === 0 && a1 === 1;
-              return { kind: 'distinct', D, roots: [[r1, 0], [r2, 0]], b, d, f: (n) => b * r1 ** n + d * r2 ** n,
+              return { kind: 'distinct', D, Dtex, roots: [[r1, 0], [r2, 0]], b, d, active, f: (n) => b * r1 ** n + d * r2 ** n,
                 rootsTex: String.raw`r_1 = \tfrac{c_1 + \sqrt{\Delta}}{2} = ${tn(r1)},\quad r_2 = \tfrac{c_1 - \sqrt{\Delta}}{2} = ${tn(r2)}`,
                 consTex: String.raw`b + d = ${tn(a0)}, \qquad ${tn(r1)}\,b ${r2 < 0 ? '-' : '+'} ${tn(Math.abs(r2))}\,d = ${tn(a1)}`,
                 solTex: String.raw`b = ${tn(b)},\quad d = ${tn(d)}`,
                 formTex: String.raw`a_n = ${tn(b)} \cdot ${base(r1)}^n ${d < 0 ? '-' : '+'} ${tn(Math.abs(d))} \cdot ${base(r2)}^n` + (fib ? String.raw`\;=\; \tfrac{\varphi^n - \psi^n}{\sqrt5}` : '') };
             }
-            const rho = Math.sqrt(-c2), th = Math.acos(Math.max(-1, Math.min(1, c1 / (2 * rho))));
-            const al = a0, be = (a1 / rho - al * Math.cos(th)) / Math.sin(th);
+            const real = c1 / 2, imaginary = decimalSqrt(-discriminant, 2 * exact.places) / 2;
+            const rho = decimalSqrt(-C2, exact.places), th = Math.atan2(imaginary, real);
+            const al = a0, be = integerRatio(2n * A1 * scale - A0 * C1, 2n * scale * scale) / imaginary;
             const rho1 = near(rho, 1);
             const cf = (x) => (near(x, 1) ? '' : near(x, -1) ? '-' : tn(x) + '\\ ');
             let thTex = tn(th);
             for (let q = 1; q <= 12; q++) { const p = (th / Math.PI) * q; if (isInt(p) && Math.round(p) > 0) { thTex += String.raw` = \tfrac{${Math.round(p) === 1 ? '' : Math.round(p)}\pi}{${q}}`.replace(/\\tfrac\{(\d*)\\pi\}\{1\}/, '$1\\pi'); break; } }
-            return { kind: 'complex', D, roots: [[rho * Math.cos(th), rho * Math.sin(th)], [rho * Math.cos(th), -rho * Math.sin(th)]], b: al, d: be,
+            return { kind: 'complex', D, Dtex, rho, roots: [[real, imaginary], [real, -imaginary]], b: al, d: be,
               f: (n) => rho ** n * (al * Math.cos(n * th) + be * Math.sin(n * th)),
               rootsTex: String.raw`r = ${rho1 ? '' : tn(rho)}(\cos\theta \pm i\ \sin\theta),\quad \theta \approx ${thTex}`,
               consTex: String.raw`a_n = ${rho1 ? '' : tn(rho) + '^n'}(\alpha\ \cos(n\theta) + \beta\ \sin(n\theta))`,
@@ -528,17 +596,16 @@
             const S = solve(c1, c2, a0, a1);
             drawPlot(S.roots);
             const kindText = S.kind === 'distinct' ? 'positive, so there are two different real roots' : S.kind === 'repeated' ? 'zero, so there is one repeated root' : 'negative, so the roots are a pair of complex numbers';
-            const dom = Math.max(...S.roots.map(([x, y]) => Math.hypot(x, y)));
-            const growth = dom > 1 + 1e-9 ? `The largest root has size ${fmt(dom)} > 1, so the terms eventually grow by about that factor per step.` : dom < 1 - 1e-9 ? `Every root has size below 1, so the terms shrink toward 0.` : `The largest root has size exactly 1, so the terms neither explode nor vanish${S.kind === 'complex' ? ': they cycle around' : ''}.`;
+            const growth = growthText(S);
             steps.innerHTML = String.raw`
               <div><div class="lbl">1 · Recurrence</div>\(a_n = ${combo([[c1, 'a_{n-1}'], [c2, 'a_{n-2}']])},\ a_0 = ${tn(a0)},\ a_1 = ${tn(a1)}\)</div>
               <div><div class="lbl">2 · Characteristic equation</div>\(r^2 ${c1 === 0 ? '' : (c1 > 0 ? '- ' : '+ ') + (Math.abs(c1) === 1 ? '' : tn(Math.abs(c1))) + 'r'} ${c2 > 0 ? '-' : '+'} ${tn(Math.abs(c2))} = 0\)</div>
-              <div><div class="lbl">3 · Discriminant</div>\(\Delta = c_1^2 + 4c_2 = ${tn(S.D)}\): ${kindText}.</div>
+              <div><div class="lbl">3 · Discriminant</div>\(\Delta = c_1^2 + 4c_2 = ${S.Dtex}\): ${kindText}.</div>
               <div><div class="lbl">4 · Roots</div>\(${S.rootsTex}\)</div>
               <div><div class="lbl">5 · Constants from \(a_0, a_1\)</div>\(${S.consTex}\)<br>\(${S.solTex}\)</div>
               <div><div class="lbl">6 · Closed form</div>\(${S.formTex}\)</div>
               <p class="small muted">${growth}</p>
-              <p class="small" style="margin-top:auto"><b>Try this.</b> Change only \(a_0\) or \(a_1\). The roots stay put and only the constants change: the rule fixes the <i>shape</i> of the solution, and the initial conditions fix its <i>size</i>.</p>`;
+              <p class="small" style="margin-top:auto"><b>Try this.</b> Change only \(a_0\) or \(a_1\). The roots stay put, but a constant can become zero. Initial conditions determine which root terms appear and can change the sequence's growth.</p>`;
             ctx.tex(steps);
             const it = [a0, a1];
             for (let n = 2; n <= 10; n++) it.push(c1 * it[n - 1] + c2 * it[n - 2]);
@@ -547,7 +614,7 @@
               h('table.tt.rc-table', h('thead', h('tr', h('th', 'n'), h('th', 'from rule'), h('th', 'closed form'), h('th', 'ratio'))),
                 h('tbody', it.map((x, n) => h('tr', h('td', String(n)), h('td.mono', fmt(x)), h('td.mono', { class: near(x, S.f(n)) ? 'ok' : 'bad' }, fmt(S.f(n))), h('td.mono.muted', n > 0 && it[n - 1] !== 0 ? fmt(x / it[n - 1]) : '–'))))),
               h('div.feedback', { class: allOk ? 'good' : 'bad', style: { fontSize: '0.8rem' } }, allOk ? 'The closed form matches the rule on every row (up to rounding).' : 'Mismatch: check the inputs.'),
-              h('p.tiny.muted', 'The ratio column divides each term by the one before it. When one root is largest in size, the ratio settles near that root.'));
+              h('p.tiny.muted', 'The ratio column divides each term by the one before it; a zero denominator has no ratio. A unique dominant root with a nonzero contribution controls the limiting ratio.'));
           }
           draw();
         },

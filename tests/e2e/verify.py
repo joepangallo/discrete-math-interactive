@@ -29,7 +29,8 @@ ap.add_argument("--python", action="store_true", help="run every code walkthroug
 ap.add_argument("--trace", action="store_true", help="also exercise Trace mode on code slides")
 ap.add_argument("--shots", default="", help="directory for one screenshot per slide")
 ap.add_argument("--viewport", default="1280x720")
-ap.add_argument("--mobile", action="store_true", help="also check phone width for horizontal overflow")
+ap.add_argument("--mobile", action="store_true", help="also check every slide and its controls at phone width")
+ap.add_argument("--mobile-only", action="store_true", help="run only generator checks and the complete mobile layout checks")
 ap.add_argument("--dark", action="store_true")
 ap.add_argument("--query", default="", help="extra query string, e.g. py=brython")
 args = ap.parse_args()
@@ -117,7 +118,7 @@ with sync_playwright() as p:
         current["slide"] = "generators"
         err(b)
 
-    for s in slides:
+    for s in ([] if args.mobile_only else slides):
         current["slide"] = s["key"]
         page.evaluate("(k) => { location.hash = k; }", s["key"])
         page.wait_for_function("(k) => document.querySelector('.slide:not([hidden])')?.dataset.key === k", arg=s["key"], timeout=5000)
@@ -256,16 +257,66 @@ with sync_playwright() as p:
                     err(f"quiz question {i + 1}: no feedback")
                 overflow_check(f"quiz question {i + 1} answered")
 
-    if args.mobile:
+    if args.mobile or args.mobile_only:
         current["slide"] = "mobile"
         page.set_viewport_size({"width": 390, "height": 844})
-        for s in slides[:: max(1, len(slides) // 25)]:
+        page.emulate_media(reduced_motion="reduce")
+        page.evaluate("document.fonts.ready")
+
+        def mobile_check(label):
+            issues = page.evaluate("""() => {
+                const sl = document.querySelector('.slide:not([hidden])');
+                const problems = [];
+                for (const el of [document.documentElement, document.querySelector('.stage'), sl]) {
+                  const over = el.scrollWidth - el.clientWidth;
+                  if (over > 3) problems.push(`${el.className || el.tagName}: horizontal overflow +${over}px`);
+                }
+                // A wide table/code panel may scroll locally. Offscreen controls
+                // must have such a scroll container, not an ancestor that clips them.
+                for (const el of sl.querySelectorAll('button, input, select, textarea, [role=button], [role=link]')) {
+                  const r = el.getBoundingClientRect();
+                  if (!r.width || !r.height || (r.left >= -2 && r.right <= innerWidth + 2)) continue;
+                  let scrollable = false;
+                  for (let p = el.parentElement; p && p !== sl; p = p.parentElement) {
+                    if (/^(auto|scroll)$/.test(getComputedStyle(p).overflowX) && p.scrollWidth > p.clientWidth + 3) {
+                      const pr = p.getBoundingClientRect();
+                      scrollable = pr.left >= -2 && pr.right <= innerWidth + 2;
+                      break;
+                    }
+                  }
+                  if (!scrollable) problems.push(`unreachable control: ${(el.getAttribute('aria-label') || el.textContent || el.tagName).slice(0, 80)}`);
+                }
+                return [...new Set(problems)];
+            }""")
+            for issue in issues:
+                err(f"{label}: {issue}")
+
+        for s in slides:
             current["slide"] = "mobile " + s["key"]
-            page.evaluate("(k) => { location.hash = k; }", s["key"])
-            page.wait_for_timeout(200)
-            wide = page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
-            if wide > 1:
-                err(f"page scrolls horizontally by {wide}px at phone width")
+            page.evaluate("(k) => DM.goTo(k, {instant: true})", s["key"])
+            page.wait_for_timeout(30)
+            mobile_check("initial")
+            selector = {"practice": ".pr-types button", "design": ".dp-list button", "quiz": ".qz-dots button"}.get(s["kind"])
+            if selector:
+                n = page.locator(".slide:not([hidden]) " + selector).count()
+                for i in range(n):
+                    page.evaluate("([selector, i]) => document.querySelector('.slide:not([hidden])').querySelectorAll(selector)[i].click()", [selector, i])
+                    if s["kind"] == "practice":
+                        page.evaluate("document.querySelector('.slide:not([hidden]) .pr-solution').hidden = false")
+                    elif s["kind"] == "quiz":
+                        page.evaluate("document.querySelector('.slide:not([hidden]) .qz-choices button').click()")
+                    mobile_check(f"{s['kind']} item {i + 1}")
+
+        # Regression: the rightmost qualifications used to be clipped by the stage.
+        if any(s["key"] == "networks-8" for s in slides):
+            current["slide"] = "mobile networks-8"
+            page.evaluate("DM.goTo('networks-8', {instant: true})")
+            for job in ("Deploy", "Clean"):
+                button = page.get_by_role("button", name=f"Ava qualified for {job}", exact=True)
+                before = button.get_attribute("aria-pressed")
+                button.click(timeout=5000)
+                if button.get_attribute("aria-pressed") == before:
+                    err(f"qualification control for {job} did not toggle")
 
     browser.close()
 srv.shutdown()

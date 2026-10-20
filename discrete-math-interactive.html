@@ -509,7 +509,21 @@ dialog .dlg-body { padding: 0.8rem 1rem 1rem; overflow: auto; max-height: calc(m
   .stage { overflow-y: auto; }
   .slide { position: relative; inset: auto; min-height: 100%; overflow: visible; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .slide-head h2 { font-size: 1.4rem; }
-  .split, .split-wide, .split-narrow, .cols-3, .cols-4, .cw, .dp, .pr, .qz, .dp-compare { grid-template-columns: minmax(0, 1fr); }
+  /* Module layouts include inline column widths. Stack those panels too; keep
+     small control grids (bits, matrices, sliders) in their original layout. */
+  body:not(.print-mode) :is(.split, .split-wide, .split-narrow, .cols, .cols-3, .cols-4,
+    .cw, .dp, .pr, .qz, .dp-compare, .m4-relgrid, .m4-db-grid, .nt-sieve, .nt-euclid,
+    .nt-clock, .nt-rsa, .ct-arr, .ct-pas, .ct-bin, .ct-ph, .rc-lab, .gr-lab,
+    .tr-grid, .nf-lab, .nf-seg) { grid-template-columns: minmax(0, 1fr) !important; }
+  body:not(.print-mode) .slide-body { overflow-wrap: anywhere; }
+  body:not(.print-mode) .slide-body table { display: block; max-width: 100%; overflow-x: auto; }
+  body:not(.print-mode) .slide-body .tex { display: inline-block; max-width: 100%; overflow-x: auto; vertical-align: middle; }
+  body:not(.print-mode) .slide-body :not(pre) > code:not(.cw code) { white-space: normal; }
+  body:not(.print-mode) .slide-body .btn { white-space: normal; max-width: 100%; }
+  body:not(.print-mode) .slide-body .row { flex-wrap: wrap !important; }
+  body:not(.print-mode) .slide-body .seg { flex-wrap: wrap; }
+  body:not(.print-mode) .slide-body .m5-cells { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  body:not(.print-mode) .nf-fig > svg { flex: none; height: auto; }
   .cw-main { min-height: 22rem; }
   .crumbs, .brand .full { display: none; }
   .tools .lbl { display: none; }
@@ -831,9 +845,10 @@ def __dm_trace(src, limit=700):
     buf = __dm_StringIO()
     steps = []
     err = None
+    limit_reached = False
     g = {'__name__': '__main__'}
     skip = (types.ModuleType, types.FunctionType, type, types.BuiltinFunctionType)
-    class _Limit(Exception):
+    class _Limit(BaseException):
         pass
     def snap(frame):
         d = {}
@@ -851,11 +866,13 @@ def __dm_trace(src, limit=700):
             f = f.f_back
         return n
     def tracer(frame, event, arg):
+        nonlocal limit_reached
         if frame.f_code.co_filename != '<lesson>':
             return None
         if event in ('line', 'return'):
             if len(steps) >= limit:
-                raise _Limit('Stopped after %d steps' % limit)
+                limit_reached = True
+                raise _Limit()
             st = {'line': frame.f_lineno, 'ev': event, 'fn': frame.f_code.co_name,
                   'vars': snap(frame), 'out': buf.getvalue(), 'depth': depth(frame)}
             if event == 'return':
@@ -870,10 +887,18 @@ def __dm_trace(src, limit=700):
                 exec(code, g)
             finally:
                 __dm_settrace(None)
-    except _Limit as e:
-        err = {'type': 'StepLimit', 'msg': str(e), 'line': None}
+    except _Limit:
+        pass
     except BaseException as e:
         err = __dm_err(e)
+    # A student can catch even BaseException. Keep the incomplete-trace warning
+    # independently of the exception, including any error raised afterward.
+    if limit_reached:
+        msg = 'Stopped recording after %d steps. The trace is incomplete.' % limit
+        if err is not None:
+            where = ' (line %s)' % err['line'] if err['line'] is not None else ''
+            msg += '\nProgram error after tracing stopped: %s%s: %s' % (err['type'], where, err['msg'])
+        err = {'type': 'StepLimit', 'msg': msg, 'line': None}
     return __dm_dumps({'out': buf.getvalue(), 'err': err, 'steps': steps})
 `;
 
@@ -1022,14 +1047,14 @@ onmessage = (e) => {
           if (!p) return;
           this.pending.delete(d.id);
           clearTimeout(p.timer);
-          if (!d.ok) { p.reject(new Error(d.error)); return; }
           let res;
           try {
+            if (!d.ok) throw new Error(d.error || 'Python could not report the result');
             res = JSON.parse(d.result);
             if (!validResult(res)) throw new Error('unexpected result');
           } catch {
             this._kill();
-            p.resolve({ out: '', err: { type: 'Restarted', msg: 'The program changed Python in a way this page cannot read back, so Python was restarted. Run it again.', line: null }, steps: [] });
+            p.resolve({ out: '', err: { type: 'Restarted', msg: 'Python could not report this program\'s result. Its session was reset; the next run will start fresh.', line: null }, steps: [] });
             return;
           }
           p.resolve(res);
@@ -1275,8 +1300,11 @@ onmessage = (e) => {
       const li = $(`.cw-lines li[data-i="${st.line - 1}"]`, view);
       if (li) li.scrollIntoView({ block: 'nearest' });
       const where = st.fn === '<module>' ? 'top level' : `inside ${st.fn}()`;
+      const atEnd = i === steps.length - 1;
+      const incomplete = trace.res.err?.type === 'StepLimit';
       let headline;
-      if (st.ev === 'return') headline = st.fn === '<module>' ? 'The program has finished.' : `${st.fn}() returns ${st.ret}`;
+      if (atEnd && incomplete) headline = 'Last recorded step; tracing reached its limit. Later execution is not shown.';
+      else if (st.ev === 'return') headline = st.fn === '<module>' ? 'The program has finished.' : `${st.fn}() returns ${st.ret}`;
       else headline = `Line ${st.line} is about to run (${where}).`;
       const rows = Object.entries(st.vars);
       const prevVars = prev && prev.depth === st.depth && prev.fn === st.fn ? prev.vars : {};
@@ -1284,8 +1312,10 @@ onmessage = (e) => {
       const lineIdx = st.line - 1;
       const exHtml = src[lineIdx] && src[lineIdx].code === codeLines()[lineIdx] ? lineEx(lineIdx) : '<p class="muted">This line differs from the original, so there is no prepared note for it.</p>';
       const slider = h('input', { type: 'range', min: 0, max: steps.length - 1, value: i, 'aria-label': 'Trace step', oninput: (e) => { stopPlay(); trace.i = +e.target.value; drawTraceStep(); } });
-      const outSoFar = st.out ? `<span class="dim">Output so far:</span>\n${esc(st.out)}` : '<span class="dim">Nothing printed yet.</span>';
-      out.innerHTML = outSoFar + (i === steps.length - 1 && trace.res.err ? `\n<span class="err">${esc(trace.res.err.type)}: ${esc(trace.res.err.msg)}</span>` : '');
+      const captured = atEnd ? trace.res.out : st.out;
+      const outputLabel = atEnd ? 'Final captured output:' : 'Output so far:';
+      const outSoFar = captured ? `<span class="dim">${outputLabel}</span>\n${esc(captured)}` : `<span class="dim">${atEnd ? 'Nothing printed.' : 'Nothing printed yet.'}</span>`;
+      out.innerHTML = outSoFar + ((atEnd || incomplete) && trace.res.err ? `\n<span class="err">${esc(trace.res.err.type)}: ${esc(trace.res.err.msg)}</span>` : '');
       rc(explain,
         h('div.where', h('span', `Step ${i + 1} of ${steps.length}`), h('span', where)),
         h('p', { style: { fontWeight: 600 } }, headline),
@@ -3985,6 +4015,44 @@ DM.module({
   const range = (a, b, step = 1) => { const out = []; for (let x = a; x <= b; x += step) out.push(x); return out; };
   const factorText = (v) => { const f = smallestFactor(v); return f === v ? `${v}, prime` : `${v} = ${f} × ${v / f}`; };
 
+  // Exact rational arithmetic keeps rounding from inventing counterexamples. Bound every
+  // intermediate, including powers, so a custom expression cannot stall the lesson.
+  const ARITH_BITS = 4096;
+  const arithLimit = 1n << BigInt(ARITH_BITS);
+  const absInt = (n) => (n < 0n ? -n : n);
+  function rational(p, q = 1n) {
+    if (q === 0n) throw new Error('division by zero is undefined');
+    if (q < 0n) { p = -p; q = -q; }
+    if (absInt(p) >= arithLimit || q >= arithLimit) throw new Error('an intermediate exceeds the exact-arithmetic limit');
+    let a = absInt(p), b = q;
+    while (b) [a, b] = [b, a % b];
+    return { p: p / a, q: q / a };
+  }
+  function arith(op, a, b) {
+    if (op === '+') return rational(a.p * b.q + b.p * a.q, a.q * b.q);
+    if (op === '-') return rational(a.p * b.q - b.p * a.q, a.q * b.q);
+    if (op === '*') return rational(a.p * b.p, a.q * b.q);
+    if (op === '/') return rational(a.p * b.q, a.q * b.p);
+    if (op === '%') {
+      if (b.p === 0n) throw new Error('remainder modulo zero is undefined');
+      const quotient = (a.p * b.q) / (a.q * b.p);
+      return rational(a.p * b.q - quotient * b.p * a.q, a.q * b.q);
+    }
+    if (b.q !== 1n) throw new Error('fractional powers cannot be checked exactly here; use a whole-number exponent');
+    const e = absInt(b.p);
+    const bits = Math.max(absInt(a.p).toString(2).length, a.q.toString(2).length);
+    if (e > BigInt(ARITH_BITS) || BigInt(bits) * e > BigInt(ARITH_BITS)) throw new Error('a power exceeds the exact-arithmetic limit');
+    return b.p < 0n ? rational(a.q ** e, a.p ** e) : rational(a.p ** e, a.q ** e);
+  }
+  const arithText = (v) => v.q === 1n ? String(v.p) : `${v.p}/${v.q}`;
+  function squareRoot(n) {
+    if (n < 2n) return n;
+    let x = 1n << BigInt(Math.ceil(n.toString(2).length / 2));
+    let next = (x + n / x) / 2n;
+    while (next < x) { x = next; next = (x + n / x) / 2n; }
+    return x;
+  }
+
   // arithmetic in n for the "your own claim" box: + − * / % ^, parentheses, and 2n for 2 * n
   function parseArith(src) {
     const s = String(src).replace(/\*\*/g, '^').replace(/×/g, '*').replace(/−/g, '-').replace(/²/g, '^2').replace(/³/g, '^3');
@@ -4005,21 +4073,24 @@ DM.module({
     let k = 0;
     function expr() {
       let f = term();
-      while (t[k] === '+' || t[k] === '-') { const op = t[k++]; const a = f, b = term(); f = op === '+' ? (n) => a(n) + b(n) : (n) => a(n) - b(n); }
+      while (t[k] === '+' || t[k] === '-') { const op = t[k++]; const a = f, b = term(); f = (n) => arith(op, a(n), b(n)); }
       return f;
     }
     function term() {
       let f = unary();
-      while (t[k] === '*' || t[k] === '/' || t[k] === '%') { const op = t[k++]; const a = f, b = unary(); f = op === '*' ? (n) => a(n) * b(n) : op === '/' ? (n) => a(n) / b(n) : (n) => a(n) % b(n); }
+      while (t[k] === '*' || t[k] === '/' || t[k] === '%') { const op = t[k++]; const a = f, b = unary(); f = (n) => arith(op, a(n), b(n)); }
       return f;
     }
-    function unary() { if (t[k] === '-') { k++; const f = unary(); return (n) => -f(n); } return power(); }
-    function power() { const b = atom(); if (t[k] === '^') { k++; const e = unary(); return (n) => b(n) ** e(n); } return b; }
+    function unary() { if (t[k] === '-') { k++; const f = unary(); return (n) => { const v = f(n); return { p: -v.p, q: v.q }; }; } return power(); }
+    function power() { const b = atom(); if (t[k] === '^') { k++; const e = unary(); return (n) => arith('^', b(n), e(n)); } return b; }
     function atom() {
       const tok = t[k++];
       if (tok === '(') { const f = expr(); if (t[k++] !== ')') throw new Error('A "(" is missing its ")".'); return f; }
-      if (tok === 'n') return (n) => n;
-      if (/^\d+$/.test(tok || '')) { const c = Number(tok); return () => c; }
+      if (tok === 'n') return (n) => rational(BigInt(n));
+      if (/^\d+$/.test(tok || '')) return () => {
+        if (tok.length > 1234) throw new Error('a number exceeds the exact-arithmetic limit');
+        return rational(BigInt(tok));
+      };
       throw new Error(tok ? `Unexpected "${tok}".` : 'The expression ends too early.');
     }
     const f = expr();
@@ -4150,11 +4221,20 @@ DM.module({
       lesson: 'Make up a pattern and try to break it. A single red square is a disproof; any number of green squares is only evidence.' },
   ];
   const PROPS = {
-    'is prime': (v) => (Math.abs(v) > 1e10 ? null : { ok: isPrime(v), text: Number.isInteger(v) && v >= 2 ? factorText(v) : `${v}, not prime` }),
-    'is odd': (v) => ({ ok: Number.isInteger(v) && Math.abs(v % 2) === 1, text: `${v}` }),
-    'is even': (v) => ({ ok: Number.isInteger(v) && v % 2 === 0, text: `${v}` }),
-    'is a perfect square': (v) => ({ ok: v >= 0 && Number.isInteger(Math.sqrt(v)), text: v >= 0 && Number.isInteger(Math.sqrt(v)) ? `${v} = ${Math.sqrt(v)}²` : `${v}` }),
-    'is positive': (v) => ({ ok: v > 0, text: `${v}` }),
+    'is prime': (v) => {
+      if (v.q !== 1n || v.p < 2n) return { ok: false, text: `${arithText(v)}, not prime` };
+      if (v.p > 10000000000n) return null;
+      const n = Number(v.p);
+      return { ok: isPrime(n), text: factorText(n) };
+    },
+    'is odd': (v) => ({ ok: v.q === 1n && absInt(v.p % 2n) === 1n, text: arithText(v) }),
+    'is even': (v) => ({ ok: v.q === 1n && v.p % 2n === 0n, text: arithText(v) }),
+    'is a perfect square': (v) => {
+      const root = v.q === 1n && v.p >= 0n ? squareRoot(v.p) : null;
+      const ok = root !== null && root * root === v.p;
+      return { ok, text: ok ? `${v.p} = ${root}²` : arithText(v) };
+    },
+    'is positive': (v) => ({ ok: v.p > 0n, text: arithText(v) }),
   };
 
   // ---- practice data ----
@@ -4557,7 +4637,12 @@ DM.module({
             if (C.custom) {
               try {
                 const f = parseArith(fsrc);
-                test = (n) => { const v = f(n); if (!Number.isFinite(v)) return { ok: null, text: `n = ${n}: f(n) is undefined` }; const r = PROPS[prop](v); return r ? { ok: r.ok, text: `n = ${n}: f(${n}) = ${r.text}` } : { ok: null, text: `n = ${n}: f(${n}) = ${v} is too large to test here` }; };
+                test = (n) => {
+                  try {
+                    const v = f(n), r = PROPS[prop](v);
+                    return r ? { ok: r.ok, text: `n = ${n}: f(${n}) = ${r.text}` } : { ok: null, text: `n = ${n}: f(${n}) = ${arithText(v)} is too large to test for primality here` };
+                  } catch (e) { return { ok: null, text: `n = ${n}: not tested — ${e.message}` }; }
+                };
               } catch (e) { err = e.message; }
             }
             if (err) { ctx.rc(summary, h('div.feedback.bad', err)); ctx.rc(figure); detail.textContent = ''; lesson.innerHTML = C.lesson; return; }
@@ -4585,9 +4670,9 @@ DM.module({
             const sel = res.find((r) => r.n === pick);
             detail.innerHTML = sel ? `<b class="${sel.ok === true ? 'ok' : sel.ok === false ? 'bad' : 'muted'}">${sel.ok === true ? '✓' : sel.ok === false ? '✗' : '?'}</b> ${ctx.esc(sel.text)}` : '';
             ctx.rc(summary,
-              h('div', h('span.pf-badge', { class: fails.length ? 'f' : 't' }, fails.length ? 'disproved' : 'no counterexample yet')),
-              h('div.small', { html: `Tested <b>${res.length}</b> values: <b class="ok">${passes}</b> hold${fails.length ? `, <b class="bad">${fails.length}</b> fail` : ''}${skipped ? `, ${skipped} could not be tested` : ''}.` }),
-              h('div.small', { html: fails.length ? `First counterexample: <b class="mono">${ctx.esc(fails[0].text)}</b>. One is enough to make the "for all" claim false.` : 'Every tested case holds. That is evidence, and only a proof can rule out a failure at the very next value.' }));
+              h('div', h('span.pf-badge', { class: fails.length ? 'f' : skipped ? 'n' : 't' }, fails.length ? 'disproved' : skipped ? 'incomplete check' : 'no counterexample yet')),
+              h('div.small', { html: `Checked <b>${passes + fails.length}</b> of <b>${res.length}</b> values: <b class="ok">${passes}</b> hold${fails.length ? `, <b class="bad">${fails.length}</b> fail` : ''}${skipped ? `, ${skipped} could not be tested` : ''}.` }),
+              h('div.small', { html: fails.length ? `First counterexample: <b class="mono">${ctx.esc(fails[0].text)}</b>. One is enough to make the "for all" claim false.` : skipped ? 'Some cases could not be checked exactly here. They provide no evidence for or against the claim.' : 'Every tested case holds. That is evidence, and only a proof can rule out a failure at the very next value.' }));
             lesson.innerHTML = C.lesson;
           }
           draw();
@@ -5911,7 +5996,7 @@ DM.module({
           const mid = h('div.stack', { style: { gap: '0.45rem', minHeight: 0 } });
           const right = h('div.stack', { style: { gap: '0.4rem', minHeight: 0 } });
           body.append(h('div.m4-db.stack.fill', { style: { minHeight: 0, gap: '0.55rem' } }, ctl,
-            h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.05fr)', gap: '0.9rem', minHeight: 0, alignItems: 'start' } }, left, mid, right)));
+            h('div.m4-db-grid', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.05fr)', gap: '0.9rem', minHeight: 0, alignItems: 'start' } }, left, mid, right)));
           const lit = (v, lang) => (typeof v === 'number' ? String(v) : lang === 'tex' ? `\\text{'${v}'}` : `'${v}'`);
           const cmp = (a, op, b) => (op === '=' ? a === b : op === '≠' ? a !== b : op === '<' ? a < b : a > b);
           function draw() {
@@ -9310,13 +9395,13 @@ bsearch(s, i, j, key) {     // search s[i..j]
   /** plain-text number: integers exact, others to 4 decimals, huge values in exponent form */
   function fmt(x) {
     if (!Number.isFinite(x)) return x > 0 ? '∞' : x < 0 ? '−∞' : '?';
-    if (Math.abs(x) >= 1e9) return x.toExponential(3).replace('-', '−');
+    if (Math.abs(x) >= 1e9 || (x !== 0 && Math.abs(x) < 1e-4)) return x.toExponential(3).replace('-', '−');
     if (isInt(x)) return (Math.round(x) || 0).toLocaleString('en-US').replace('-', '−');
     return String(+x.toFixed(4) || 0).replace('-', '−');
   }
   /** TeX number: same rules, ASCII minus */
   function tn(x) {
-    if (Math.abs(x) >= 1e9) { const [m, e] = x.toExponential(3).split('e'); return `${m} \\times 10^{${+e}}`; }
+    if (Math.abs(x) >= 1e9 || (x !== 0 && Math.abs(x) < 1e-4)) { const [m, e] = x.toExponential(3).split('e'); return `${m} \\times 10^{${+e}}`; }
     if (isInt(x)) return String(Math.round(x) || 0);
     return String(+x.toFixed(4) || 0);
   }
@@ -9335,6 +9420,58 @@ bsearch(s, i, j, key) {     // search s[i..j]
   const fibs = [0, 1];
   while (fibs.length < 60) fibs.push(fibs[fibs.length - 1] + fibs[fibs.length - 2]);
   const pow2s = (x) => ({ 0: '1', 0.5: '√n', 1: 'n', 1.5: 'n√n', 2: 'n²', 3: 'n³', 4: 'n⁴' })[x];
+
+  // Compare the entered decimal values exactly before using floating-point roots.
+  // An epsilon would erase deliberately small nonzero contributions as well as noise.
+  function decimalIntegers(values) {
+    const parts = values.map((v) => {
+      const [mantissa, exponent = '0'] = String(v).split('e');
+      const places = (mantissa.split('.')[1] || '').length - Number(exponent);
+      return { value: BigInt(mantissa.replace('.', '')), places };
+    });
+    const places = Math.max(0, ...parts.map((p) => p.places));
+    return { scale: 10n ** BigInt(places), places, values: parts.map((p) => p.value * 10n ** BigInt(places - p.places)) };
+  }
+  function integerRatio(p, q) {
+    if (p === 0n) return 0;
+    const sign = (p < 0n) !== (q < 0n) ? -1 : 1;
+    const a = String(p < 0n ? -p : p), b = String(q < 0n ? -q : q);
+    const mantissa = sign * Number(`${a[0]}.${a.slice(1, 16)}`) / Number(`${b[0]}.${b.slice(1, 16)}`);
+    return Number(`${mantissa}e${a.length - b.length}`);
+  }
+  function decimalSqrt(p, places) {
+    const digits = String(p), leading = digits.slice(0, 16);
+    let mantissa = Number(leading) / 10 ** (leading.length - 1);
+    let exponent = digits.length - 1 - places;
+    if (exponent % 2 !== 0) { mantissa *= 10; exponent--; }
+    return Number(`${Math.sqrt(mantissa)}e${exponent / 2}`);
+  }
+
+  // Growth belongs to the solved sequence: a root with coefficient zero contributes
+  // nothing, and a repeated root can contribute an extra factor of n.
+  function growthText(S) {
+    const contributes = S.active || [S.b !== 0, S.d !== 0];
+    if (!contributes.some(Boolean)) return 'Both constants are 0, so every term is 0. The ratio of consecutive terms is undefined.';
+    if (S.kind === 'complex') {
+      const rho = S.rho;
+      const trend = rho < 1 ? 'The oscillations shrink toward 0.' : rho > 1 ? `The oscillation envelope grows like ${fmt(rho)}ⁿ; individual terms can still be small or zero.` : 'The terms stay bounded and oscillate; they need not repeat periodically.';
+      return `${trend} Both complex roots have the same magnitude, so consecutive-term ratios need not converge.`;
+    }
+    if (S.kind === 'repeated' && contributes[1]) {
+      const r = S.roots[0][0], rho = Math.abs(r);
+      const trend = rho < 1 ? 'The terms still shrink toward 0: exponential decay outweighs the factor n.' : rho > 1 ? `Their magnitude grows on the scale n · ${fmt(rho)}ⁿ.` : 'Their magnitude grows linearly, even though the root has magnitude 1.';
+      return `The repeated root contributes a nonzero n · rⁿ term. ${trend}${r < 0 ? ' The signs eventually alternate.' : ''} The ratio approaches ${fmt(r)}.`;
+    }
+    const active = S.roots.map(([r], i) => ({ r, present: contributes[i] })).filter((x) => x.present).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+    const r = active[0].r, rho = Math.abs(r);
+    const inactive = S.roots.length > active.length ? 'A root with coefficient 0 contributes nothing to this sequence. ' : '';
+    if (active.length === 2 && Math.abs(active[1].r) === rho) {
+      const trend = rho < 1 ? 'Both terms shrink toward 0.' : rho > 1 ? `The terms have an envelope proportional to ${fmt(rho)}ⁿ; cancellation can make one parity of terms zero.` : 'The sequence is bounded: even-index terms have one value and odd-index terms have another.';
+      return `${trend} The active roots have equal magnitudes and opposite signs, so consecutive-term ratios need not converge.`;
+    }
+    const trend = rho < 1 ? 'The terms shrink toward 0.' : rho > 1 ? `Their magnitude eventually grows by a factor approaching ${fmt(rho)} per step.` : r > 0 ? 'The terms approach a nonzero constant.' : 'The terms approach an alternating pair of nonzero values.';
+    return `${inactive}The dominant active root is ${fmt(r)}. ${trend}${r < 0 && rho !== 1 ? ' The signs eventually alternate.' : ''} The ratio approaches ${fmt(r)}.`;
+  }
 
   DM.module({
     id: 'recurrences',
@@ -9743,7 +9880,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
       {
         title: 'Lab: characteristic-equation solver',
         kind: 'lab',
-        html: String.raw`<p class="muted small">Enter the coefficients and initial conditions of \(a_n = c_1 a_{n-1} + c_2 a_{n-2}\), or pick a preset. The lab solves the characteristic equation, finds the constants, and checks the closed form against the recurrence term by term. The plot shows the roots: a root outside the dashed unit circle makes the sequence grow.</p>`,
+        html: String.raw`<p class="muted small">Enter the coefficients and initial conditions of \(a_n = c_1 a_{n-1} + c_2 a_{n-2}\), or pick a preset. The lab solves the characteristic equation, finds the constants, and checks the closed form against the recurrence term by term. A root outside the dashed unit circle contributes exponential growth only when its term has a nonzero coefficient.</p>`,
         render(body, ctx) {
           const { h, s, rc } = ctx;
           const presets = [
@@ -9770,32 +9907,48 @@ bsearch(s, i, j, key) {     // search s[i..j]
           const num = (t) => { const x = Number(String(t).trim().replace('−', '-')); return String(t).trim() === '' ? NaN : x; };
           const base = (r) => (r < 0 || !isInt(r) ? `(${tn(r)})` : tn(r));
           function solve(c1, c2, a0, a1) {
-            const D = c1 * c1 + 4 * c2;
-            if (Math.abs(D) < 1e-12) {
-              const r = c1 / 2, b = a0, d = a1 / r - a0;
-              return { kind: 'repeated', D, roots: [[r, 0]], b, d, f: (n) => (b + d * n) * r ** n,
+            const exact = decimalIntegers([c1, c2, a0, a1]);
+            const [C1, C2, A0, A1] = exact.values, scale = exact.scale;
+            const discriminant = C1 * C1 + 4n * C2 * scale;
+            const D = Number(`${discriminant}e-${2 * exact.places}`);
+            const digits = String(discriminant < 0n ? -discriminant : discriminant);
+            const Dtex = D === 0 && discriminant !== 0n ? `${discriminant < 0n ? '-' : ''}${digits[0]}.${digits.slice(1, 5)} \\times 10^{${digits.length - 1 - 2 * exact.places}}` : tn(D);
+            if (discriminant === 0n) {
+              const numerator = 2n * A1 * scale - A0 * C1;
+              const r = c1 / 2, b = a0, d = integerRatio(numerator, C1 * scale);
+              return { kind: 'repeated', D, Dtex, roots: [[r, 0]], b, d, active: [A0 !== 0n, numerator !== 0n], f: (n) => (b + d * n) * r ** n,
                 rootsTex: String.raw`r = \frac{c_1}{2} = ${tn(r)}\ \text{(twice)}`,
                 consTex: String.raw`n=0:\ b = ${tn(a0)} \qquad n=1:\ ${tn(r)}b + ${tn(r)}d = ${tn(a1)}`,
                 solTex: String.raw`b = ${tn(b)},\quad d = ${tn(d)}`,
-                formTex: String.raw`a_n = \left(${combo([[+tn(b), ''], [+tn(d), 'n']])}\right) \cdot ${base(r)}^n` };
+                formTex: String.raw`a_n = \left(${tn(b)} ${d < 0 ? '-' : '+'} ${tn(Math.abs(d))}n\right) \cdot ${base(r)}^n` };
             }
-            if (D > 0) {
-              const sq = Math.sqrt(D), r1 = (c1 + sq) / 2, r2 = (c1 - sq) / 2;
-              const d = (a1 - a0 * r1) / (r2 - r1), b = a0 - d;
+            if (discriminant > 0n) {
+              const sq = decimalSqrt(discriminant, 2 * exact.places);
+              let r1 = (c1 + sq) / 2, r2 = (c1 - sq) / 2;
+              if (c1 >= 0 && Math.abs(c1 - sq) < Math.max(c1, sq) / 2) r2 = -c2 / r1;
+              else if (c1 < 0 && Math.abs(c1 + sq) < Math.max(-c1, sq) / 2) r1 = -c2 / r2;
+              let b = (a1 - a0 * r2) / sq, d = (a0 * r1 - a1) / sq, active = [true, true];
+              if (A0 === 0n && A1 === 0n) { b = 0; d = 0; active = [false, false]; }
+              else if (A0 !== 0n && A1 * A1 * scale - C1 * A0 * A1 - C2 * A0 * A0 === 0n) {
+                const onlyRoot = integerRatio(A1, A0);
+                if ((2n * A1 * scale - C1 * A0) * A0 > 0n) { r1 = onlyRoot; b = a0; d = 0; active = [true, false]; }
+                else { r2 = onlyRoot; b = 0; d = a0; active = [false, true]; }
+              }
               const fib = c1 === 1 && c2 === 1 && a0 === 0 && a1 === 1;
-              return { kind: 'distinct', D, roots: [[r1, 0], [r2, 0]], b, d, f: (n) => b * r1 ** n + d * r2 ** n,
+              return { kind: 'distinct', D, Dtex, roots: [[r1, 0], [r2, 0]], b, d, active, f: (n) => b * r1 ** n + d * r2 ** n,
                 rootsTex: String.raw`r_1 = \tfrac{c_1 + \sqrt{\Delta}}{2} = ${tn(r1)},\quad r_2 = \tfrac{c_1 - \sqrt{\Delta}}{2} = ${tn(r2)}`,
                 consTex: String.raw`b + d = ${tn(a0)}, \qquad ${tn(r1)}\,b ${r2 < 0 ? '-' : '+'} ${tn(Math.abs(r2))}\,d = ${tn(a1)}`,
                 solTex: String.raw`b = ${tn(b)},\quad d = ${tn(d)}`,
                 formTex: String.raw`a_n = ${tn(b)} \cdot ${base(r1)}^n ${d < 0 ? '-' : '+'} ${tn(Math.abs(d))} \cdot ${base(r2)}^n` + (fib ? String.raw`\;=\; \tfrac{\varphi^n - \psi^n}{\sqrt5}` : '') };
             }
-            const rho = Math.sqrt(-c2), th = Math.acos(Math.max(-1, Math.min(1, c1 / (2 * rho))));
-            const al = a0, be = (a1 / rho - al * Math.cos(th)) / Math.sin(th);
+            const real = c1 / 2, imaginary = decimalSqrt(-discriminant, 2 * exact.places) / 2;
+            const rho = decimalSqrt(-C2, exact.places), th = Math.atan2(imaginary, real);
+            const al = a0, be = integerRatio(2n * A1 * scale - A0 * C1, 2n * scale * scale) / imaginary;
             const rho1 = near(rho, 1);
             const cf = (x) => (near(x, 1) ? '' : near(x, -1) ? '-' : tn(x) + '\\ ');
             let thTex = tn(th);
             for (let q = 1; q <= 12; q++) { const p = (th / Math.PI) * q; if (isInt(p) && Math.round(p) > 0) { thTex += String.raw` = \tfrac{${Math.round(p) === 1 ? '' : Math.round(p)}\pi}{${q}}`.replace(/\\tfrac\{(\d*)\\pi\}\{1\}/, '$1\\pi'); break; } }
-            return { kind: 'complex', D, roots: [[rho * Math.cos(th), rho * Math.sin(th)], [rho * Math.cos(th), -rho * Math.sin(th)]], b: al, d: be,
+            return { kind: 'complex', D, Dtex, rho, roots: [[real, imaginary], [real, -imaginary]], b: al, d: be,
               f: (n) => rho ** n * (al * Math.cos(n * th) + be * Math.sin(n * th)),
               rootsTex: String.raw`r = ${rho1 ? '' : tn(rho)}(\cos\theta \pm i\ \sin\theta),\quad \theta \approx ${thTex}`,
               consTex: String.raw`a_n = ${rho1 ? '' : tn(rho) + '^n'}(\alpha\ \cos(n\theta) + \beta\ \sin(n\theta))`,
@@ -9830,17 +9983,16 @@ bsearch(s, i, j, key) {     // search s[i..j]
             const S = solve(c1, c2, a0, a1);
             drawPlot(S.roots);
             const kindText = S.kind === 'distinct' ? 'positive, so there are two different real roots' : S.kind === 'repeated' ? 'zero, so there is one repeated root' : 'negative, so the roots are a pair of complex numbers';
-            const dom = Math.max(...S.roots.map(([x, y]) => Math.hypot(x, y)));
-            const growth = dom > 1 + 1e-9 ? `The largest root has size ${fmt(dom)} > 1, so the terms eventually grow by about that factor per step.` : dom < 1 - 1e-9 ? `Every root has size below 1, so the terms shrink toward 0.` : `The largest root has size exactly 1, so the terms neither explode nor vanish${S.kind === 'complex' ? ': they cycle around' : ''}.`;
+            const growth = growthText(S);
             steps.innerHTML = String.raw`
               <div><div class="lbl">1 · Recurrence</div>\(a_n = ${combo([[c1, 'a_{n-1}'], [c2, 'a_{n-2}']])},\ a_0 = ${tn(a0)},\ a_1 = ${tn(a1)}\)</div>
               <div><div class="lbl">2 · Characteristic equation</div>\(r^2 ${c1 === 0 ? '' : (c1 > 0 ? '- ' : '+ ') + (Math.abs(c1) === 1 ? '' : tn(Math.abs(c1))) + 'r'} ${c2 > 0 ? '-' : '+'} ${tn(Math.abs(c2))} = 0\)</div>
-              <div><div class="lbl">3 · Discriminant</div>\(\Delta = c_1^2 + 4c_2 = ${tn(S.D)}\): ${kindText}.</div>
+              <div><div class="lbl">3 · Discriminant</div>\(\Delta = c_1^2 + 4c_2 = ${S.Dtex}\): ${kindText}.</div>
               <div><div class="lbl">4 · Roots</div>\(${S.rootsTex}\)</div>
               <div><div class="lbl">5 · Constants from \(a_0, a_1\)</div>\(${S.consTex}\)<br>\(${S.solTex}\)</div>
               <div><div class="lbl">6 · Closed form</div>\(${S.formTex}\)</div>
               <p class="small muted">${growth}</p>
-              <p class="small" style="margin-top:auto"><b>Try this.</b> Change only \(a_0\) or \(a_1\). The roots stay put and only the constants change: the rule fixes the <i>shape</i> of the solution, and the initial conditions fix its <i>size</i>.</p>`;
+              <p class="small" style="margin-top:auto"><b>Try this.</b> Change only \(a_0\) or \(a_1\). The roots stay put, but a constant can become zero. Initial conditions determine which root terms appear and can change the sequence's growth.</p>`;
             ctx.tex(steps);
             const it = [a0, a1];
             for (let n = 2; n <= 10; n++) it.push(c1 * it[n - 1] + c2 * it[n - 2]);
@@ -9849,7 +10001,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
               h('table.tt.rc-table', h('thead', h('tr', h('th', 'n'), h('th', 'from rule'), h('th', 'closed form'), h('th', 'ratio'))),
                 h('tbody', it.map((x, n) => h('tr', h('td', String(n)), h('td.mono', fmt(x)), h('td.mono', { class: near(x, S.f(n)) ? 'ok' : 'bad' }, fmt(S.f(n))), h('td.mono.muted', n > 0 && it[n - 1] !== 0 ? fmt(x / it[n - 1]) : '–'))))),
               h('div.feedback', { class: allOk ? 'good' : 'bad', style: { fontSize: '0.8rem' } }, allOk ? 'The closed form matches the rule on every row (up to rounding).' : 'Mismatch: check the inputs.'),
-              h('p.tiny.muted', 'The ratio column divides each term by the one before it. When one root is largest in size, the ratio settles near that root.'));
+              h('p.tiny.muted', 'The ratio column divides each term by the one before it; a zero denominator has no ratio. A unique dominant root with a nonzero contribution controls the limiting ratio.'));
           }
           draw();
         },
@@ -12768,12 +12920,14 @@ bsearch(s, i, j, key) {     // search s[i..j]
                 };
               }
               const want = post.map((nd) => nd.op || nd.s).join(' ');
-              const norm = (s) => String(s).replace(/[×xX]/g, '*').replace(/[−–]/g, '-').replace(/÷/g, '/').replace(/\s+/g, '');
+              // Preserve operand boundaries: 11 is one number, not the two operands 1 1.
+              const tokens = (s) => String(s).replace(/[×xX]/g, '*').replace(/[−–]/g, '-').replace(/÷/g, '/').match(/\d+|\S/g) || [];
+              const expected = tokens(want);
               return {
                 prompt: `Write the <b>postfix</b> form of <code>${infix(tree)}</code>. Separate the tokens with spaces; you may type * for × and - for −.`,
                 answer: want,
                 answerText: want,
-                check: (inp) => norm(inp) === norm(want),
+                check: (inp) => { const got = tokens(inp); return got.length === expected.length && got.every((t, i) => t === expected[i]); },
                 placeholder: 'e.g. 3 4 + 2 *',
                 solution: `Picture the expression tree, then read it in postorder (left subtree, right subtree, operator): <b class="mono">${post.map(exLabel).join(' ')}</b>. The last operator applied, ${SYM[tree.op]}, is the root, so it comes last.<div class="tr-mini" style="height:7rem">${binSVG(tree, { label: exLabel, dx: 38, dy: 42, r: 14, pad: 18, aria: 'Expression tree' })}</div>`,
               };
@@ -17538,9 +17692,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
           {
             name: 'Make invalid states unrepresentable',
-            html: '<p>Choose types whose every value is legal, so bad data cannot exist in the first place. A set cannot hold duplicates. An <code>Enum</code> cannot hold a misspelled status. A frozen dataclass cannot change after it was checked.</p><p>In set language: shrink the set of values a type allows until it equals the set of valid states. Every rule the type enforces is a rule no caller can forget.</p>',
-            bad: 'order = {"status": "pending", "tags": ["vip", "vip"]}\norder["status"] = "shiped"    # typo stored silently',
-            good: 'Status = Enum("Status", ["PENDING", "SHIPPED"])\n@dataclass(frozen=True)\nclass Order:\n    status: Status            # only legal values\n    tags: frozenset[str]      # no duplicates, no edits',
+            html: '<p>Type hints do not validate inputs. <code>__post_init__</code> checks them; <code>object.__setattr__</code> finishes initialization. Frozen fields and a <code>frozenset</code> prevent later edits.</p>',
+            bad: 'order = {"status": "shiped", "tags": ["vip", "vip"]}',
+            good: 'from dataclasses import dataclass\nfrom enum import Enum\nStatus = Enum("Status", "PENDING SHIPPED DELIVERED")\n@dataclass(frozen=True)\nclass Order:\n    status: Status\n    tags: frozenset[str]\n    def __post_init__(self):\n        if not isinstance(self.status, Status):\n            raise ValueError("invalid status")\n        tags = frozenset(self.tags)\n        if not all(isinstance(t, str) for t in tags):\n            raise ValueError("tags must be strings")\n        object.__setattr__(self, "tags", tags)',
           },
           {
             name: 'Write pure functions',
@@ -17860,9 +18014,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
           { q: 'You must suggest an order for taking courses so that every prerequisite comes first. Which model and algorithm fit?',
             choices: ['A tree and an in-order traversal', 'A directed acyclic graph and a topological sort', 'A set and a union', 'A probability model and random sampling'], answer: 1,
             explain: '"A before B" is a directed edge. The prerequisite graph must have no cycles, and a topological sort lists the vertices so every edge points forward. A tree does not fit because a course can have several prerequisites.' },
-          { q: 'An order\'s status must be one of PENDING, SHIPPED or DELIVERED. Which design makes an invalid status impossible to store?',
-            choices: ['A string field plus a comment listing the legal values', 'An <code>Enum</code> with exactly those three members', 'A string field that a script checks once a month', 'An integer field that accepts any number'], answer: 1,
-            explain: 'With an Enum the set of legal values is part of the type, so a typo such as "SHIPED" fails immediately instead of corrupting data. This is "make invalid states unrepresentable": the structure enforces the rule, so no caller can forget it.' },
+          { q: 'An order\'s status must be one of PENDING, SHIPPED or DELIVERED. Which design rejects an invalid status when the order is created?',
+            choices: ['A string field plus a comment listing the legal values', 'An <code>Enum</code> with those three members, checked by the constructor', 'A string field that a script checks once a month', 'An integer field that accepts any number'], answer: 1,
+            explain: 'The Enum defines the legal statuses, and the constructor checks that the supplied value is one of its members. A raw string such as "SHIPED" is rejected immediately. Python type hints alone do not run this check; the explicit validation enforces it.' },
           { q: 'An \\(O(n^2)\\) report takes 3 seconds on 10,000 rows. Estimate the time for 100,000 rows.',
             choices: ['30 seconds', '300 seconds', '3,000 seconds', '30,000 seconds'], answer: 1,
             explain: 'Ten times the rows means \\(10^2 = 100\\) times the work for an \\(n^2\\) algorithm: \\(3 \\times 100 = 300\\) seconds, five minutes. A job that scaled like \\(n\\,\\log\\,n\\) would grow by a factor of about 12.5 instead, to roughly 40 seconds.' },

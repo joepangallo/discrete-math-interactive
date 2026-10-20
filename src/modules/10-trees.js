@@ -1323,12 +1323,14 @@
                 };
               }
               const want = post.map((nd) => nd.op || nd.s).join(' ');
-              const norm = (s) => String(s).replace(/[×xX]/g, '*').replace(/[−–]/g, '-').replace(/÷/g, '/').replace(/\s+/g, '');
+              // Preserve operand boundaries: 11 is one number, not the two operands 1 1.
+              const tokens = (s) => String(s).replace(/[×xX]/g, '*').replace(/[−–]/g, '-').replace(/÷/g, '/').match(/\d+|\S/g) || [];
+              const expected = tokens(want);
               return {
                 prompt: `Write the <b>postfix</b> form of <code>${infix(tree)}</code>. Separate the tokens with spaces; you may type * for × and - for −.`,
                 answer: want,
                 answerText: want,
-                check: (inp) => norm(inp) === norm(want),
+                check: (inp) => { const got = tokens(inp); return got.length === expected.length && got.every((t, i) => t === expected[i]); },
                 placeholder: 'e.g. 3 4 + 2 *',
                 solution: `Picture the expression tree, then read it in postorder (left subtree, right subtree, operator): <b class="mono">${post.map(exLabel).join(' ')}</b>. The last operator applied, ${SYM[tree.op]}, is the root, so it comes last.<div class="tr-mini" style="height:7rem">${binSVG(tree, { label: exLabel, dx: 38, dy: 42, r: 14, pad: 18, aria: 'Expression tree' })}</div>`,
               };

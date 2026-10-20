@@ -1,8 +1,7 @@
 """Python-runner robustness tests (both engines).
 
-Checks that an endless loop is stopped and the next run still works, that a program which
-breaks json.dumps cannot wedge the page, that a trace finishing after the student switched to
-Edit mode does not overwrite the editor, and that arrow keys on a mode tab switch tabs, not slides.
+Checks timeout and reporting-failure recovery, truthful trace-limit warnings even when student
+code catches the stop signal, late trace results, and keyboard/accessibility behavior.
 
 Usage: python3 tests/e2e/runner.py discrete-math-interactive.html [--query py=brython]
 """
@@ -72,7 +71,49 @@ with sync_playwright() as p:
     out2 = edit_and_run("print('still fine')")
     check(out2.strip() == "still fine", f"[{engine}] replacing json.dumps cannot break later runs (got {out2.strip()[:60]!r})")
 
+    # Mutate a dependency of the saved helper functions, so reporting itself raises
+    # instead of returning malformed JSON. Both engines must discard that worker.
+    out = edit_and_run("import builtins\nbuiltins.str = None\nprint('patched')")
+    check("Restarted" in out and page.evaluate("DM.py.worker === null && DM.py.pending.size === 0"),
+          f"[{engine}] a reporting exception resets the Python session")
+    out = edit_and_run("print('after reporting failure')")
+    check(out.strip() == "after reporting failure", f"[{engine}] the next run recovers after a reporting exception")
+
     if engine == "pyodide":
+        out = edit_and_run("import json\njson._default_encoder = None\nprint('patched')")
+        check("Restarted" in out, "[pyodide] mutating json encoder internals resets the Python session")
+        out = edit_and_run("print('after json failure')")
+        check(out.strip() == "after json failure", "[pyodide] the next run recovers after a JSON serialization exception")
+
+        trace_program = "try:\n    for i in range(1000):\n        x = i\nexcept {handler}:\n    print('caught')\nprint('done')"
+        for handler in ("Exception", "BaseException"):
+            code = trace_program.format(handler=handler)
+            result = page.evaluate("code => DM.py.trace(code)", code)
+            check((result.get("err") or {}).get("type") == "StepLimit" and len(result.get("steps", [])) == 700,
+                  f"[pyodide] except {handler} cannot suppress the incomplete-trace warning")
+            expected_out = "caught\ndone\n" if handler == "BaseException" else ""
+            check(result.get("out") == expected_out, f"[pyodide] trace limit handles except {handler} without inventing output")
+
+        code = trace_program.format(handler="BaseException") + "\nraise ValueError('after the limit')"
+        result = page.evaluate("code => DM.py.trace(code)", code)
+        check((result.get("err") or {}).get("type") == "StepLimit" and "ValueError" in result["err"]["msg"] and "after the limit" in result["err"]["msg"],
+              "[pyodide] incomplete traces retain subsequent program errors")
+
+        page.click(f"{ACTIVE} .cw-bar [role=tab]:nth-child(2)")
+        page.fill(f"{ACTIVE} .editor textarea", trace_program.format(handler="BaseException"))
+        page.click(f"{ACTIVE} .cw-bar [role=tab]:nth-child(3)")
+        page.wait_for_selector(f"{ACTIVE} .trace-ctl", timeout=90000)
+        out = page.locator(f"{ACTIVE} .cw-out pre").inner_text()
+        check("StepLimit" in out and "incomplete" in out, "[pyodide] trace truncation is visible from the first step")
+        page.click(f"{ACTIVE} .trace-ctl button:last-child")
+        out = page.locator(f"{ACTIVE} .cw-out pre").inner_text()
+        check("Final captured output:" in out and "caught\ndone\n" in out and "StepLimit" in out,
+              "[pyodide] End shows output produced after the stop signal was caught")
+        check("Last recorded step" in page.locator(f"{ACTIVE} .cw-explain").inner_text(),
+              "[pyodide] End identifies the last recorded state of an incomplete trace")
+        out = edit_and_run("print('after truncated trace')")
+        check(out.strip() == "after truncated trace", "[pyodide] normal execution works after a caught trace limit")
+
         page.click(f"{ACTIVE} .cw-out-head .btn:not(.primary)")  # reset code
         page.click(f"{ACTIVE} .cw-bar [role=tab]:nth-child(3)")
         page.click(f"{ACTIVE} .cw-bar [role=tab]:nth-child(2)")

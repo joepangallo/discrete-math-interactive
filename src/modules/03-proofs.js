@@ -94,6 +94,44 @@
   const range = (a, b, step = 1) => { const out = []; for (let x = a; x <= b; x += step) out.push(x); return out; };
   const factorText = (v) => { const f = smallestFactor(v); return f === v ? `${v}, prime` : `${v} = ${f} × ${v / f}`; };
 
+  // Exact rational arithmetic keeps rounding from inventing counterexamples. Bound every
+  // intermediate, including powers, so a custom expression cannot stall the lesson.
+  const ARITH_BITS = 4096;
+  const arithLimit = 1n << BigInt(ARITH_BITS);
+  const absInt = (n) => (n < 0n ? -n : n);
+  function rational(p, q = 1n) {
+    if (q === 0n) throw new Error('division by zero is undefined');
+    if (q < 0n) { p = -p; q = -q; }
+    if (absInt(p) >= arithLimit || q >= arithLimit) throw new Error('an intermediate exceeds the exact-arithmetic limit');
+    let a = absInt(p), b = q;
+    while (b) [a, b] = [b, a % b];
+    return { p: p / a, q: q / a };
+  }
+  function arith(op, a, b) {
+    if (op === '+') return rational(a.p * b.q + b.p * a.q, a.q * b.q);
+    if (op === '-') return rational(a.p * b.q - b.p * a.q, a.q * b.q);
+    if (op === '*') return rational(a.p * b.p, a.q * b.q);
+    if (op === '/') return rational(a.p * b.q, a.q * b.p);
+    if (op === '%') {
+      if (b.p === 0n) throw new Error('remainder modulo zero is undefined');
+      const quotient = (a.p * b.q) / (a.q * b.p);
+      return rational(a.p * b.q - quotient * b.p * a.q, a.q * b.q);
+    }
+    if (b.q !== 1n) throw new Error('fractional powers cannot be checked exactly here; use a whole-number exponent');
+    const e = absInt(b.p);
+    const bits = Math.max(absInt(a.p).toString(2).length, a.q.toString(2).length);
+    if (e > BigInt(ARITH_BITS) || BigInt(bits) * e > BigInt(ARITH_BITS)) throw new Error('a power exceeds the exact-arithmetic limit');
+    return b.p < 0n ? rational(a.q ** e, a.p ** e) : rational(a.p ** e, a.q ** e);
+  }
+  const arithText = (v) => v.q === 1n ? String(v.p) : `${v.p}/${v.q}`;
+  function squareRoot(n) {
+    if (n < 2n) return n;
+    let x = 1n << BigInt(Math.ceil(n.toString(2).length / 2));
+    let next = (x + n / x) / 2n;
+    while (next < x) { x = next; next = (x + n / x) / 2n; }
+    return x;
+  }
+
   // arithmetic in n for the "your own claim" box: + − * / % ^, parentheses, and 2n for 2 * n
   function parseArith(src) {
     const s = String(src).replace(/\*\*/g, '^').replace(/×/g, '*').replace(/−/g, '-').replace(/²/g, '^2').replace(/³/g, '^3');
@@ -114,21 +152,24 @@
     let k = 0;
     function expr() {
       let f = term();
-      while (t[k] === '+' || t[k] === '-') { const op = t[k++]; const a = f, b = term(); f = op === '+' ? (n) => a(n) + b(n) : (n) => a(n) - b(n); }
+      while (t[k] === '+' || t[k] === '-') { const op = t[k++]; const a = f, b = term(); f = (n) => arith(op, a(n), b(n)); }
       return f;
     }
     function term() {
       let f = unary();
-      while (t[k] === '*' || t[k] === '/' || t[k] === '%') { const op = t[k++]; const a = f, b = unary(); f = op === '*' ? (n) => a(n) * b(n) : op === '/' ? (n) => a(n) / b(n) : (n) => a(n) % b(n); }
+      while (t[k] === '*' || t[k] === '/' || t[k] === '%') { const op = t[k++]; const a = f, b = unary(); f = (n) => arith(op, a(n), b(n)); }
       return f;
     }
-    function unary() { if (t[k] === '-') { k++; const f = unary(); return (n) => -f(n); } return power(); }
-    function power() { const b = atom(); if (t[k] === '^') { k++; const e = unary(); return (n) => b(n) ** e(n); } return b; }
+    function unary() { if (t[k] === '-') { k++; const f = unary(); return (n) => { const v = f(n); return { p: -v.p, q: v.q }; }; } return power(); }
+    function power() { const b = atom(); if (t[k] === '^') { k++; const e = unary(); return (n) => arith('^', b(n), e(n)); } return b; }
     function atom() {
       const tok = t[k++];
       if (tok === '(') { const f = expr(); if (t[k++] !== ')') throw new Error('A "(" is missing its ")".'); return f; }
-      if (tok === 'n') return (n) => n;
-      if (/^\d+$/.test(tok || '')) { const c = Number(tok); return () => c; }
+      if (tok === 'n') return (n) => rational(BigInt(n));
+      if (/^\d+$/.test(tok || '')) return () => {
+        if (tok.length > 1234) throw new Error('a number exceeds the exact-arithmetic limit');
+        return rational(BigInt(tok));
+      };
       throw new Error(tok ? `Unexpected "${tok}".` : 'The expression ends too early.');
     }
     const f = expr();
@@ -259,11 +300,20 @@
       lesson: 'Make up a pattern and try to break it. A single red square is a disproof; any number of green squares is only evidence.' },
   ];
   const PROPS = {
-    'is prime': (v) => (Math.abs(v) > 1e10 ? null : { ok: isPrime(v), text: Number.isInteger(v) && v >= 2 ? factorText(v) : `${v}, not prime` }),
-    'is odd': (v) => ({ ok: Number.isInteger(v) && Math.abs(v % 2) === 1, text: `${v}` }),
-    'is even': (v) => ({ ok: Number.isInteger(v) && v % 2 === 0, text: `${v}` }),
-    'is a perfect square': (v) => ({ ok: v >= 0 && Number.isInteger(Math.sqrt(v)), text: v >= 0 && Number.isInteger(Math.sqrt(v)) ? `${v} = ${Math.sqrt(v)}²` : `${v}` }),
-    'is positive': (v) => ({ ok: v > 0, text: `${v}` }),
+    'is prime': (v) => {
+      if (v.q !== 1n || v.p < 2n) return { ok: false, text: `${arithText(v)}, not prime` };
+      if (v.p > 10000000000n) return null;
+      const n = Number(v.p);
+      return { ok: isPrime(n), text: factorText(n) };
+    },
+    'is odd': (v) => ({ ok: v.q === 1n && absInt(v.p % 2n) === 1n, text: arithText(v) }),
+    'is even': (v) => ({ ok: v.q === 1n && v.p % 2n === 0n, text: arithText(v) }),
+    'is a perfect square': (v) => {
+      const root = v.q === 1n && v.p >= 0n ? squareRoot(v.p) : null;
+      const ok = root !== null && root * root === v.p;
+      return { ok, text: ok ? `${v.p} = ${root}²` : arithText(v) };
+    },
+    'is positive': (v) => ({ ok: v.p > 0n, text: arithText(v) }),
   };
 
   // ---- practice data ----
@@ -666,7 +716,12 @@
             if (C.custom) {
               try {
                 const f = parseArith(fsrc);
-                test = (n) => { const v = f(n); if (!Number.isFinite(v)) return { ok: null, text: `n = ${n}: f(n) is undefined` }; const r = PROPS[prop](v); return r ? { ok: r.ok, text: `n = ${n}: f(${n}) = ${r.text}` } : { ok: null, text: `n = ${n}: f(${n}) = ${v} is too large to test here` }; };
+                test = (n) => {
+                  try {
+                    const v = f(n), r = PROPS[prop](v);
+                    return r ? { ok: r.ok, text: `n = ${n}: f(${n}) = ${r.text}` } : { ok: null, text: `n = ${n}: f(${n}) = ${arithText(v)} is too large to test for primality here` };
+                  } catch (e) { return { ok: null, text: `n = ${n}: not tested — ${e.message}` }; }
+                };
               } catch (e) { err = e.message; }
             }
             if (err) { ctx.rc(summary, h('div.feedback.bad', err)); ctx.rc(figure); detail.textContent = ''; lesson.innerHTML = C.lesson; return; }
@@ -694,9 +749,9 @@
             const sel = res.find((r) => r.n === pick);
             detail.innerHTML = sel ? `<b class="${sel.ok === true ? 'ok' : sel.ok === false ? 'bad' : 'muted'}">${sel.ok === true ? '✓' : sel.ok === false ? '✗' : '?'}</b> ${ctx.esc(sel.text)}` : '';
             ctx.rc(summary,
-              h('div', h('span.pf-badge', { class: fails.length ? 'f' : 't' }, fails.length ? 'disproved' : 'no counterexample yet')),
-              h('div.small', { html: `Tested <b>${res.length}</b> values: <b class="ok">${passes}</b> hold${fails.length ? `, <b class="bad">${fails.length}</b> fail` : ''}${skipped ? `, ${skipped} could not be tested` : ''}.` }),
-              h('div.small', { html: fails.length ? `First counterexample: <b class="mono">${ctx.esc(fails[0].text)}</b>. One is enough to make the "for all" claim false.` : 'Every tested case holds. That is evidence, and only a proof can rule out a failure at the very next value.' }));
+              h('div', h('span.pf-badge', { class: fails.length ? 'f' : skipped ? 'n' : 't' }, fails.length ? 'disproved' : skipped ? 'incomplete check' : 'no counterexample yet')),
+              h('div.small', { html: `Checked <b>${passes + fails.length}</b> of <b>${res.length}</b> values: <b class="ok">${passes}</b> hold${fails.length ? `, <b class="bad">${fails.length}</b> fail` : ''}${skipped ? `, ${skipped} could not be tested` : ''}.` }),
+              h('div.small', { html: fails.length ? `First counterexample: <b class="mono">${ctx.esc(fails[0].text)}</b>. One is enough to make the "for all" claim false.` : skipped ? 'Some cases could not be checked exactly here. They provide no evidence for or against the claim.' : 'Every tested case holds. That is evidence, and only a proof can rule out a failure at the very next value.' }));
             lesson.innerHTML = C.lesson;
           }
           draw();

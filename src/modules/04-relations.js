@@ -902,7 +902,7 @@
           const mid = h('div.stack', { style: { gap: '0.45rem', minHeight: 0 } });
           const right = h('div.stack', { style: { gap: '0.4rem', minHeight: 0 } });
           body.append(h('div.m4-db.stack.fill', { style: { minHeight: 0, gap: '0.55rem' } }, ctl,
-            h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.05fr)', gap: '0.9rem', minHeight: 0, alignItems: 'start' } }, left, mid, right)));
+            h('div.m4-db-grid', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.05fr)', gap: '0.9rem', minHeight: 0, alignItems: 'start' } }, left, mid, right)));
           const lit = (v, lang) => (typeof v === 'number' ? String(v) : lang === 'tex' ? `\\text{'${v}'}` : `'${v}'`);
           const cmp = (a, op, b) => (op === '=' ? a === b : op === '≠' ? a !== b : op === '<' ? a < b : a > b);
           function draw() {

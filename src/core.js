@@ -283,9 +283,10 @@ def __dm_trace(src, limit=700):
     buf = __dm_StringIO()
     steps = []
     err = None
+    limit_reached = False
     g = {'__name__': '__main__'}
     skip = (types.ModuleType, types.FunctionType, type, types.BuiltinFunctionType)
-    class _Limit(Exception):
+    class _Limit(BaseException):
         pass
     def snap(frame):
         d = {}
@@ -303,11 +304,13 @@ def __dm_trace(src, limit=700):
             f = f.f_back
         return n
     def tracer(frame, event, arg):
+        nonlocal limit_reached
         if frame.f_code.co_filename != '<lesson>':
             return None
         if event in ('line', 'return'):
             if len(steps) >= limit:
-                raise _Limit('Stopped after %d steps' % limit)
+                limit_reached = True
+                raise _Limit()
             st = {'line': frame.f_lineno, 'ev': event, 'fn': frame.f_code.co_name,
                   'vars': snap(frame), 'out': buf.getvalue(), 'depth': depth(frame)}
             if event == 'return':
@@ -322,10 +325,18 @@ def __dm_trace(src, limit=700):
                 exec(code, g)
             finally:
                 __dm_settrace(None)
-    except _Limit as e:
-        err = {'type': 'StepLimit', 'msg': str(e), 'line': None}
+    except _Limit:
+        pass
     except BaseException as e:
         err = __dm_err(e)
+    # A student can catch even BaseException. Keep the incomplete-trace warning
+    # independently of the exception, including any error raised afterward.
+    if limit_reached:
+        msg = 'Stopped recording after %d steps. The trace is incomplete.' % limit
+        if err is not None:
+            where = ' (line %s)' % err['line'] if err['line'] is not None else ''
+            msg += '\nProgram error after tracing stopped: %s%s: %s' % (err['type'], where, err['msg'])
+        err = {'type': 'StepLimit', 'msg': msg, 'line': None}
     return __dm_dumps({'out': buf.getvalue(), 'err': err, 'steps': steps})
 `;
 
@@ -474,14 +485,14 @@ onmessage = (e) => {
           if (!p) return;
           this.pending.delete(d.id);
           clearTimeout(p.timer);
-          if (!d.ok) { p.reject(new Error(d.error)); return; }
           let res;
           try {
+            if (!d.ok) throw new Error(d.error || 'Python could not report the result');
             res = JSON.parse(d.result);
             if (!validResult(res)) throw new Error('unexpected result');
           } catch {
             this._kill();
-            p.resolve({ out: '', err: { type: 'Restarted', msg: 'The program changed Python in a way this page cannot read back, so Python was restarted. Run it again.', line: null }, steps: [] });
+            p.resolve({ out: '', err: { type: 'Restarted', msg: 'Python could not report this program\'s result. Its session was reset; the next run will start fresh.', line: null }, steps: [] });
             return;
           }
           p.resolve(res);
@@ -727,8 +738,11 @@ onmessage = (e) => {
       const li = $(`.cw-lines li[data-i="${st.line - 1}"]`, view);
       if (li) li.scrollIntoView({ block: 'nearest' });
       const where = st.fn === '<module>' ? 'top level' : `inside ${st.fn}()`;
+      const atEnd = i === steps.length - 1;
+      const incomplete = trace.res.err?.type === 'StepLimit';
       let headline;
-      if (st.ev === 'return') headline = st.fn === '<module>' ? 'The program has finished.' : `${st.fn}() returns ${st.ret}`;
+      if (atEnd && incomplete) headline = 'Last recorded step; tracing reached its limit. Later execution is not shown.';
+      else if (st.ev === 'return') headline = st.fn === '<module>' ? 'The program has finished.' : `${st.fn}() returns ${st.ret}`;
       else headline = `Line ${st.line} is about to run (${where}).`;
       const rows = Object.entries(st.vars);
       const prevVars = prev && prev.depth === st.depth && prev.fn === st.fn ? prev.vars : {};
@@ -736,8 +750,10 @@ onmessage = (e) => {
       const lineIdx = st.line - 1;
       const exHtml = src[lineIdx] && src[lineIdx].code === codeLines()[lineIdx] ? lineEx(lineIdx) : '<p class="muted">This line differs from the original, so there is no prepared note for it.</p>';
       const slider = h('input', { type: 'range', min: 0, max: steps.length - 1, value: i, 'aria-label': 'Trace step', oninput: (e) => { stopPlay(); trace.i = +e.target.value; drawTraceStep(); } });
-      const outSoFar = st.out ? `<span class="dim">Output so far:</span>\n${esc(st.out)}` : '<span class="dim">Nothing printed yet.</span>';
-      out.innerHTML = outSoFar + (i === steps.length - 1 && trace.res.err ? `\n<span class="err">${esc(trace.res.err.type)}: ${esc(trace.res.err.msg)}</span>` : '');
+      const captured = atEnd ? trace.res.out : st.out;
+      const outputLabel = atEnd ? 'Final captured output:' : 'Output so far:';
+      const outSoFar = captured ? `<span class="dim">${outputLabel}</span>\n${esc(captured)}` : `<span class="dim">${atEnd ? 'Nothing printed.' : 'Nothing printed yet.'}</span>`;
+      out.innerHTML = outSoFar + ((atEnd || incomplete) && trace.res.err ? `\n<span class="err">${esc(trace.res.err.type)}: ${esc(trace.res.err.msg)}</span>` : '');
       rc(explain,
         h('div.where', h('span', `Step ${i + 1} of ${steps.length}`), h('span', where)),
         h('p', { style: { fontWeight: 600 } }, headline),
