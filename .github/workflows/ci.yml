@@ -16,7 +16,8 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # ubuntu-latest moved to 26.04, which Playwright 1.60 cannot install browsers on; 24.04 is supported
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     # Actions are pinned to reviewed commits (the v4 / v5 tags as of 2026-10-21) so a moved tag cannot change what runs.
     steps:
