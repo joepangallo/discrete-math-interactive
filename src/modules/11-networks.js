@@ -251,7 +251,7 @@
       'conservation of flow': 'At every vertex except s and t, the total flow in equals the total flow out. Nothing is created or lost along the way.',
       'value of a flow': 'The total amount leaving the source, written |f|. Conservation makes it equal to the total amount entering the sink.',
       'saturated edge': 'An edge whose flow equals its capacity, so it has no room left in the forward direction.',
-      'residual network': 'For a given flow, the network of remaining room: c − f forward on each edge, plus f backward (flow that could be cancelled).',
+      'residual network': 'For a given flow, the network of remaining room: c − f forward on each edge, plus f backward (flow that could be canceled).',
       'residual capacity': 'The room on one step of the residual network: c − f on a forward step, f on a backward step.',
       'augmenting path': 'A path from s to t in the residual network where every step has positive residual capacity. Pushing flow along it increases the flow value.',
       'bottleneck': 'The smallest residual capacity on an augmenting path: the amount that can be pushed along it.',
@@ -260,8 +260,8 @@
       'cut': 'A split of the vertices into S (containing s) and T (containing t). Its capacity c(S, T) adds up the capacities of edges from S to T only.',
       'minimum cut': 'A cut with the smallest possible capacity. Its edges are the true bottleneck of the network.',
       'max-flow min-cut theorem': 'In every transport network, the value of a maximum flow equals the capacity of a minimum cut.',
-      'bipartite graph': 'A graph whose vertices split into two groups, with every edge joining one group to the other (for example workers and jobs).',
       'matching': 'A set of edges in which no two share an endpoint: each worker gets at most one job and each job at most one worker.',
+      'maximum matching': 'A matching with as many edges as possible. In a bipartite graph its size equals the maximum flow of the network built by joining s to every worker and every job to t, with every capacity 1.',
       "Hall's condition": 'Every worker can be matched exactly when every set A of workers is qualified, in total, for at least |A| different jobs: |N(A)| ≥ |A|.',
     },
     symbols: [
@@ -307,6 +307,9 @@
       .nf-grids svg [data-p] { cursor: crosshair; }
       .nf-cost td { padding: 0.12rem 0.4rem; }
       .nf-cost td:last-child { text-align: right; font-family: var(--font-mono); }
+      .nf-svg [data-edge]:focus, .nf-svg [data-node]:focus, .nf-grids svg [data-p]:focus { outline: none; }
+      .nf-svg [data-edge]:focus-visible rect, .nf-grids svg [data-p]:focus-visible rect { stroke: var(--kw); stroke-width: 3; }
+      .nf-svg [data-node]:focus-visible circle { stroke: var(--kw); stroke-width: 4; }
     `,
     slides: [
       /* ---------------------------------------------------------------- 1 */
@@ -344,7 +347,7 @@
               <p>To grow a flow, look for spare room. The <span class="term">residual network</span> records two kinds of room for every edge \(u \to v\) with flow \(f\) and capacity \(c\):</p>
               <ul>
                 <li><b>Forward step</b> \(u \to v\): room \(c - f\). That many more units fit.</li>
-                <li><b>Backward step</b> \(v \dashrightarrow u\): room \(f\). Units already sent along \(u \to v\) can be cancelled, which has the same effect as sending them back.</li>
+                <li><b>Backward step</b> \(v \dashrightarrow u\): room \(f\). Units already sent along \(u \to v\) can be canceled, which has the same effect as sending them back.</li>
               </ul>
               <div class="def">An <span class="term">augmenting path</span> is a path from \(s\) to \(t\) in the residual network where every step has positive <span class="term">residual capacity</span>. Its <span class="term">bottleneck</span> is the smallest room on the path. Pushing the bottleneck along it (add on forward steps, subtract on backward steps) raises \(|f|\) by exactly that amount and keeps both flow rules true.</div>
               <div class="why">Without backward steps, an early bad choice is permanent and a greedy algorithm can get stuck below the maximum. Backward steps let the algorithm change its mind.</div>
@@ -371,7 +374,7 @@
             trap: { label: 'The trap', pos: { s: [80, 250], a: [370, 85], b: [370, 415], t: [660, 250] }, spec: 'sa:1 sb:1 ab:1 at:1 bt:1', sel: 2 },
           };
           let key = 'six', net, flow, rule = 'bfs', view = 'flow', pending = null, log = [], done = null, sel = 3, msg = '';
-          const svg = s('svg', { class: 'nf-svg', viewBox: '0 0 730 500', role: 'img', 'aria-label': 'Transport network with flows' });
+          const svg = s('svg', { class: 'nf-svg', viewBox: '0 0 730 500', role: 'group', 'aria-label': 'Transport network with flows' });
           const legend = h('div.legend');
           const segBtns = (opts, get, set) => h('div.seg', ...opts.map(([k, label]) => h('button', { 'aria-pressed': String(get() === k), dataset: { k }, onclick: (e) => { set(k); [...e.currentTarget.parentNode.children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === k))); } }, label)));
           const netSeg = segBtns([['six', 'Six vertices'], ['trap', 'The trap']], () => key, (k) => load(k));
@@ -391,12 +394,10 @@
               h('div.row', { style: { gap: '0.4rem' } }, stepBtn, runBtn, resetBtn),
               valueEl, msgEl, editEl,
               h('div', h('div.tiny.mono.muted', 'AUGMENTATIONS SO FAR'), logEl))));
-          svg.addEventListener('click', (e) => {
-            const g = e.target.closest('[data-edge]');
-            if (!g) return;
-            sel = +g.dataset.edge;
-            draw();
-          });
+          const pickEdge = (g) => { sel = +g.dataset.edge; draw(); };
+          svg.addEventListener('click', (e) => { const g = e.target.closest('[data-edge]'); if (g) pickEdge(g); });
+          // every edge label is a focusable button, so Tab reaches it and Enter or Space selects it
+          svg.addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const g = e.target.closest('[data-edge]'); if (g) { e.preventDefault(); pickEdge(g); } });
 
           function load(k) { key = k; net = { s: 's', t: 't', edges: parseEdges(PRE[k].spec) }; sel = PRE[k].sel; restart(k === 'six' ? 'Every edge starts empty. Press Find next path.' : 'Every capacity is 1, and the maximum flow is 2. Switch the search to DFS and step through it to see the trap and its escape.'); }
           function restart(note) { flow = net.edges.map(() => 0); pending = null; log = []; done = null; msg = note; draw(); }
@@ -460,6 +461,8 @@
             const P = PRE[key].pos;
             const onPath = new Map();
             if (pending) pending.forEach((a) => onPath.set(a.e, a.dir));
+            const focused = svg.contains(document.activeElement);
+            const btn = (i, what) => `data-edge="${i}" tabindex="0" role="button" aria-label="${what}${i === sel ? ', selected' : ''}"`;
             let m = '';
             net.edges.forEach((e, i) => {
               const d = onPath.get(i);
@@ -467,15 +470,16 @@
                 let kind = flow[i] === 0 ? 'base' : flow[i] === e.c ? 'sat' : 'flow', lab = 'plain';
                 if (done) { if (done.has(e.u) && !done.has(e.v)) { kind = 'cut'; lab = 'cut'; } else if (!done.has(e.u) && done.has(e.v)) kind = 'ignore'; }
                 if (d) { kind = d > 0 ? 'hot' : 'hotback'; lab = 'hot'; }
-                m += edgeMarkup(P[e.u], P[e.v], { kind, lab, text: `<tspan font-weight="700">${flow[i]}</tspan>/${e.c}`, r1: 22, r2: 22, fs: 15, data: `data-edge="${i}"`, selected: i === sel });
+                m += edgeMarkup(P[e.u], P[e.v], { kind, lab, text: `<tspan font-weight="700">${flow[i]}</tspan>/${e.c}`, r1: 22, r2: 22, fs: 15, data: btn(i, `edge ${edgeName(e)}, flow ${flow[i]} of ${e.c}`), selected: i === sel });
               } else {
                 const fwd = e.c - flow[i], bk = flow[i];
-                if (fwd > 0 || bk === 0) m += edgeMarkup(P[e.u], P[e.v], { kind: d > 0 ? 'hot' : fwd > 0 ? 'base' : 'faint', lab: d > 0 ? 'hot' : 'plain', text: String(fwd), off: bk > 0 ? 7 : 0, labOff: bk > 0 ? 14 : 0, r1: 22, r2: 22, fs: 15, data: `data-edge="${i}"`, selected: i === sel });
-                if (bk > 0) m += edgeMarkup(P[e.v], P[e.u], { kind: d < 0 ? 'hotback' : 'back', lab: d < 0 ? 'hot' : 'back', text: String(bk), off: fwd > 0 ? 7 : 0, labOff: fwd > 0 ? 14 : 0, r1: 22, r2: 22, fs: 15, data: `data-edge="${i}"`, selected: i === sel });
+                if (fwd > 0 || bk === 0) m += edgeMarkup(P[e.u], P[e.v], { kind: d > 0 ? 'hot' : fwd > 0 ? 'base' : 'faint', lab: d > 0 ? 'hot' : 'plain', text: String(fwd), off: bk > 0 ? 7 : 0, labOff: bk > 0 ? 14 : 0, r1: 22, r2: 22, fs: 15, data: btn(i, `edge ${edgeName(e)}, forward room ${fwd}`), selected: i === sel });
+                if (bk > 0) m += edgeMarkup(P[e.v], P[e.u], { kind: d < 0 ? 'hotback' : 'back', lab: d < 0 ? 'hot' : 'back', text: String(bk), off: fwd > 0 ? 7 : 0, labOff: fwd > 0 ? 14 : 0, r1: 22, r2: 22, fs: 15, data: btn(i, `backward step ${e.v} to ${e.u}, room ${bk}`), selected: i === sel });
               }
             });
             for (const [n, p] of Object.entries(P)) m += nodeMarkup(n, p, { r: 22, fs: 17, kind: done ? (done.has(n) ? 'S' : 'plain') : pending && (n === 's' || pending.some((a) => a.to === n)) ? 'hot' : 'plain' });
             svg.innerHTML = m;
+            if (focused) svg.querySelector(`[data-edge="${sel}"]`)?.focus({ preventScroll: true });
             const sw = (v, dashed) => h('span.swatch', { style: { background: v, opacity: dashed ? 0.7 : 1 } });
             ctx.rc(legend, ...(view === 'flow'
               ? [h('span', sw('var(--accent)'), 'carries flow (thick = full)'), h('span', sw('var(--kw)'), 'augmenting path (dashed = backward step)'), h('span', sw('var(--false)'), 'minimum cut'), h('span', sw('var(--accent-2)'), 'S side at the end')]
@@ -512,7 +516,7 @@
                   <li>Push the bottleneck along the path (up on forward steps, down on backward steps), then go back to step 2.</li>
                 </ol></div>
               <div class="thm">With integer capacities, every push adds at least 1 to \(|f|\), so the method stops after at most \(|f^*|\) pushes (\(f^*\) a maximum flow). It also finds a maximum flow that is a whole number on every edge.</div>
-              <p class="small muted">Johnsonbaugh calls this the <i>maximal flow algorithm</i> and finds paths by labelling vertices. The labelling is one way to search the residual network.</p>
+              <p class="small muted">Johnsonbaugh calls this the <i>maximal flow algorithm</i> and finds paths by labeling vertices. The labeling is one way to search the residual network.</p>
             </div>
             <div class="stack">
               <div class="def">The <span class="term">Edmonds–Karp algorithm</span> adds one rule: always use a <i>shortest</i> augmenting path (fewest edges), found by breadth-first search. It needs at most \(|V| \cdot |E|\) augmentations, so it runs in \(O(|V| \cdot |E|^2)\) time however large the capacities are.</div>
@@ -566,7 +570,7 @@
           cuts.sort((x, y) => x.cap - y.cap || x.key.length - y.key.length || x.key.localeCompare(y.key));
           const maxCap = cuts[cuts.length - 1].cap;
           let S = new Set(['s']);
-          const svg = s('svg', { class: 'nf-svg', viewBox: '0 0 720 470', role: 'img', 'aria-label': 'Network: click vertices to choose the cut' });
+          const svg = s('svg', { class: 'nf-svg', viewBox: '0 0 720 470', role: 'group', 'aria-label': 'Network: click vertices to choose the cut' });
           const strip = s('svg', { class: 'nf-svg', viewBox: '0 0 330 100', role: 'img', 'aria-label': 'All 32 cuts sorted by capacity', style: 'width:100%;height:auto;display:block' });
           const formula = h('div.nf-big', { style: { fontSize: '1.25rem' } });
           const kv = h('div.nf-kv');
@@ -584,25 +588,23 @@
                 h('button.btn.sm', { onclick: () => { S = new Set(['s']); draw(); } }, 'S = {s}'),
                 h('button.btn.sm', { onclick: () => { S = new Set(['s', ...inner]); draw(); } }, 'Everything except t'),
                 h('button.btn.sm', { onclick: () => { S = new Set(cuts[0].S); draw(); } }, 'Show a minimum cut')))));
-          svg.addEventListener('click', (e) => {
-            const g = e.target.closest('[data-node]');
-            if (!g) return;
-            const n = g.dataset.node;
-            if (n === 's' || n === 't') return;
-            if (S.has(n)) S.delete(n); else S.add(n);
-            draw();
-          });
+          const flip = (g) => { const n = g.dataset.node; if (n === 's' || n === 't') return; if (S.has(n)) S.delete(n); else S.add(n); draw(); };
+          svg.addEventListener('click', (e) => { const g = e.target.closest('[data-node]'); if (g) flip(g); });
+          svg.addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const g = e.target.closest('[data-node]'); if (g) { e.preventDefault(); flip(g); } });
           strip.addEventListener('click', (e) => { const g = e.target.closest('[data-bar]'); if (g) { S = new Set(cuts[+g.dataset.bar].S); draw(); } });
 
           function draw() {
+            const focused = svg.contains(document.activeElement) ? document.activeElement.closest('[data-node]')?.dataset.node : null;
             let m = '';
             net.edges.forEach((e, i) => {
               const out = S.has(e.u) && !S.has(e.v), back = !S.has(e.u) && S.has(e.v);
               m += edgeMarkup(P[e.u], P[e.v], { kind: out ? 'cut' : back ? 'ignore' : 'base', lab: out ? 'cut' : back ? 'dim' : 'plain', text: String(e.c), r1: 21, r2: 21, fs: 15, data: `data-edge="${i}"` });
             });
-            for (const [n, p] of Object.entries(P)) m += nodeMarkup(n, p, { r: 21, fs: 17, kind: S.has(n) ? 'S' : 'plain', data: `data-node="${n}"` });
+            // inner vertices are toggle buttons for the keyboard; s and t never move
+            for (const [n, p] of Object.entries(P)) m += nodeMarkup(n, p, { r: 21, fs: 17, kind: S.has(n) ? 'S' : 'plain', data: n === 's' || n === 't' ? `data-node="${n}"` : `data-node="${n}" tabindex="0" role="button" aria-pressed="${S.has(n)}" aria-label="vertex ${n}, in ${S.has(n) ? 'S' : 'T'}"` });
             m += `<text x="${P.s[0]}" y="${P.s[1] + 40}" text-anchor="middle" font-size="12" fill="var(--ink-3)">always S</text><text x="${P.t[0]}" y="${P.t[1] + 40}" text-anchor="middle" font-size="12" fill="var(--ink-3)">always T</text>`;
             svg.innerHTML = m;
+            if (focused) svg.querySelector(`[data-node="${focused}"]`)?.focus({ preventScroll: true });
             const out = net.edges.filter((e) => S.has(e.u) && !S.has(e.v));
             const back = net.edges.filter((e) => !S.has(e.u) && S.has(e.v));
             const cap = capOf(S);
@@ -643,7 +645,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In a <span class="term">bipartite graph</span> the vertices form two groups, here workers \(W\) and jobs \(J\), and every edge joins a worker to a job they are qualified for. A <span class="term">matching</span> is a set of edges with no shared endpoints: each worker does at most one job and each job gets at most one worker. A <b>maximum matching</b> has as many edges as possible.</div>
+              <div class="def">In a <span class="term">bipartite graph</span> the vertices form two groups, here workers \(W\) and jobs \(J\), and every edge joins a worker to a job they are qualified for. A <span class="term">matching</span> is a set of edges with no shared endpoints: each worker does at most one job and each job gets at most one worker. A <b><span class="term">maximum matching</span></b> has as many edges as possible.</div>
               <p><b>Matching as a flow.</b> Add a source \(s\) with an edge to every worker, point each qualification edge from worker to job, and add an edge from every job to a sink \(t\). Give every edge capacity 1. An integer maximum flow sends at most one unit through each worker and each job, so its value is the size of a maximum matching.</p>
               <div class="card" style="padding:0.3rem 0.5rem">${FIG_MATCH.replace('<svg ', '<svg style="width:100%;max-height:10.5rem;display:block" ')}</div>
             </div>
@@ -809,8 +811,8 @@
             ['Low contrast', () => mk((x, y) => { const k = (x * 3 + y * 5) % 8; return ((x - 5.5) / 4) ** 2 + ((y - 3.5) / 2.7) ** 2 <= 1 ? [5, 7, 6, 4, 6, 7, 5, 6][k] : [2, 3, 1, 4, 3, 2, 5, 3][k]; })],
           ];
           let img = PRESETS[0][1](), lam = 2, brush = 9;
-          const inSvg = s('svg', { class: 'nf-svg', viewBox: `0 0 ${COLS * CS + 4} ${ROWS * CS + 4}`, role: 'img', 'aria-label': 'Pixel scores: click or drag to paint' });
-          const outSvg = s('svg', { class: 'nf-svg', viewBox: `0 0 ${COLS * CS + 4} ${ROWS * CS + 4}`, role: 'img', 'aria-label': 'Minimum-cut labelling' });
+          const inSvg = s('svg', { class: 'nf-svg', viewBox: `0 0 ${COLS * CS + 4} ${ROWS * CS + 4}`, role: 'group', 'aria-label': 'Pixel scores: click or drag to paint, or move with the arrow keys and paint with Space' });
+          const outSvg = s('svg', { class: 'nf-svg', viewBox: `0 0 ${COLS * CS + 4} ${ROWS * CS + 4}`, role: 'img', 'aria-label': 'Minimum-cut labeling' });
           const lamOut = h('b.mono');
           const slider = h('input', { type: 'range', min: 0, max: 6, step: 1, value: lam, 'aria-label': 'Smoothness lambda', oninput: (e) => { lam = +e.target.value; draw(); } });
           const cost = h('table.nf-cost.small', { style: { width: '100%' } });
@@ -823,24 +825,38 @@
                 h('div.card', { style: { padding: '0.4rem 0.5rem' } }, h('div.tiny.mono.muted', 'MINIMUM CUT: SHADED = OBJECT'), outSvg)),
               h('div.legend',
                 h('span', h('span.swatch', { style: { background: 'var(--accent)', opacity: 0.6 } }), 'object side (S)'),
-                h('span', h('span.swatch', { style: { background: 'var(--false)' } }), 'cut neighbour edge, costs λ'),
+                h('span', h('span.swatch', { style: { background: 'var(--false)' } }), 'cut neighbor edge, costs λ'),
                 h('span', h('span.swatch', { style: { background: 'var(--ink)', borderRadius: '50%' } }), 'label differs from the pixel\'s own guess (score ≥ 5)')),
               h('div.card.small', { style: { padding: '0.5rem 0.75rem' } },
                 h('b', 'How the network is built. '),
-                h('span', { html: 'Edge <b>s → pixel</b> has capacity = score: cutting it labels the pixel background and costs its score. Edge <b>pixel → t</b> has capacity 9 − score: cutting it labels the pixel object. Each pair of neighbouring pixels gets edges of capacity <b>λ</b> both ways, so splitting neighbours costs λ. Every cut is one labelling and its capacity is that labelling\'s total cost, so the minimum cut is the cheapest labelling.' }))),
+                h('span', { html: 'Edge <b>s → pixel</b> has capacity = score: cutting it labels the pixel background and costs its score. Edge <b>pixel → t</b> has capacity 9 − score: cutting it labels the pixel object. Each pair of neighboring pixels gets edges of capacity <b>λ</b> both ways, so splitting neighbors costs λ. Every cut is one labeling and its capacity is that labeling\'s total cost, so the minimum cut is the cheapest labeling.' }))),
             h('div.nf-panel',
               h('div.nf-ctl', h('span', 'Brush'), brushSeg, h('span', 'Image'), h('div.row', { style: { gap: '0.25rem' } }, PRESETS.map(([label, fn]) => h('button.btn.sm', { onclick: () => { img = fn(); draw(); } }, label)))),
               h('label.field', h('span', 'Smoothness ', lamOut), slider),
               h('div.card', { style: { padding: '0.45rem 0.65rem' } }, h('div.tiny.mono.muted', 'COST OF THE MINIMUM CUT'), cost),
               note,
-              h('div.ai.small', { html: 'Graph cuts power classic tools such as GrabCut for lifting an object out of a photo, and they were long a standard step in medical-image labelling. Modern pipelines often let a neural network produce the per-pixel scores and then clean them up with a smoothing step like this one.' }))));
+              h('div.ai.small', { html: 'Graph cuts power classic tools such as GrabCut for lifting an object out of a photo, and they were long a standard step in medical-image labeling. Modern pipelines often let a neural network produce the per-pixel scores and then clean them up with a smoothing step like this one.' }))));
 
-          let painting = false;
-          const paint = (e) => { const g = e.target.closest('[data-p]'); if (!g) return; const p = +g.dataset.p; if (img[p] !== brush) { img[p] = brush; draw(); } };
+          let painting = false, cursor = 0;
+          const paintAt = (p) => { if (img[p] !== brush) { img[p] = brush; draw(); } };
+          const paint = (e) => { const g = e.target.closest('[data-p]'); if (!g) return; cursor = +g.dataset.p; paintAt(cursor); };
           inSvg.addEventListener('pointerdown', (e) => { painting = true; paint(e); });
           inSvg.addEventListener('pointerover', (e) => { if (painting && e.buttons & 1) paint(e); });
-          window.addEventListener('pointerup', () => { painting = false; });
           inSvg.addEventListener('click', paint);
+          // a drag ends wherever the pointer is released, so the listener is global, but only while this slide is shown
+          const release = () => { painting = false; };
+          ctx.onShow(() => window.addEventListener('pointerup', release));
+          ctx.onHide(() => window.removeEventListener('pointerup', release));
+          // keyboard path: one cell is in the tab order, the arrow keys move it, Space or Enter paints it with the brush
+          const focusCell = () => { inSvg.querySelectorAll('[data-p]').forEach((g) => g.setAttribute('tabindex', +g.dataset.p === cursor ? '0' : '-1')); inSvg.querySelector(`[data-p="${cursor}"]`)?.focus({ preventScroll: true }); };
+          inSvg.addEventListener('keydown', (e) => {
+            const g = e.target.closest('[data-p]');
+            if (!g) return;
+            const p = +g.dataset.p;
+            const moves = { ArrowLeft: p % COLS ? p - 1 : p, ArrowRight: p % COLS < COLS - 1 ? p + 1 : p, ArrowUp: p >= COLS ? p - COLS : p, ArrowDown: p + COLS < N ? p + COLS : p };
+            if (e.key in moves) { e.preventDefault(); cursor = moves[e.key]; focusCell(); }
+            else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); cursor = p; paintAt(p); focusCell(); }
+          });
 
           function solve() {
             const S = N, T = N + 1, g = fastFlow(N + 2);
@@ -866,7 +882,7 @@
             let a = '', b = '';
             for (let p = 0; p < N; p++) {
               const x = 2 + (p % COLS) * CS, y = 2 + Math.floor(p / COLS) * CS, v = img[p];
-              a += `<g data-p="${p}"><rect x="${x}" y="${y}" width="${CS}" height="${CS}" fill="var(--ink)" fill-opacity="${r1(0.05 + (0.85 * v) / 9)}" stroke="var(--sheet)" stroke-width="1"/><text x="${x + CS / 2}" y="${y + CS / 2 + 1}" text-anchor="middle" dominant-baseline="central" font-size="11" fill="${v >= 5 ? 'var(--sheet)' : 'var(--ink-2)'}">${v}</text></g>`;
+              a += `<g data-p="${p}" tabindex="${p === cursor ? 0 : -1}" role="button" aria-label="row ${Math.floor(p / COLS) + 1}, column ${(p % COLS) + 1}, score ${v}"><rect x="${x}" y="${y}" width="${CS}" height="${CS}" fill="var(--ink)" fill-opacity="${r1(0.05 + (0.85 * v) / 9)}" stroke="var(--sheet)" stroke-width="1"/><text x="${x + CS / 2}" y="${y + CS / 2 + 1}" text-anchor="middle" dominant-baseline="central" font-size="11" fill="${v >= 5 ? 'var(--sheet)' : 'var(--ink-2)'}">${v}</text></g>`;
               b += `<rect x="${x}" y="${y}" width="${CS}" height="${CS}" fill="${r.obj[p] ? 'var(--accent)' : 'var(--sheet)'}" fill-opacity="${r.obj[p] ? 0.6 : 1}" stroke="var(--rule)" stroke-width="0.6"/>`;
               if (r.obj[p] !== v >= 5) b += `<circle cx="${x + CS / 2}" cy="${y + CS / 2}" r="3.6" fill="var(--ink)"/>`;
             }
@@ -882,11 +898,11 @@
             const nObj = r.obj.filter(Boolean).length;
             ctx.rc(cost,
               h('tr', h('td', 'Data cost: each pixel pays for its label'), h('td', String(r.data))),
-              h('tr', h('td', `Cut neighbour pairs: ${r.bnd} × λ (${lam})`), h('td', String(r.bnd * lam))),
+              h('tr', h('td', `Cut neighbor pairs: ${r.bnd} × λ (${lam})`), h('td', String(r.bnd * lam))),
               h('tr', { style: { borderTop: '1px solid var(--rule)' } }, h('td', h('b', 'Total = min cut = max flow')), h('td', h('b', String(r.data + r.bnd * lam)))));
             note.innerHTML = lam === 0
               ? `With λ = 0 each pixel decides alone: score 5 or more means object. Noise survives as specks and holes. Raise λ.`
-              : nObj === 0 ? `Nothing is labelled object. At λ = ${lam} any boundary costs more than the object's pixels save, so the cheapest cut keeps every pixel on the background side. Lower λ.`
+              : nObj === 0 ? `Nothing is labeled object. At λ = ${lam} any boundary costs more than the object's pixels save, so the cheapest cut keeps every pixel on the background side. Lower λ.`
               : `${nObj} pixels are object. Smoothing overruled ${changed} pixel${changed === 1 ? '' : 's'} (dots), because flipping ${changed === 1 ? 'it' : 'them'} saves more boundary cost than it adds in data cost.` + (lam >= 5 ? ' At large λ the boundary is so expensive that small parts of the object vanish too.' : '');
           }
           draw();
@@ -919,7 +935,7 @@
           ['    while path and path[-1] != s:', 'Walks backwards while the list is non-empty and its last vertex, <code>path[-1]</code>, is not yet <code>s</code>.'],
           ['        path.append(parent[path[-1]])', 'Adds the parent of the last vertex. Here the list grows <code>[t]</code>, then <code>[t, a]</code>, then <code>[t, a, s]</code>.'],
           ['    return path[::-1]', 'The slice <code>[::-1]</code> reverses the list, so the path reads from <code>s</code> to <code>t</code>: <code>["s", "a", "t"]</code>.'],
-          ['res = {"s": {"a": 4, "b": 2}, "a": {"b": 3, "t": 1},', 'The residual capacities before any flow is sent, so they equal the capacities. <code>res["a"]["t"]</code> is 1. A depth-first search that always takes the first neighbour would wander <code>s → a → b → t</code>.'],
+          ['res = {"s": {"a": 4, "b": 2}, "a": {"b": 3, "t": 1},', 'The residual capacities before any flow is sent, so they equal the capacities. <code>res["a"]["t"]</code> is 1. A depth-first search that always takes the first neighbor would wander <code>s → a → b → t</code>.'],
           ['       "b": {"t": 5}, "t": {}}', 'The second line of the same dictionary: Python lets a literal continue inside its braces. <code>t</code> has no outgoing steps, so it maps to an empty dictionary.'],
           ['print(bfs_path(res, "s", "t"))', 'Prints <code>[\'s\', \'a\', \'t\']</code>: two edges, the shortest route, even though its bottleneck is only 1. Edmonds–Karp counts edges, not width, and that rule is what bounds the number of rounds.'],
         ],
@@ -928,14 +944,14 @@
       },
       /* ---------------------------------------------------------------- 11 */
       {
-        title: 'Code: pushing flow and cancelling it',
+        title: 'Code: pushing flow and canceling it',
         kind: 'code',
         file: 'augment.py',
         html: String.raw`<p class="muted small">This is the push step, run on the trap network from the augmenting-path slide. The second path uses the backward step \(b \dashrightarrow a\). Watch <code>res["a"]["b"]</code> drop to 0 and come back to 1 in <b>Trace</b>.</p>`,
         fivew: {
           what: 'Builds the residual network for a set of capacities, pushes the bottleneck along two augmenting paths, and recovers the final flow on every edge.',
           why: 'It shows the bookkeeping that makes backward steps work: every push lowers the room ahead and raises the room behind, so later paths can cancel earlier flow.',
-          who: 'Anyone implementing or debugging a max-flow routine, and students checking that they understand why cancelling flow is allowed.',
+          who: 'Anyone implementing or debugging a max-flow routine, and students checking that they understand why canceling flow is allowed.',
           where: 'The update loop here is the body of every Ford–Fulkerson style algorithm, including Edmonds–Karp and its variants in libraries.',
           when: 'Once per augmenting path. In a full Edmonds–Karp program the paths come from the BFS on the previous slide instead of a fixed list.',
         },
@@ -945,17 +961,17 @@
           ['res = {u: dict(nbrs) for u, nbrs in cap.items()}', 'A dictionary comprehension that copies each inner dictionary with <code>dict(...)</code>, so changing <code>res</code> later never changes <code>cap</code>. With zero flow, the room on every edge equals its capacity.'],
           ['for u in cap:', 'Loops over every vertex to add the backward entries.'],
           ['    for v in cap[u]:', 'Loops over every edge <code>u → v</code>.'],
-          ['        res[v].setdefault(u, 0)', 'Makes sure the backward step <code>v → u</code> exists, with room 0 because nothing can be cancelled yet. <code>setdefault</code> only inserts when the key is missing, so a real edge <code>v → u</code> would keep its own capacity.'],
+          ['        res[v].setdefault(u, 0)', 'Makes sure the backward step <code>v → u</code> exists, with room 0 because nothing can be canceled yet. <code>setdefault</code> only inserts when the key is missing, so a real edge <code>v → u</code> would keep its own capacity.'],
           ['paths = [["s", "a", "b", "t"], ["s", "b", "a", "t"]]', 'Two augmenting paths in the order a careless search might find them. The second one walks <code>b → a</code>, against edge <code>a → b</code>. That step only has room after the first push.'],
           ['for path in paths:', 'The augmenting loop: one round per path.'],
           ['    hops = list(zip(path, path[1:]))', '<code>zip</code> pairs each vertex with the next one: <code>[("s", "a"), ("a", "b"), ("b", "t")]</code> in round 1. <code>list(...)</code> stores the pairs so we can loop over them twice.'],
           ['    push = min(res[u][v] for u, v in hops)', 'The bottleneck: the smallest room on the path. It is 1 in both rounds. In round 2 the room on <code>("b", "a")</code> is 1 only because round 1 sent a unit along <code>a → b</code>.'],
           ['    for u, v in hops:', 'Updates every step of the path.'],
           ['        res[u][v] -= push', 'Less room in the direction we pushed. In round 1, <code>res["a"]["b"]</code> drops from 1 to 0.'],
-          ['        res[v][u] += push', 'More room in the opposite direction, because the units just sent could be cancelled later. Round 1 sets <code>res["b"]["a"] = 1</code>; round 2 uses it and raises <code>res["a"]["b"]</code> back to 1, which cancels the flow on <code>a → b</code>.'],
+          ['        res[v][u] += push', 'More room in the opposite direction, because the units just sent could be canceled later. Round 1 sets <code>res["b"]["a"] = 1</code>; round 2 uses it and raises <code>res["a"]["b"]</code> back to 1, which cancels the flow on <code>a → b</code>.'],
           ['    print(" -> ".join(path), "pushes", push)', 'Reports each round, for example <code>s -> a -> b -> t pushes 1</code>.'],
           ['flow = {u + v: res[v][u] for u in cap for v in cap[u]}', 'Reads the flow on each original edge <code>u → v</code> from its backward room <code>res[v][u]</code>, because the room to cancel is exactly the flow sent. (This shortcut works here because no two edges point in opposite directions.) The keys glue the names together, like <code>"ab"</code>.'],
-          ['print(flow, "value:", flow["sa"] + flow["sb"])', 'Prints <code>{\'sa\': 1, \'sb\': 1, \'ab\': 0, \'at\': 1, \'bt\': 1} value: 2</code>. Edge <code>a → b</code> ends at 0 because round 2 cancelled it, and the value 2 is the total leaving <code>s</code>.'],
+          ['print(flow, "value:", flow["sa"] + flow["sb"])', 'Prints <code>{\'sa\': 1, \'sb\': 1, \'ab\': 0, \'at\': 1, \'bt\': 1} value: 2</code>. Edge <code>a → b</code> ends at 0 because round 2 canceled it, and the value 2 is the total leaving <code>s</code>.'],
         ],
         expected: "s -> a -> b -> t pushes 1\ns -> b -> a -> t pushes 1\n{'sa': 1, 'sb': 1, 'ab': 0, 'at': 1, 'bt': 1} value: 2\n",
         tryIt: 'Swap the order of the two paths and run it. The first path <code>s → b → a → t</code> now fails with bottleneck 0, because nothing has been sent along <code>a → b</code> yet. What does that tell you about backward steps?',
@@ -965,7 +981,7 @@
         title: 'Code: maximum matching by augmenting paths',
         kind: 'code',
         file: 'matching.py',
-        html: String.raw`<p class="muted small">The same augmenting-path idea, specialised to workers and jobs, fits in a short recursive function. In <b>Trace</b>, watch Cy's search re-route Ava from Train to Clean.</p>`,
+        html: String.raw`<p class="muted small">The same augmenting-path idea, specialized to workers and jobs, fits in a short recursive function. In <b>Trace</b>, watch Cy's search re-route Ava from Train to Clean.</p>`,
         fivew: {
           what: 'Finds a maximum matching between workers and the jobs they are qualified for, placing workers one at a time and re-routing earlier workers when needed.',
           why: 'It is max flow with every capacity 1, written directly on the bipartite graph. Each successful search is one augmenting path and grows the matching by exactly one.',
@@ -997,7 +1013,7 @@
       {
         title: 'Design practice: network models in real code',
         kind: 'design',
-        html: String.raw`<p class="muted small">A max-flow routine is short; modelling the problem correctly and trusting the answer take most of the work. Click each principle (or use <kbd>↓</kbd>).</p>`,
+        html: String.raw`<p class="muted small">A max-flow routine is short; modeling the problem correctly and trusting the answer take most of the work. Click each principle (or use <kbd>↓</kbd>).</p>`,
         principles: [
           {
             name: 'Model the problem before writing code',
@@ -1066,7 +1082,7 @@
               return {
                 prompt: `An augmenting path ${vs.join(' – ')} uses these steps in the current flow. How many units can be pushed along it?${table}`,
                 answer: ans,
-                hint: 'forward room = capacity − flow; backward room = flow (what can be cancelled).',
+                hint: 'forward room = capacity − flow; backward room = flow (what can be canceled).',
                 solution: `Room on each step: ${rows.map((r) => `${step(r)}: ${r.back ? `${r.f} (cancel up to the flow)` : `${r.c} − ${r.f} = ${r.room}`}`).join('; ')}. The bottleneck is the smallest, <b>${ans}</b>, so pushing raises the flow value by ${ans}.`,
               };
             },
@@ -1145,14 +1161,14 @@
         kind: 'quiz',
         questions: [
           { q: 'At an interior vertex \\(b\\), flow arrives on two edges carrying 4 and 3 units. Two edges leave \\(b\\), and one of them carries 5. What must the other carry?', choices: ['2', '7', '12', 'Anything up to its capacity'], answer: 0, explain: 'Conservation: flow in equals flow out at every vertex other than \\(s\\) and \\(t\\). In: \\(4 + 3 = 7\\). Out: \\(5 + x = 7\\), so \\(x = 2\\).' },
-          { q: 'Edge \\(a \\to b\\) has capacity 7 and carries 3 units. What does it contribute to the residual network?', choices: ['A step \\(a \\to b\\) with room 4 and a step \\(b \\dashrightarrow a\\) with room 3', 'A step \\(a \\to b\\) with room 3 only', 'A step \\(a \\to b\\) with room 7', 'A step \\(b \\dashrightarrow a\\) with room 4'], answer: 0, explain: 'Forward room is \\(c - f = 7 - 3 = 4\\). Backward room is the flow that could be cancelled, \\(f = 3\\).' },
-          { q: 'Why does the residual network include backward steps?', choices: ['So the algorithm can cancel flow it sent earlier and send it along a better route', 'Because flow networks are really undirected', 'To store each capacity twice for speed', 'So that flow can leave the sink'], answer: 0, explain: 'A first path may block better ones. A backward step undoes some earlier flow, which lets Ford–Fulkerson reach the true maximum. Without it the trap network gets stuck at 1 instead of 2.' },
-          { q: 'In one network you find a flow of value 12 and a cut of capacity 12. What can you conclude?', choices: ['The flow is maximum and the cut is minimum', 'Nothing until the algorithm runs again', 'The flow can still grow by up to 12', 'The network has exactly 12 edges'], answer: 0, explain: 'Every flow is at most every cut. A flow equal to a cut cannot grow, and that cut cannot shrink. Each certifies the other.' },
+          { q: 'Edge \\(a \\to b\\) has capacity 7 and carries 3 units. What does it contribute to the residual network?', choices: ['A step \\(a \\to b\\) with room 3 only', 'A step \\(a \\to b\\) with room 4 and a step \\(b \\dashrightarrow a\\) with room 3', 'A step \\(a \\to b\\) with room 7', 'A step \\(b \\dashrightarrow a\\) with room 4'], answer: 1, explain: 'Forward room is \\(c - f = 7 - 3 = 4\\). Backward room is the flow that could be canceled, \\(f = 3\\).' },
+          { q: 'Why does the residual network include backward steps?', choices: ['Because flow networks are really undirected', 'To store each capacity twice for speed', 'So the algorithm can cancel flow it sent earlier and send it along a better route', 'So that flow can leave the sink'], answer: 2, explain: 'A first path may block better ones. A backward step undoes some earlier flow, which lets Ford–Fulkerson reach the true maximum. Without it the trap network gets stuck at 1 instead of 2.' },
+          { q: 'In one network you find a flow of value 12 and a cut of capacity 12. What can you conclude?', choices: ['Nothing until the algorithm runs again', 'The flow can still grow by up to 12', 'The network has exactly 12 edges', 'The flow is maximum and the cut is minimum'], answer: 3, explain: 'Every flow is at most every cut. A flow equal to a cut cannot grow, and that cut cannot shrink. Each certifies the other.' },
           { q: 'With \\(S = \\{s, a\\}\\), the edges between the groups are \\(s \\to b\\) (4), \\(a \\to b\\) (3), \\(a \\to t\\) (5) and \\(b \\to a\\) (6). What is \\(c(S, T)\\)?', choices: ['12', '18', '6', '9'], answer: 0, explain: 'Only edges from \\(S\\) to \\(T\\) count: \\(4 + 3 + 5 = 12\\). The edge \\(b \\to a\\) runs from \\(T\\) into \\(S\\), so it is ignored.' },
-          { q: 'What does the Edmonds–Karp algorithm add to the Ford–Fulkerson method?', choices: ['Always augment along a shortest path (fewest edges), found by BFS', 'Always augment along the path with the largest bottleneck', 'Use depth-first search because it is faster', 'Skip backward steps to save time'], answer: 0, explain: 'Edmonds–Karp is Ford–Fulkerson with BFS paths. That choice limits the work to \\(O(|V| \\cdot |E|^2)\\) regardless of capacity values. The largest-bottleneck rule is a different, also reasonable, heuristic.' },
-          { q: 'All capacities are whole numbers. Which statement is guaranteed?', choices: ['Ford–Fulkerson stops, and it finds a maximum flow with a whole number on every edge', 'Ford–Fulkerson needs exactly \\(|E|\\) augmentations', 'The maximum flow equals the sum of all capacities', 'Every edge ends up saturated'], answer: 0, explain: 'Each push adds at least 1, so the method must stop, and starting from 0 every update adds or subtracts whole numbers. Usually only the edges of a minimum cut end up full.' },
-          { q: 'To find a maximum matching between 5 workers and 6 jobs as a flow problem, which capacities do you use?', choices: ['1 on every edge: s → worker, worker → job, job → t', '5 on edges out of s and 6 on edges into t', 'The number of jobs each worker is qualified for', 'Unlimited capacity on every edge'], answer: 0, explain: 'Capacity 1 into each worker and out of each job means each is used at most once, so an integer maximum flow is a maximum matching.' },
-          { q: 'Ava, Ben and Cy are each qualified only for jobs in {Label, Train}. What does Hall\'s condition tell you?', choices: ['At most two of them can be placed, because three workers share only two jobs', 'All three can be placed if the search runs long enough', 'The condition holds because each worker qualifies for at least one job', 'Nothing, because Hall\'s condition only looks at single workers'], answer: 0, explain: 'For \\(A = \\{\\text{Ava}, \\text{Ben}, \\text{Cy}\\}\\), \\(N(A) = \\{\\text{Label}, \\text{Train}\\}\\) and \\(|N(A)| = 2 \\lt 3\\). Hall\'s condition checks every group of workers, including groups of two or three.' },
+          { q: 'What does the Edmonds–Karp algorithm add to the Ford–Fulkerson method?', choices: ['Always augment along the path with the largest bottleneck', 'Always augment along a shortest path (fewest edges), found by BFS', 'Use depth-first search because it is faster', 'Skip backward steps to save time'], answer: 1, explain: 'Edmonds–Karp is Ford–Fulkerson with BFS paths. That choice limits the work to \\(O(|V| \\cdot |E|^2)\\) regardless of capacity values. The largest-bottleneck rule is a different, also reasonable, heuristic.' },
+          { q: 'All capacities are whole numbers. Which statement is guaranteed?', choices: ['Ford–Fulkerson needs exactly \\(|E|\\) augmentations', 'The maximum flow equals the sum of all capacities', 'Ford–Fulkerson stops, and it finds a maximum flow with a whole number on every edge', 'Every edge ends up saturated'], answer: 2, explain: 'Each push adds at least 1, so the method must stop, and starting from 0 every update adds or subtracts whole numbers. Usually only the edges of a minimum cut end up full.' },
+          { q: 'To find a maximum matching between 5 workers and 6 jobs as a flow problem, which capacities do you use?', choices: ['5 on edges out of s and 6 on edges into t', 'The number of jobs each worker is qualified for', 'Unlimited capacity on every edge', '1 on every edge: s → worker, worker → job, job → t'], answer: 3, explain: 'Capacity 1 into each worker and out of each job means each is used at most once, so an integer maximum flow is a maximum matching.' },
+          { q: 'Ava, Ben and Cy are each qualified only for jobs in {Label, Train}. What does Hall\'s condition tell you?', choices: ['At most two can be placed, because three workers share only two jobs', 'All three can be placed if the search runs long enough', 'The condition holds because each worker qualifies for at least one job', 'Nothing, because Hall\'s condition only looks at single workers'], answer: 0, explain: 'For \\(A = \\{\\text{Ava}, \\text{Ben}, \\text{Cy}\\}\\), \\(N(A) = \\{\\text{Label}, \\text{Train}\\}\\) and \\(|N(A)| = 2 \\lt 3\\). Hall\'s condition checks every group of workers, including groups of two or three.' },
           { q: 'The minimum cut of a data pipeline consists of links L1 and L2. You can afford one upgrade. Which choice can raise the maximum throughput?', choices: ['Upgrade a link that carries no flow today', 'Upgrade L1 or L2', 'Upgrade the link with the largest capacity', 'No upgrade can change the maximum flow'], answer: 1, explain: 'The maximum flow equals the minimum cut, so only raising a cut edge can raise it. If the network has several minimum cuts, you may need to upgrade an edge in each of them before the throughput moves.' },
         ],
       },

@@ -2,137 +2,8 @@
    Propositions and connectives, the conditional, equivalence laws, predicates and quantifiers, and the
    same ideas written as Boolean expressions in code. */
 (() => {
-  // ---- propositional formulas in p q r s with ¬ ∧ ∨ ⊕ → ↔ (keyboard forms ~ & | ^ -> <->) ----
-  const VARS = ['p', 'q', 'r', 's'];
-  const SYMS = [['<->', '↔'], ['<=>', '↔'], ['↔', '↔'], ['⇔', '↔'], ['->', '→'], ['=>', '→'], ['→', '→'], ['⇒', '→'],
-    ['&&', '∧'], ['∧', '∧'], ['&', '∧'], ['||', '∨'], ['∨', '∨'], ['|', '∨'], ['⊕', '⊕'], ['^', '⊕'],
-    ['¬', '¬'], ['~', '¬'], ['!', '¬'], ['(', '('], [')', ')'], ['⊤', 'T'], ['⊥', 'F'], ['1', 'T'], ['0', 'F']];
-  const WORDS = { and: '∧', or: '∨', not: '¬', xor: '⊕', implies: '→', iff: '↔', true: 'T', false: 'F' };
-  function lex(src) {
-    const s = String(src);
-    const toks = [];
-    let i = 0;
-    outer: while (i < s.length) {
-      if (/\s/.test(s[i])) { i++; continue; }
-      for (const [k, v] of SYMS) if (s.startsWith(k, i)) { toks.push(v); i += k.length; continue outer; }
-      const w = /^[A-Za-z]+/.exec(s.slice(i));
-      if (!w) throw new Error(`I don't recognise the symbol "${s[i]}". Use ¬ ∧ ∨ ⊕ → ↔, or type ~ & | ^ -> <->.`);
-      const word = w[0];
-      if (WORDS[word.toLowerCase()]) toks.push(WORDS[word.toLowerCase()]);
-      else for (const c of word) {
-        if (VARS.includes(c) || c === 'T' || c === 'F') toks.push(c);
-        else if (VARS.includes(c.toLowerCase())) toks.push(c.toLowerCase());
-        else throw new Error(`"${c}" is not a variable here. Use p, q, r and s (T and F are the constants true and false).`);
-      }
-      i += word.length;
-    }
-    return toks;
-  }
-  // precedence from loosest to tightest: ↔, →, ⊕, ∨, ∧, then ¬. → groups to the right: p → q → r = p → (q → r)
-  const BIN = ['↔', '→', '⊕', '∨', '∧'];
-  function parse(src) {
-    const t = lex(src);
-    let i = 0;
-    if (!t.length) throw new Error('Type a formula, for example p → q.');
-    function level(k) {
-      if (k === BIN.length) return unary();
-      const op = BIN[k];
-      const left = level(k + 1);
-      if (t[i] !== op) return left;
-      i++;
-      if (op === '→') return { op, a: left, b: level(k) };
-      let n = { op, a: left, b: level(k + 1) };
-      while (t[i] === op) { i++; n = { op, a: n, b: level(k + 1) }; }
-      return n;
-    }
-    function unary() {
-      if (t[i] === '¬') { i++; return { op: '¬', a: unary() }; }
-      const tok = t[i++];
-      if (tok === '(') {
-        const n = level(0);
-        if (t[i++] !== ')') throw new Error('A "(" is missing its matching ")".');
-        return n;
-      }
-      if (VARS.includes(tok)) return { v: tok };
-      if (tok === 'T' || tok === 'F') return { c: tok === 'T' };
-      if (tok === undefined) throw new Error('The formula ends too early: every operator needs something on its right.');
-      throw new Error(`"${tok}" cannot start a formula here. Expected a variable, ¬ or "(".`);
-    }
-    const tree = level(0);
-    if (i < t.length) throw new Error(t[i] === ')' ? 'There is a ")" without a matching "(".' : `Something is missing before "${t[i]}". Put an operator such as ∧ or → between two parts.`);
-    return tree;
-  }
-  function ev(n, env) {
-    if (n.v) return env[n.v];
-    if ('c' in n) return n.c;
-    const a = ev(n.a, env);
-    if (n.op === '¬') return !a;
-    const b = ev(n.b, env);
-    if (n.op === '∧') return a && b;
-    if (n.op === '∨') return a || b;
-    if (n.op === '⊕') return a !== b;
-    if (n.op === '→') return !a || b;
-    return a === b;
-  }
-  // fully parenthesised except for chains of the same ∧ or ∨, so students never have to recall precedence
-  function show(n, parent) {
-    if (n.v) return n.v;
-    if ('c' in n) return n.c ? 'T' : 'F';
-    if (n.op === '¬') return '¬' + show(n.a, '¬');
-    const s = show(n.a, n.op) + ' ' + n.op + ' ' + show(n.b, n.op);
-    return !parent || (parent === n.op && (n.op === '∧' || n.op === '∨')) ? s : '(' + s + ')';
-  }
-  const TEXOP = { '∧': '\\land', '∨': '\\lor', '⊕': '\\oplus', '→': '\\to', '↔': '\\leftrightarrow' };
-  function toTex(n, parent) {
-    if (n.v) return n.v;
-    if ('c' in n) return n.c ? '\\mathrm{T}' : '\\mathrm{F}';
-    if (n.op === '¬') return '\\neg ' + toTex(n.a, '¬');
-    const s = toTex(n.a, n.op) + ' ' + TEXOP[n.op] + ' ' + toTex(n.b, n.op);
-    return !parent || (parent === n.op && (n.op === '∧' || n.op === '∨')) ? s : '(' + s + ')';
-  }
-  // sub-formulas from the inside out, each listed once: the order a person evaluates them in
-  function steps(n, out = [], seen = new Set()) {
-    if (n.v || 'c' in n) return out;
-    steps(n.a, out, seen);
-    if (n.b) steps(n.b, out, seen);
-    const k = show(n);
-    if (!seen.has(k)) { seen.add(k); out.push(n); }
-    return out;
-  }
-  function collect(n, acc) { if (n.v) acc.add(n.v); if (n.a) collect(n.a, acc); if (n.b) collect(n.b, acc); return acc; }
-  const varsOf = (...trees) => { const acc = new Set(); trees.forEach((t) => collect(t, acc)); return VARS.filter((v) => acc.has(v)); };
-  // rows in textbook order: all T first, the last variable alternating fastest
-  function assignments(vars) {
-    const out = [];
-    for (let m = 0; m < 2 ** vars.length; m++) {
-      const env = {};
-      vars.forEach((v, j) => { env[v] = !((m >> (vars.length - 1 - j)) & 1); });
-      out.push(env);
-    }
-    return out;
-  }
-  const L = (b) => (b ? 'T' : 'F');
-  const tf = (b) => `<span class="pill ${b ? 't' : 'f'}">${L(b)}</span>`;
-  const envText = (vars, e) => vars.map((v) => `${v} = ${L(e[v])}`).join(', ');
-  function firstDifference(f, g) {
-    const vars = varsOf(f, g);
-    return { vars, bad: assignments(vars).find((e) => ev(f, e) !== ev(g, e)) };
-  }
-  function sameMeaning(srcA, srcB) {
-    try { return !firstDifference(parse(srcA), parse(srcB)).bad; } catch { return false; }
-  }
-  // one short reason per operator, used when a row is explained
-  function reason(n, env) {
-    const a = ev(n.a, env);
-    const b = n.b ? ev(n.b, env) : null;
-    const A = show(n.a), B = n.b ? show(n.b) : '';
-    if (n.op === '¬') return `${A} is ${L(a)}, and ¬ flips it`;
-    if (n.op === '∧') return a && b ? 'both sides are T' : `${!a ? A : B} is F`;
-    if (n.op === '∨') return a || b ? `${a ? A : B} is T` : 'both sides are F';
-    if (n.op === '⊕') return a !== b ? 'exactly one side is T' : `both sides are ${L(a)}`;
-    if (n.op === '→') return a && !b ? 'hypothesis T, conclusion F: the only false case' : !a ? 'the hypothesis is F, so it is vacuously true' : 'the conclusion is T';
-    return a === b ? `both sides are ${L(a)}` : 'the two sides differ';
-  }
+  // ---- propositional formulas: the parser, evaluator and printers live in DM.logic (src/lib/logic.js) ----
+  const { parse, ev, show, toTex, steps, varsOf, assignments, L, tf, envText, firstDifference, sameMeaning, reason } = DM.logic;
   // a static truth table for the concept slides: cols = [[texHeader, env => bool], ...]
   function ttHtml(vars, cols, hit) {
     const head = vars.map((v) => `<th>\\(${v}\\)</th>`).concat(cols.map(([t]) => `<th>\\(${t}\\)</th>`)).join('');
@@ -142,7 +13,7 @@
   const TT_BASIC = ttHtml(['p', 'q'], [['\\neg p', (e) => !e.p], ['p \\land q', (e) => e.p && e.q], ['p \\lor q', (e) => e.p || e.q], ['p \\oplus q', (e) => e.p !== e.q]]);
   const TT_COND = ttHtml(['p', 'q'], [['p \\to q', (e) => !e.p || e.q]], (e) => e.p && !e.q);
 
-  // ---- the quantifier playground's world: shapes with a colour and a size ----
+  // ---- the quantifier playground's world: shapes with a color and a size ----
   const HUES = { red: 'var(--false)', blue: 'var(--fnc)', green: 'var(--true)' };
   const is = {
     Circle: (o) => o.shape === 'circle', Square: (o) => o.shape === 'square', Triangle: (o) => o.shape === 'triangle',
@@ -158,7 +29,7 @@
       note: 'A ∀ statement needs every object to pass. One object that fails is a counterexample, and one is enough.' },
     { tex: String.raw`\exists x\  \text{Red}(x)`, en: 'Some object is red.', q: '∃', f: is.Red,
       neg: String.raw`\forall x\  \neg\text{Red}(x)`, negEn: 'No object is red.',
-      note: 'An ∃ statement needs just one witness. To make it false you would have to recolour every red object.' },
+      note: 'An ∃ statement needs just one witness. To make it false you would have to recolor every red object.' },
     { tex: String.raw`\forall x\  (\text{Circle}(x) \to \text{Red}(x))`, en: 'Every circle is red.', q: '∀', f: (x) => !is.Circle(x) || is.Red(x),
       neg: String.raw`\exists x\  (\text{Circle}(x) \land \neg\text{Red}(x))`, negEn: 'Some circle is not red.',
       note: 'Squares and triangles pass automatically: for them Circle(x) is false, so the conditional is vacuously true. Only a circle that is not red can break this statement.' },
@@ -171,15 +42,15 @@
     { tex: String.raw`\exists x\  (\text{Triangle}(x) \to \text{Large}(x))`, en: 'Some object is large if it is a triangle.', q: '∃', f: (x) => !is.Triangle(x) || is.Large(x),
       neg: String.raw`\forall x\  (\text{Triangle}(x) \land \neg\text{Large}(x))`, negEn: 'Every object is a small triangle.',
       note: 'The trap with → inside ∃: any object that is not a triangle is a witness, because the conditional is vacuously true for it. The statement says almost nothing.' },
-    { tex: String.raw`\forall x\  \exists y\  (x \ne y \land \text{SameColour}(x, y))`, en: 'Every object shares its colour with some other object.', q: '∀∃', iv: 'y', f: (x, y) => x !== y && x.color === y.color,
-      neg: String.raw`\exists x\  \forall y\  (x = y \lor \neg\text{SameColour}(x, y))`, negEn: 'Some object has a colour that no other object has.',
+    { tex: String.raw`\forall x\  \exists y\  (x \ne y \land \text{SameColor}(x, y))`, en: 'Every object shares its color with some other object.', q: '∀∃', iv: 'y', f: (x, y) => x !== y && x.color === y.color,
+      neg: String.raw`\exists x\  \forall y\  (x = y \lor \neg\text{SameColor}(x, y))`, negEn: 'Some object has a color that no other object has.',
       note: 'Read nested quantifiers left to right. For each x you may pick a different y, so each object only needs a partner of its own.' },
-    { tex: String.raw`\forall x\  \exists y\  (\text{Square}(y) \land \text{SameColour}(x, y))`, en: 'Every object has a square of its colour.', q: '∀∃', iv: 'y', f: (x, y) => is.Square(y) && x.color === y.color,
-      neg: String.raw`\exists x\  \forall y\  (\neg\text{Square}(y) \lor \neg\text{SameColour}(x, y))`, negEn: 'Some object has no square of its colour.',
+    { tex: String.raw`\forall x\  \exists y\  (\text{Square}(y) \land \text{SameColor}(x, y))`, en: 'Every object has a square of its color.', q: '∀∃', iv: 'y', f: (x, y) => is.Square(y) && x.color === y.color,
+      neg: String.raw`\exists x\  \forall y\  (\neg\text{Square}(y) \lor \neg\text{SameColor}(x, y))`, negEn: 'Some object has no square of its color.',
       note: 'Here y may depend on x: a red object points to a red square and a blue object to a blue square. The next statement swaps the two quantifiers.' },
-    { tex: String.raw`\exists y\  \forall x\  (\text{Square}(y) \land \text{SameColour}(x, y))`, en: 'One square has the colour of every object.', q: '∃∀', iv: 'x', f: (y, x) => is.Square(y) && x.color === y.color,
-      neg: String.raw`\forall y\  \exists x\  (\neg\text{Square}(y) \lor \neg\text{SameColour}(x, y))`, negEn: 'Every candidate y is not a square or differs in colour from some x.',
-      note: 'Same words, quantifiers swapped. Now one y must work for every x at once, which can only happen when every object has the same colour.' },
+    { tex: String.raw`\exists y\  \forall x\  (\text{Square}(y) \land \text{SameColor}(x, y))`, en: 'One square has the color of every object.', q: '∃∀', iv: 'x', f: (y, x) => is.Square(y) && x.color === y.color,
+      neg: String.raw`\forall y\  \exists x\  (\neg\text{Square}(y) \lor \neg\text{SameColor}(x, y))`, negEn: 'Every candidate y is not a square or differs in color from some x.',
+      note: 'Same words, quantifiers swapped. Now one y must work for every x at once, which can only happen when every object has the same color.' },
   ];
   // per object: does the inner part hold, and which partner object explains it
   function evaluate(st, D) {
@@ -204,7 +75,7 @@
     { p: 'the model is retrained', np: 'the model is not retrained', q: 'accuracy improves', nq: 'accuracy does not improve' },
     { p: 'the server is down', np: 'the server is up', q: 'an alert is sent', nq: 'no alert is sent' },
     { p: 'the battery is low', np: 'the battery is not low', q: 'the phone dims the screen', nq: 'the phone does not dim the screen' },
-    { p: 'you practise daily', np: 'you do not practise daily', q: 'your typing speed improves', nq: 'your typing speed does not improve' },
+    { p: 'you practice daily', np: 'you do not practice daily', q: 'your typing speed improves', nq: 'your typing speed does not improve' },
   ];
   const cap = (s) => s[0].toUpperCase() + s.slice(1);
   const PAIRS = [
@@ -681,7 +552,7 @@
       {
         title: 'Lab: quantifier playground',
         kind: 'lab',
-        html: String.raw`<p class="muted small">The domain is the row of objects. Pick a statement: witnesses glow green and counterexamples glow red. Click an object to change its shape, colour or size, add or remove objects, and watch the truth value respond. Try emptying the domain completely.</p>`,
+        html: String.raw`<p class="muted small">The domain is the row of objects. Pick a statement: witnesses glow green and counterexamples glow red. Click an object to change its shape, color or size, add or remove objects, and watch the truth value respond. Try emptying the domain completely.</p>`,
         render(body, ctx) {
           const { h, s } = ctx;
           let D = START_WORLD.map((o) => ({ ...o }));
@@ -748,7 +619,7 @@
               ? [h('b.mono', { style: { color: 'var(--ink)' } }, `#${pick + 1}`), seg('shape', ['circle', 'square', 'triangle']), seg('color', ['red', 'blue', 'green']), seg('size', ['small', 'large']),
                 h('button.btn.sm', { onclick: () => { D.splice(pick, 1); pick = Math.min(pick, D.length - 1); draw(); } }, 'Remove')]
               : [h('span', 'The domain is empty.')],
-              h('button.btn.sm', { onclick: () => { D = START_WORLD.map((x) => ({ ...x })); pick = 3; draw(); } }, 'Reset objects'));
+              h('button.btn.sm', { onclick: () => { D = START_WORLD.map((x) => ({ ...x })); pick = 3; draw(); } }, 'Reset'));
             negBox.innerHTML = `<b>Negation:</b> \\(${st.neg}\\), "${st.negEn}" It is ${tf(!r.truth)}: a statement and its negation always have opposite values.`;
             ctx.tex(negBox);
           }
@@ -810,7 +681,7 @@
           ['', ''],
           ['col = []', 'An empty list, <code>col</code> (short for column), that will collect the formula\'s value in each row, so we can classify the whole column after the loop. At the end it holds 8 Booleans.'],
           ['for p, q, r in product([True, False], repeat=3):', '<code>product([True, False], repeat=3)</code> yields the 8 triples <code>(True, True, True)</code>, <code>(True, True, False)</code>, …, <code>(False, False, False)</code>, in textbook order with T first. Each triple is unpacked into <code>p</code>, <code>q</code> and <code>r</code>.'],
-          ['    col.append(formula(p, q, r))', 'Evaluates the formula for this row and stores the result at the end of <code>col</code>. Python calls <code>formula</code>, which calls <code>implies</code> four times.'],
+          ['    col.append(formula(p, q, r))', 'Evaluates the formula for this row and stores the result at the end of <code>col</code>. Python calls <code>formula</code>, which calls <code>implies</code> four times in most rows but only three times in the two rows where \\(p \\to q\\) is false: there the short-circuit <code>and</code> inside <code>chain</code> never calls <code>implies(q, r)</code>.'],
           ['    print(int(p), int(q), int(r), "|", int(col[-1]))', '<code>col[-1]</code> is the last item in the list: the value just added. <code>int(True)</code> is 1 and <code>int(False)</code> is 0, so each row prints as digits, such as <code>1 0 1 | 1</code>. Computer scientists often write truth tables with 1 for T and 0 for F; Module 12 does the same for circuits.'],
           ['print("tautology?", all(col), "satisfiable?", any(col))', '<code>all(col)</code> asks "is it T in every row?", the definition of a tautology and the quantifier \\(\\forall\\). <code>any(col)</code> asks "is it T in some row?", which means satisfiable, the quantifier \\(\\exists\\). Output: <code>tautology? True satisfiable? True</code>.'],
         ],
@@ -826,8 +697,8 @@
         fivew: {
           what: 'Compares \\(p \\to q\\) with its converse, its contrapositive and \\(\\neg p \\lor q\\), reporting either "equivalent" or the first row where they differ.',
           why: 'It turns the definition of logical equivalence ("same value in every row") directly into code, and it shows that one disagreeing row is all it takes to refute an equivalence.',
-          who: 'Developers refactoring a tangled condition who want proof that the new version behaves exactly like the old one, and compiler writers checking that an optimisation keeps meaning.',
-          where: 'Refactoring tools, logic tutors, and equivalence checkers in chip design, which compare a circuit before and after optimisation.',
+          who: 'Developers refactoring a tangled condition who want proof that the new version behaves exactly like the old one, and compiler writers checking that an optimization keeps meaning.',
+          where: 'Refactoring tools, logic tutors, and equivalence checkers in chip design, which compare a circuit before and after optimization.',
           when: 'Whenever you rewrite a Boolean condition and want certainty rather than a hunch. For a few variables, checking every row is instant and leaves no room for doubt.',
         },
         lines: [
@@ -897,7 +768,7 @@
           },
           {
             name: 'Never compare a Boolean to True or False',
-            html: '<p><code>is_valid == True</code> is the proposition \\(p \\leftrightarrow \\mathrm{T}\\), which is equivalent to \\(p\\) itself, so the comparison only adds noise. It can also mislead: values such as <code>1</code> or a non-empty list count as true in an <code>if</code>, yet the comparison treats them differently. To test for "no value", use <code>is None</code>.</p>',
+            html: '<p><code>is_valid == True</code> is the proposition \\(p \\leftrightarrow \\mathrm{T}\\), which is equivalent to \\(p\\) itself, so the comparison only adds noise. It can also mislead: a value such as <code>2</code> or a non-empty list counts as true in an <code>if</code>, yet <code>2 == True</code> and <code>[1] == True</code> are both <code>False</code>, so the comparison and the plain <code>if</code> disagree. To test for "no value", use <code>is None</code>.</p>',
             bad: 'if is_valid == True:\n    save()\nif done == False:\n    retry()',
             good: 'if is_valid:\n    save()\nif not done:\n    retry()',
           },
@@ -1076,11 +947,11 @@
           { q: 'Which sentence is a proposition?', choices: ['"Close the window."', '"Is 17 prime?"', '"17 is a prime number."', String.raw`"\(x + 2 = 5\)."`], answer: 2, explain: String.raw`A proposition must be true or false. "17 is a prime number" is true. A command and a question have no truth value, and \(x + 2 = 5\) becomes true or false only once \(x\) is chosen, which makes it a predicate.` },
           { q: String.raw`When is \(p \to q\) false?`, choices: [String.raw`When \(p\) is false and \(q\) is true`, String.raw`When \(p\) is true and \(q\) is false`, 'When both are false', String.raw`Whenever \(q\) is false`], answer: 1, explain: String.raw`A conditional is a promise that breaks only when the hypothesis happens and the conclusion does not. When \(p\) is false the conditional is vacuously true, whatever \(q\) is.` },
           { q: String.raw`Let \(p\): "you can board" and \(q\): "you have a ticket". Which formula means "You can board only if you have a ticket"?`, choices: [String.raw`\(q \to p\)`, String.raw`\(p \to q\)`, String.raw`\(p \land q\)`, String.raw`\(p \leftrightarrow q\)`], answer: 1, explain: String.raw`"Only if" introduces the conclusion: boarding requires a ticket, so boarding \(\to\) ticket. A ticket is necessary but not sufficient (you could still miss the flight), so \(q \to p\) says something different.` },
-          { q: 'What is the contrapositive of "If a number is divisible by 4, then it is even"?', choices: ['If a number is even, then it is divisible by 4.', 'If a number is not divisible by 4, then it is not even.', 'If a number is not even, then it is not divisible by 4.', 'A number is divisible by 4 and not even.'], answer: 2, explain: String.raw`The contrapositive swaps and negates: \(\neg q \to \neg p\). It is equivalent to the original, so it is true as well. A is the converse (false: 6 is even but not divisible by 4) and B is the inverse (also false).` },
+          { q: 'What is the contrapositive of "If a number is divisible by 4, then it is even"?', choices: ['If a number is even, then it is divisible by 4.', 'If a number is not divisible by 4, then it is not even.', 'If a number is not even, then it is not divisible by 4.', 'A number is divisible by 4 and not even.'], answer: 2, explain: String.raw`The contrapositive swaps and negates: \(\neg q \to \neg p\). It is equivalent to the original, so it is true as well. "If a number is even, then it is divisible by 4" is the converse (false: 6 is even but not divisible by 4) and "If a number is not divisible by 4, then it is not even" is the inverse (also false).` },
           { q: String.raw`Which formula is logically equivalent to \(\neg(p \land q)\)?`, choices: [String.raw`\(\neg p \land \neg q\)`, String.raw`\(\neg p \lor \neg q\)`, String.raw`\(p \lor q\)`, String.raw`\(\neg p \to \neg q\)`], answer: 1, explain: String.raw`De Morgan: "not both" means "at least one is false". \(\neg p \land \neg q\) says both are false, which is stronger. In the row \(p\) = T, \(q\) = F, \(\neg(p \land q)\) is T but \(\neg p \land \neg q\) is F.` },
           { q: String.raw`The formula \((p \land (p \to q)) \to q\) is true in all four rows of its truth table. It is therefore a…`, choices: ['contradiction', 'contingency', 'tautology', 'predicate'], answer: 2, explain: 'A tautology is true for every assignment of truth values. This one is modus ponens, the most used rule of inference in proofs (Module 3).' },
           { q: String.raw`What is the negation of \(\forall x\  (x^2 \gt 0)\)?`, choices: [String.raw`\(\forall x\  (x^2 \lt 0)\)`, String.raw`\(\exists x\  (x^2 \le 0)\)`, String.raw`\(\exists x\  (x^2 \gt 0)\)`, String.raw`\(\forall x\  (x^2 \le 0)\)`], answer: 1, explain: String.raw`\(\neg \forall x\  P(x) \equiv \exists x\  \neg P(x)\): flip the quantifier and negate the inside. The negation of \(x^2 \gt 0\) is \(x^2 \le 0\), not \(x^2 \lt 0\). Over the integers the negation is true, with witness \(x = 0\).` },
-          { q: 'Over the integers, which statement is true?', choices: [String.raw`\(\exists y\  \forall x\  (y \gt x)\)`, String.raw`\(\forall x\  \exists y\  (y \gt x)\)`, 'Both of them', 'Neither of them'], answer: 1, explain: String.raw`In \(\forall x\  \exists y\), the choice of \(y\) may depend on \(x\): take \(y = x + 1\). In \(\exists y\  \forall x\), one \(y\) would have to beat every integer, including itself, which is impossible. Swapping different quantifiers changes the meaning.` },
+          { q: 'Over the integers, which statement is true?', choices: [String.raw`\(\exists y\  \forall x\  (y \gt x)\)`, String.raw`\(\forall x\  \exists y\  (y \gt x)\)`, 'Both of them', 'Neither of them'], answer: 1, fixed: true, explain: String.raw`In \(\forall x\  \exists y\), the choice of \(y\) may depend on \(x\): take \(y = x + 1\). In \(\exists y\  \forall x\), one \(y\) would have to beat every integer, including itself, which is impossible. Swapping different quantifiers changes the meaning.` },
           { q: 'Why is <code>if user is not None and user.age &gt;= 18:</code> safe when <code>user</code> is <code>None</code>?', choices: ['Python converts <code>None</code> to 0', 'Short-circuit evaluation: once the left side is <code>False</code>, the right side never runs', '<code>and</code> evaluates its right side first', 'It is not safe: it raises an error'], answer: 1, explain: '<code>and</code> stops at the first false operand. With no user, <code>user is not None</code> is <code>False</code>, so <code>user.age</code> is never evaluated. Reverse the two tests and the code crashes with an <code>AttributeError</code>.' },
           { q: 'What does <code>all([])</code> return in Python?', choices: ['<code>True</code>', '<code>False</code>', '<code>None</code>', 'It raises an error'], answer: 0, explain: String.raw`<code>all</code> is \(\forall\). Over an empty domain there is no counterexample, so the statement is vacuously true. <code>any([])</code> is <code>False</code> because there is no witness. Code that must reject empty input has to check for it separately.` },
         ],

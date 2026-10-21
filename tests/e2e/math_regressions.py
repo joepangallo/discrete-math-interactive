@@ -1,34 +1,34 @@
 """Student-facing arithmetic and recurrence regressions.
 
-Usage: python3 tests/e2e/math_regressions.py /tmp/discrete-math.html
-Build first with: node src/build.mjs --out /tmp/discrete-math.html
+Usage: python3 tests/e2e/math_regressions.py discrete-math-interactive.html
 Requires Python Playwright and either its Chromium or Google Chrome.
 """
 import argparse
-from pathlib import Path
+import sys
 
 from playwright.sync_api import sync_playwright
+
+from _harness import Checks, goto_slide, launch, serve, slide_key, wait_ready
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("html", type=Path)
+    parser.add_argument("html")
     args = parser.parse_args()
-    checks = 0
+    check = Checks()
+    srv, base = serve(args.html)
 
     with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch()
-        except Exception:  # Chromium may be supplied by an installed Chrome instead.
-            browser = p.chromium.launch(channel="chrome")
+        browser = launch(p)
         page = browser.new_page(viewport={"width": 1440, "height": 1000}, reduced_motion="reduce")
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        page.goto(args.html.resolve().as_uri())
-        page.wait_for_function("document.body.dataset.ready === '1'")
-        page.evaluate("DM.goTo('proofs-6', {instant: true})")
+        page.goto(base)
+        wait_ready(page)
+        conjecture_key = slide_key(page, "proofs", title_re=r"conjecture tester")
+        goto_slide(page, conjecture_key)
         page.get_by_role("button", name="Your own claim", exact=True).click()
-        conjecture = page.locator('section[data-key="proofs-6"]')
+        conjecture = page.locator(f'section[data-key="{conjecture_key}"]')
 
         # The first three cases used to fabricate counterexamples through lost integer bits.
         # The fractional cases also distinguish exact arithmetic from a final-result guard.
@@ -53,15 +53,15 @@ def main():
             page.get_by_role("textbox", name="f(n)", exact=True).fill(formula)
             page.get_by_role("combobox", name="Property", exact=True).select_option(prop)
             text = conjecture.inner_text()
-            assert count in text, (formula, prop, text)
-            assert conjecture.locator(".pf-badge").text_content() == verdict, (formula, verdict)
+            badge = conjecture.locator(".pf-badge").text_content()
+            ok = count in text and badge == verdict
             if verdict == "incomplete check":
-                assert "Every tested case holds" not in text, formula
-                assert "First counterexample" not in text, formula
-            checks += 1
+                ok = ok and "Every tested case holds" not in text and "First counterexample" not in text
+            check(ok, f"conjecture {formula!r} {prop}: expected '{count}' / {verdict} (got badge {badge!r})")
 
-        page.evaluate("DM.goTo('recurrences-7', {instant: true})")
-        recurrence = page.locator('section[data-key="recurrences-7"]')
+        recurrence_key = slide_key(page, "recurrences", title_re=r"characteristic-equation solver")
+        goto_slide(page, recurrence_key)
+        recurrence = page.locator(f'section[data-key="{recurrence_key}"]')
         # Cover cancellation, zero solutions, repeated unit roots, negative roots,
         # opposite real roots, and complex roots without assuming periodicity.
         cases = [
@@ -95,14 +95,13 @@ def main():
             for key, value in zip(("c1", "c2", "a0", "a1"), values):
                 page.locator(f"#rc-ce-{key}").fill(str(value))
             text = recurrence.locator(".rc-steps").inner_text()
-            assert first in text and second in text, (values, text)
-            assert "Mismatch: check the inputs" not in recurrence.inner_text(), values
-            checks += 1
+            check(first in text and second in text and "Mismatch: check the inputs" not in recurrence.inner_text(),
+                  f"recurrence {values}: expected '{first}' and '{second}'")
 
-        assert not errors, errors
         browser.close()
-    print(f"PASS: {checks} math UI regression cases; no browser errors")
+    srv.shutdown()
+    return check.finish([f"pageerror: {e}" for e in errors])
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

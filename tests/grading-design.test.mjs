@@ -1,13 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import vm from 'node:vm';
 
+/* Modules may read the shared helpers (DMUtil, src/lib/*.js) while loading, so the sandbox gets them too. */
 function loadModule(file) {
   let module;
-  const source = readFileSync(new URL(`../src/modules/${file}`, import.meta.url), 'utf8');
-  vm.runInNewContext(source, { DM: { module: (value) => { module = value; }, hlPy: (value) => value } }, { filename: file });
+  const sandbox = { DM: { module: (value) => { module = value; }, hlPy: (value) => value, renderMath: () => {}, modules: [], util: {}, kinds: {} }, console };
+  sandbox.globalThis = sandbox;
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(readFileSync(new URL('../src/util.js', import.meta.url), 'utf8'), sandbox, { filename: 'util.js' });
+  const libDir = new URL('../src/lib/', import.meta.url);
+  if (existsSync(libDir)) for (const f of readdirSync(libDir).filter((x) => x.endsWith('.js')).sort()) vm.runInContext(readFileSync(new URL(f, libDir), 'utf8'), sandbox, { filename: f });
+  vm.runInContext(readFileSync(new URL(`../src/modules/${file}`, import.meta.url), 'utf8'), sandbox, { filename: file });
   return module;
 }
 

@@ -3,40 +3,36 @@
 Every slide becomes one 16:9 page, followed by extra pages that expand what the interactive
 version reveals one piece at a time: every code line with its explanation, every quiz answer
 with its reasoning, sample practice problems with worked solutions, and all design principles.
+A clipped page fails the run, because a PDF nobody re-reads is where clipped content hides.
 
-Usage: python3 tests/e2e/make_pdf.py discrete-math-interactive.html discrete-math-companion.pdf
+Usage: python3 tests/e2e/make_pdf.py discrete-math-interactive.html discrete-math-companion.pdf [--allow-clipped]
 """
-import functools
-import http.server
+import argparse
 import os
 import sys
-import threading
 
 from playwright.sync_api import sync_playwright
 
-src, out = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
-root, name = os.path.split(src)
+from _harness import fonts_ok, launch, serve
 
-
-class Quiet(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *a):
-        pass
-
-
-srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=root))
-threading.Thread(target=srv.serve_forever, daemon=True).start()
+ap = argparse.ArgumentParser()
+ap.add_argument("html")
+ap.add_argument("pdf")
+ap.add_argument("--allow-clipped", action="store_true", help="write the PDF even when a page is clipped")
+args = ap.parse_args()
+out = os.path.abspath(args.pdf)
+srv, base = serve(args.html)
 
 with sync_playwright() as p:
-    try:
-        browser = p.chromium.launch()
-    except Exception:  # noqa: BLE001
-        browser = p.chromium.launch(channel="chrome")
+    browser = launch(p)
     page = browser.new_page(viewport={"width": 1280, "height": 720}, color_scheme="light")
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    page.goto(f"http://127.0.0.1:{srv.server_address[1]}/{name}?print=1")
-    page.wait_for_function("document.body.dataset.printReady === '1'", timeout=60000)
-    page.evaluate("document.fonts.ready")
+    page.goto(base + "?print=1")
+    page.wait_for_function("document.body.dataset.printReady === '1'", timeout=120000)
+    page.wait_for_function("window.katex", timeout=60000)
+    if not fonts_ok(page):
+        errors.append("the web fonts did not load; the PDF would use fallback fonts")
     page.wait_for_timeout(1500)
     n = page.evaluate("document.querySelectorAll('.print-page').length")
     clipped = page.evaluate("""() => [...document.querySelectorAll('.print-page')].map((pg, i) => {
@@ -47,8 +43,10 @@ with sync_playwright() as p:
     for c in clipped:
         print("CLIPPED", c)
     page.emulate_media(media="print")
-    page.pdf(path=out, prefer_css_page_size=True, print_background=True)
+    if not clipped or args.allow_clipped:
+        page.pdf(path=out, prefer_css_page_size=True, print_background=True)
     browser.close()
 srv.shutdown()
-print(f"wrote {out}: {n} pages" + (f", {len(errors)} page errors: {errors[:3]}" if errors else ""))
-sys.exit(1 if errors else 0)
+status = f"{n} pages" + (f", {len(errors)} page errors: {errors[:3]}" if errors else "") + (f", {len(clipped)} clipped" if clipped else "")
+print(("wrote " + out + ": " if not clipped or args.allow_clipped else "not written: ") + status)
+sys.exit(1 if errors or (clipped and not args.allow_clipped) else 0)

@@ -1,0 +1,21 @@
+{
+  "name": "discrete-math-interactive",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Interactive discrete mathematics and probability course: one self-contained HTML file with labs, runnable Python walkthroughs, generated practice, and quizzes.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "node src/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:unit": "node --test tests/content.test.mjs tests/generators.test.mjs tests/python.test.mjs tests/grading-design.test.mjs",
+    "test:build": "node --test tests/build.test.mjs",
+    "e2e": "python3 tests/e2e/verify.py discrete-math-interactive.html --python --trace --mobile",
+    "e2e:quick": "python3 tests/e2e/verify.py discrete-math-interactive.html --mobile && python3 tests/e2e/math_regressions.py discrete-math-interactive.html",
+    "e2e:runner": "python3 tests/e2e/runner.py discrete-math-interactive.html && python3 tests/e2e/runner.py discrete-math-interactive.html --query py=brython",
+    "pdf": "python3 tests/e2e/make_pdf.py discrete-math-interactive.html discrete-math-companion.pdf",
+    "check": "npm test && npm run e2e:quick"
+  }
+}

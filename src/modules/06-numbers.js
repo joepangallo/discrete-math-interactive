@@ -3,8 +3,7 @@
    number bases, fast powers, RSA, and everyday uses of mod (hashing, check digits, random numbers). */
 (() => {
   // ---- integer helpers shared by the labs and the practice generators ----
-  const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
-  const mod = (a, n) => ((a % n) + n) % n;
+  const { gcd, mod } = DMUtil.M; // the engine's gcd and always-non-negative mod, the same ones practice generators receive as M
   const powmod = (b, e, n) => { let r = 1 % n; b = mod(b, n); while (e > 0) { if (e % 2 === 1) r = (r * b) % n; b = (b * b) % n; e = Math.floor(e / 2); } return r; };
   // extended Euclid: returns [g, s, t] with g = s*a + t*b
   const egcd = (a, b) => { let [r0, r1, s0, s1, t0, t1] = [a, b, 1, 0, 0, 1]; while (r1) { const q = Math.floor(r0 / r1); [r0, r1] = [r1, r0 - q * r1]; [s0, s1] = [s1, s0 - q * s1]; [t0, t1] = [t1, t0 - q * t1]; } return [r0, s0, t0]; };
@@ -24,7 +23,7 @@
     id: 'numbers',
     num: 6,
     title: 'Integers & Number Theory',
-    objectives: [6],
+    objectives: [5, 6],
     terms: {
       'divides': 'a | b ("a divides b") means b = a·k for some integer k. Then a is a divisor (factor) of b, and b is a multiple of a.',
       'division algorithm': 'For any integer a and any integer d > 0 there is exactly one pair of integers q, r with a = d·q + r and 0 ≤ r < d.',
@@ -42,7 +41,6 @@
       'base': 'The number b whose powers give the place values of a numeral: in base 2 the places are 1, 2, 4, 8, …; in base 16 they are 1, 16, 256, …',
       'RSA': 'A public-key cryptosystem: the public key is (n, e) with n = p·q, the private key is d = e⁻¹ mod (p − 1)(q − 1). Encrypt with c = mᵉ mod n, decrypt with m = cᵈ mod n.',
       'public-key cryptography': 'Encryption with two keys: a public key that anyone may use to encrypt, and a private key, kept secret, that decrypts.',
-      'hash function': 'A function that maps a key to one of m buckets, such as h(k) = k mod m. Two keys in the same bucket are a collision.',
       'Luhn algorithm': 'The check-digit rule used on payment cards: double every second digit from the right, subtract 9 from results above 9, and require the total to be a multiple of 10.',
       'linear congruential generator': 'A simple pseudo-random generator: x₍ₖ₊₁₎ = (a·xₖ + c) mod m, started from a seed x₀.',
     },
@@ -204,11 +202,13 @@
         html: String.raw`<p class="muted small">The sieve finds every prime up to \(N\) without a single division. Each pass takes the smallest number that is still standing (it must be prime) and crosses out its multiples. <b>Step</b> runs one pass; <b>Play</b> shows each number fall. Colors show which prime removed each number.</p>`,
         render(body, ctx) {
           const { h, s } = ctx;
-          let N = 100, events = [], pos = 0, timer = null;
+          let N = 100, events = [], pos = 0;
           const svg = s('svg', { role: 'img', 'aria-label': 'Numbers from 1 to N; crossed-out numbers are composite, green numbers are prime' });
           const info = h('div.nt-side');
           const sizeSeg = h('div.seg', { 'aria-label': 'Largest number N' });
           const playBtn = h('button.btn.sm', { onclick: () => toggle() }, '▶ Play');
+          // one event per tick up to N = 100, two per tick for N = 200, so a full run takes about ten seconds either way
+          const player = ctx.ticker({ ms: 80, button: playBtn, tick: () => { if (pos >= events.length) return false; pos = Math.min(events.length, pos + (N > 100 ? 2 : 1)); draw(); return pos < events.length; } });
           body.append(
             h('div.row', { style: { gap: '0.4rem' } }, h('span.small.muted', 'Numbers up to N ='), sizeSeg, h('span', { style: { flex: 1 } }),
               h('button.btn.sm', { onclick: () => { stop(); pos = prevBoundary(); draw(); } }, '◀ Back'),
@@ -242,18 +242,15 @@
             }
             return { crossed, primes, cur, last, passStart };
           }
-          function stop() { if (timer) clearInterval(timer); timer = null; }
+          function stop() { player.stop(); }
           function toggle() {
-            if (timer) { stop(); draw(); return; }
-            if (pos >= events.length) pos = 0;
-            timer = setInterval(() => { if (pos >= events.length) { stop(); draw(); return; } pos++; draw(); }, N > 100 ? 40 : 85);
-            draw();
+            if (player.playing) { stop(); return; }
+            if (pos >= events.length) { pos = 0; draw(); }
+            player.start();
           }
-          ctx.onHide(stop);
 
           function draw() {
             ctx.rc(sizeSeg, ...[30, 60, 100, 200].map((k) => h('button', { 'aria-pressed': String(k === N), onclick: () => { stop(); N = k; build(); pos = nextBoundary(); draw(); } }, String(k))));
-            playBtn.textContent = timer ? '❚❚ Pause' : '▶ Play';
             const cols = N <= 100 ? 10 : 20, rows = Math.ceil(N / cols), cs = 40;
             svg.setAttribute('viewBox', `0 0 ${cols * cs} ${rows * cs}`);
             const st = stateAt(pos);
@@ -373,7 +370,7 @@
               h('span', { style: { flex: 1 } }),
               h('button.btn.sm', { onclick: () => { cur = Math.max(0, cur - 1); draw(); } }, '◀ Back'),
               h('button.btn.sm.primary', { onclick: () => { if (data && data.rows.length) cur = Math.min(data.rows.length - 1, cur + 1); draw(); } }, 'Step ▶'),
-              h('button.btn.sm', { onclick: () => { cur = 0; draw(); } }, 'Restart')),
+              h('button.btn.sm', { onclick: () => { cur = 0; draw(); } }, 'Reset')),
             msg,
             h('div.fill.nt-euclid', h('div.nt-side', viewSeg, left), h('div.nt-side', h('div.tiny.mono.muted', 'THE a × b RECTANGLE, CUT INTO SQUARES'), svg, legend, note)));
 
@@ -1038,9 +1035,10 @@
                   prompt: String.raw`Find the inverse of \(${a}\) modulo \(${n}\): the number \(x\) with \(0 \le x \lt ${n}\) and \(${a}x \equiv 1 \pmod{${n}}\).`,
                   answer: inv,
                   answerText: String(inv),
-                  check: (inp) => { const v = parseIntSafe(inp); return Number.isInteger(v) && mod(a * v, n) === 1; },
-                  hint: String.raw`\(\gcd(${a}, ${n}) = 1\), so an inverse exists. Try multiples of ${a} until one leaves remainder 1.`,
-                  solution: String.raw`Work through the multiples of ${a} modulo ${n}: \(${list.join(',\\ ')}\). So \(${a}^{-1} \equiv ${inv} \pmod{${n}}\). Check: \(${a} \cdot ${inv} = ${a * inv} = ${Math.floor((a * inv) / n)} \cdot ${n} + 1\). The extended Euclidean algorithm finds the same answer without the search.`,
+                  // the prompt asks for the representative in 0 … n−1, so inv + n or inv − n is not accepted
+                  check: (inp) => { const v = parseIntSafe(inp); return Number.isInteger(v) && v >= 0 && v < n && mod(a * v, n) === 1; },
+                  hint: String.raw`\(\gcd(${a}, ${n}) = 1\), so an inverse exists. Try multiples of ${a} until one leaves remainder 1, and give the answer between 0 and ${n - 1}.`,
+                  solution: String.raw`Work through the multiples of ${a} modulo ${n}: \(${list.join(',\\ ')}\). So \(${a}^{-1} \equiv ${inv} \pmod{${n}}\). Check: \(${a} \cdot ${inv} = ${a * inv} = ${Math.floor((a * inv) / n)} \cdot ${n} + 1\). Every number congruent to ${inv} works too (${inv + n}, ${inv - n}, …), but the question asks for the one in the range \(0 \le x \lt ${n}\). The extended Euclidean algorithm finds the same answer without the search.`,
                 };
               }
               if (kind === 1) {

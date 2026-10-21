@@ -3,29 +3,106 @@
 // explained, every module meets the slide mix, and nothing student-facing leaks private details.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const modDir = join(here, '..', 'src', 'modules');
+const root = join(here, '..');
+const modDir = join(root, 'src', 'modules');
 const files = readdirSync(modDir).filter((f) => /^\d\d-.*\.js$/.test(f)).sort();
 
+/* Shared helpers (src/lib/*.js) and the pure utilities load into the same sandbox the modules see. */
+function sandboxFor(found) {
+  const sandbox = { DM: { module: (m) => found.push(m), hlPy: (x) => x, renderMath: () => {}, modules: [], util: {}, kinds: {} }, console };
+  sandbox.globalThis = sandbox;
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(readFileSync(join(root, 'src', 'util.js'), 'utf8'), sandbox, { filename: 'util.js' });
+  const libDir = join(root, 'src', 'lib');
+  if (existsSync(libDir)) for (const f of readdirSync(libDir).filter((x) => x.endsWith('.js')).sort()) vm.runInContext(readFileSync(join(libDir, f), 'utf8'), sandbox, { filename: f });
+  return sandbox;
+}
 function load(file) {
   const found = [];
-  // modules may call these engine helpers while loading; stubs are enough for content checks
-  const sandbox = { DM: { module: (m) => found.push(m), hlPy: (x) => x, renderMath: () => {}, modules: [], util: {} }, console };
-  vm.runInNewContext(readFileSync(join(modDir, file), 'utf8'), sandbox, { filename: file });
+  const sandbox = sandboxFor(found);
+  vm.runInContext(readFileSync(join(modDir, file), 'utf8'), sandbox, { filename: file });
   assert.equal(found.length, 1, `${file} should register exactly one module`);
   return found[0];
 }
 
-const FORBIDDEN = [/keiser/i, /COT\s*2104/i, /\bclaude\b/i, /anthropic/i, /rubric/i, /academic integrity/i, /\/Users\//, /lorem ipsum/i];
+const FORBIDDEN = [/keiser/i, /COT\s*2104/i, /\bclaude\b/i, /anthropic/i, /\bopenai\b/i, /\bchatgpt\b/i, /\bgpt-?\d/i, /\bcopilot\b/i, /\bgemini\b/i, /\bcodex\b/i, /rubric/i, /academic integrity/i, /\/Users\//, /\/private\/tmp/, /lorem ipsum/i, /\bTODO\b/, /\bFIXME\b/];
+/* The course is written in American English; these are the British spellings that crept in. */
+const BRITISH = [/\bcolou?rs?\b/i, /\b(recognis|practis|regularis|optimis|organis|summaris|visualis|minimis|maximis|normalis|initialis|emphasis|generalis|formalis|categoris|memoris|randomis|prioritis|specialis|neutralis|realis|utilis|apologis|analys)(e|es|ed|ing|ation|ations)\b/i, /\bneighbou?rs?\b/i, /\bcentres?\b/i, /\bgrey\b/i, /\bbehaviours?\b/i, /\bfavourite/i, /\bmodelling\b/i, /\blabelled\b/i, /\bhonou?r/i, /\bfulfil\b/i, /\bprogrammes?\b/i, /\bcatalogue/i, /\bdefence\b/i, /\blicence\b/i, /\btravelled\b/i, /\bmaths\b/i, /\bwhilst\b/i];
+// "color", "neighbor" and friends match the first alternatives above; keep only the British forms.
+const isBritish = (word) => /colour|recognis|practis|regularis|optimis|organis|summaris|visualis|minimis|maximis|normalis|initialis|emphasis(e|ed|ing)|generalis|formalis|categoris|memoris|randomis|prioritis|specialis|neutralis|realis|utilis|apologis|analys(e|ed|ing|es)\b|neighbour|centre|grey|behaviour|favourite|modelling|labelled|honour|fulfil\b|programme|catalogue|defence|licence|travelled|maths|whilst/i.test(word);
+function britishWords(text) {
+  const hits = new Set();
+  for (const re of BRITISH) for (const m of text.matchAll(new RegExp(re.source, 'gi'))) if (isBritish(m[0])) hits.add(m[0]);
+  return [...hits];
+}
+/* Explanations that name an answer by its letter or position break once the choices are shuffled. */
+const POSITIONAL = /\b(choice|option|answer)\s+[A-D]\b|\b(first|second|third|fourth|last)\s+(choice|option|answer)\b|\b[A-D]\s+(is|are)\s+(the\s+)?(converse|inverse|contrapositive|correct|right|wrong)\b/i;
+const POSITIONAL_CHOICE = /^(both|neither)\b|^(all|none) of\b|\b(of the above|of these|of them)\b/i;
 
-for (const file of files) {
+const modules = files.map((file) => ({ file, m: load(file) }));
+
+test('module ids are unique and numbers are contiguous from 0', () => {
+  const ids = modules.map(({ m }) => m.id);
+  assert.equal(new Set(ids).size, ids.length, `duplicate module ids: ${ids.join(', ')}`);
+  assert.deepEqual(modules.map(({ m }) => m.num), modules.map((_, i) => i));
+});
+
+test('modules 1-13 together cover course objectives 1-13 and name only real ones', () => {
+  const all = new Set();
+  for (const { file, m } of modules) {
+    const obj = m.objectives || [];
+    assert.ok(obj.every((o) => Number.isInteger(o) && o >= 1 && o <= 13), `${file}: objectives must be integers 1-13 (got ${JSON.stringify(obj)})`);
+    if (m.num >= 1 && m.num <= 13) obj.forEach((o) => all.add(o));
+  }
+  assert.deepEqual([...all].sort((a, b) => a - b), Array.from({ length: 13 }, (_, i) => i + 1));
+});
+
+test('slide keys (ids or title slugs) are unique within every module', () => {
+  const sandbox = sandboxFor([]);
+  const { slugKey } = sandbox.DMUtil;
+  for (const { file, m } of modules) {
+    const keys = Array.from(m.slides, (sl, i) => sl.id || slugKey(sl.title, i + 1)); // Array.from: module arrays come from the vm realm
+    const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+    assert.equal(dupes.length, 0, `${file}: two slides would share the key(s) ${dupes.join(', ')}; give one an id or a different title`);
+    for (const sl of m.slides) if (sl.id) assert.match(sl.id, /^[a-z][a-z0-9-]*$/, `${file}: slide id "${sl.id}" should be a lowercase slug`);
+    for (const k of keys) assert.doesNotMatch(k, /^\d+$/, `${file}: a slide title produced no usable slug`);
+  }
+});
+
+test('glossary terms are defined once and symbols have a shape', () => {
+  const seen = new Map();
+  for (const { m } of modules) {
+    for (const term of Object.keys(m.terms || {})) {
+      const k = term.toLowerCase();
+      if (seen.has(k)) assert.fail(`term "${term}" is defined in both ${seen.get(k)} and ${m.id}; the engine keeps only the first`);
+      seen.set(k, m.id);
+    }
+    for (const sym of m.symbols || []) assert.ok(Array.isArray(sym) && typeof sym[0] === 'string' && typeof sym[1] === 'string', `${m.id}: symbol entries are [symbol, name, example?]`);
+  }
+});
+
+test('engine, styles, shell and build sources keep the student-facing hygiene rules', () => {
+  for (const f of ['src/core.js', 'src/util.js', 'src/styles.css', 'src/shell.html']) {
+    const text = readFileSync(join(root, f), 'utf8');
+    for (const re of FORBIDDEN) assert.doesNotMatch(text, re, `${f}: forbidden text ${re}`);
+    assert.deepEqual(britishWords(text), [], `${f}: use American spelling`);
+  }
+  const built = join(root, 'discrete-math-interactive.html');
+  if (existsSync(built)) {
+    const html = readFileSync(built, 'utf8');
+    for (const re of FORBIDDEN) assert.doesNotMatch(html, re, `built page: forbidden text ${re}`);
+  }
+});
+
+for (const { file, m } of modules) {
   const src = readFileSync(join(modDir, file), 'utf8');
-  const m = load(file);
   const kinds = (k) => m.slides.filter((s) => (s.kind || 'concept') === k);
 
   test(`${file}: module metadata`, () => {
@@ -40,6 +117,16 @@ for (const file of files) {
     for (const re of FORBIDDEN) assert.doesNotMatch(src, re, `forbidden text ${re}`);
     assert.doesNotMatch(src, /Math\.random/, 'use the seeded R helper, not Math.random');
     assert.doesNotMatch(src, /\$\$(?!\{)[^$]+\$\$(?!\{)/, 'use \\[ \\] for display math, not $$');
+    assert.deepEqual(britishWords(src), [], 'use American spelling');
+  });
+
+  test(`${file}: timers and global listeners are cleaned up when the slide is hidden`, () => {
+    for (const sl of m.slides) {
+      if (typeof sl.render !== 'function') continue;
+      const body = sl.render.toString();
+      if (/setInterval\(|requestAnimationFrame\(|setTimeout\(/.test(body)) assert.match(body, /onHide|ctx\.ticker|\.ticker\(/, `${sl.title}: starts a timer without ctx.onHide or ctx.ticker`);
+      if (/(window|document)\.addEventListener\(/.test(body)) assert.match(body, /removeEventListener|onHide/, `${sl.title}: adds a window/document listener without removing it`);
+    }
   });
 
   if (m.num >= 1 && m.num <= 14) {
@@ -78,6 +165,16 @@ for (const file of files) {
         assert.ok(Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.choices.length, `answer index in range: ${q.q}`);
         assert.ok(q.explain && q.explain.length >= 30, `explanation for: ${q.q}`);
         assert.equal(new Set(q.choices).size, q.choices.length, `duplicate choices in: ${q.q}`);
+        // choices are shuffled at run time unless the question is marked fixed
+        if (!q.fixed) {
+          assert.doesNotMatch(q.explain, POSITIONAL, `explanation refers to an answer by position; quote the content instead, or mark the question fixed: ${q.q}`);
+          for (const c of q.choices) assert.doesNotMatch(c.replace(/<[^>]+>/g, ''), POSITIONAL_CHOICE, `positional choice "${c}" needs fixed: true on: ${q.q}`);
+        }
+      }
+      // the right answer should not favour one position in the authored order either
+      if (s.questions.length >= 8) {
+        const counts = s.questions.reduce((acc, q) => { acc[q.answer] = (acc[q.answer] || 0) + 1; return acc; }, {});
+        assert.ok(Math.max(...Object.values(counts)) <= Math.ceil(s.questions.length * 0.6), `one answer position holds ${Math.max(...Object.values(counts))} of ${s.questions.length} answers`);
       }
     }
   });

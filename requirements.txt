@@ -1,0 +1,2 @@
+# Browser tests and the PDF companion. After installing, run: python3 -m playwright install chromium
+playwright==1.60.0

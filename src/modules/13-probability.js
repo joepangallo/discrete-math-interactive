@@ -3,8 +3,8 @@
    independence, Bayes' theorem, random variables, expected value, the binomial distribution,
    the law of large numbers, and the birthday problem. */
 (() => {
-  const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a || 1; };
-  const fr = (n, d) => { const g = gcd(n, d); return d / g === 1 ? String(n / g) : `${n / g}/${d / g}`; };
+  const { M } = globalThis.DMUtil; // the same gcd / C / frac helpers the practice generators receive
+  const fr = (n, d) => String(M.frac(n, d));
   const pct = (x, dp = 1) => (100 * x).toFixed(dp) + '%';
   const pctS = (x) => String(Number((100 * x).toFixed(2))) + '%';
   const num = (x, dp = 3) => String(Number(x.toFixed(dp)));
@@ -14,8 +14,7 @@
   const sciT = (x, d = 3) => { if (x === 0) return '0'; if (x >= 0.001) return x.toPrecision(d); const [m, e] = x.toExponential(d - 1).split('e'); return `${m} \\times 10^{${+e}}`; };
   const p4 = (x) => (x > 0 && x < 0.00005 ? '< 0.0001' : x.toFixed(4));
   const p4T = (x) => (x > 0 && x < 0.00005 ? `${sciT(x)}` : x.toFixed(4));
-  function choose(n, k) { if (k < 0 || k > n) return 0; k = Math.min(k, n - k); let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return Math.round(r); }
-  const pmf = (n, p, k) => choose(n, k) * p ** k * (1 - p) ** (n - k);
+  const pmf = (n, p, k) => M.C(n, k) * p ** k * (1 - p) ** (n - k);
   const ways2 = (s) => (s < 2 || s > 12 ? 0 : 6 - Math.abs(s - 7));
   const pairsFor = (s) => { const out = []; for (let a = 1; a <= 6; a++) { const b = s - a; if (b >= 1 && b <= 6) out.push(`(${a},${b})`); } return out; };
   // probability that at least two of n people share a birthday (365 equally likely days)
@@ -72,7 +71,7 @@
       .pb-stat td:last-child { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
       .pb-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; min-height: 1.5rem; }
       .pb-chips span { font-family: var(--font-mono); font-size: 0.75rem; border: 1px solid var(--rule); border-radius: 0.3rem; padding: 0 0.35rem; background: var(--sheet); }
-      .pb-chips span.hit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+      .pb-chips span.hit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; text-decoration: underline; }
       .pb-slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.1rem 0.6rem; align-items: center; font-size: 0.82rem; color: var(--ink-2); }
       .pb-slider input { grid-column: 1 / -1; }
       .pb-slider b { font-family: var(--font-mono); color: var(--ink); }
@@ -222,12 +221,14 @@
           };
           const CAP = 100000;
           const hist = new Float64Array(CAP + 1);
-          let key = 'die', E = EXP[key], n = 0, hits = 0, counts = [], last = [], timer = null;
+          let key = 'die', E = EXP[key], n = 0, hits = 0, counts = [], last = [];
           const W = 560, X0 = 44, X1 = 548, Y0 = 12, Y1 = 196;
           const chart = s('svg', { viewBox: `0 0 ${W} 214`, class: 'pb-svg', role: 'img', 'aria-label': 'Relative frequency against number of trials' });
           const bars = s('svg', { viewBox: `0 0 ${W} 112`, class: 'pb-svg', role: 'img', 'aria-label': 'Histogram of outcomes' });
           const seg = h('div.seg', { role: 'group', 'aria-label': 'Experiment' });
-          const autoBtn = h('button.btn', { onclick: () => toggleAuto() }, 'Auto-run');
+          const autoBtn = h('button.btn.sm', { onclick: () => { if (!auto.playing && n >= CAP) reset(); auto.toggle(); } });
+          // every tick adds 5% more trials, so the log-scale line advances at a steady pace until the cap
+          const auto = ctx.ticker({ ms: 70, button: autoBtn, tick() { add(Math.max(1, Math.ceil(n * 0.05))); draw(); return n < CAP; }, onChange: (on) => autoBtn.classList.toggle('on', on) });
           const stats = h('table.pb-stat');
           const chips = h('div.pb-chips', { 'aria-label': 'Most recent results' });
           const note = h('p.small');
@@ -237,11 +238,11 @@
           const right = h('div.stack', { style: { gap: '0.45rem' } },
             seg,
             h('div.row', { style: { gap: '0.35rem' } },
-              h('button.btn.sm', { onclick: () => { stopAuto(); add(1); draw(); } }, 'Roll ×1'),
-              h('button.btn.sm', { onclick: () => { stopAuto(); add(10); draw(); } }, '×10'),
-              h('button.btn.sm', { onclick: () => { stopAuto(); add(1000); draw(); } }, '×1,000'),
+              h('button.btn.sm', { onclick: () => { auto.stop(); add(1); draw(); } }, 'Roll ×1'),
+              h('button.btn.sm', { onclick: () => { auto.stop(); add(10); draw(); } }, '×10'),
+              h('button.btn.sm', { onclick: () => { auto.stop(); add(1000); draw(); } }, '×1,000'),
               autoBtn,
-              h('button.btn.sm', { onclick: () => { stopAuto(); reset(); draw(); } }, 'Reset')),
+              h('button.btn.sm', { onclick: () => { auto.stop(); reset(); draw(); } }, 'Reset')),
             stats, h('div', h('div.tiny.mono.muted', 'LAST RESULTS (HIGHLIGHTED = THE EVENT)'), chips), note,
             h('div.ai', { html: 'This is how you check a model\'s <b>calibration</b>. When a weather model or a classifier says "70%", the event should happen in about 70% of those cases over many predictions. A well-calibrated model passes exactly the test this lab runs.' }));
           body.append(h('div.split-wide.fill', { style: { minHeight: 0, alignItems: 'start' } }, left, right));
@@ -304,14 +305,14 @@
             rc(bars, ...kids);
           }
           function draw() {
-            rc(seg, ...Object.entries(EXP).map(([k, ex]) => h('button', { 'aria-pressed': String(k === key), onclick: () => { stopAuto(); key = k; E = EXP[k]; reset(); add(100); draw(); } }, `${ex.name}: ${ex.event}`)));
-            const f = n ? hits / n : 0, gap = Math.abs(f - E.p);
+            rc(seg, ...Object.entries(EXP).map(([k, ex]) => h('button', { 'aria-pressed': String(k === key), onclick: () => { auto.stop(); key = k; E = EXP[k]; reset(); add(100); draw(); } }, `${ex.name}: ${ex.event}`)));
+            const f = n ? hits / n : 0, gap = Math.abs(f - E.p), close = n > 0 && gap < 0.01;
             rc(stats,
               h('tr', h('td', 'Trials so far'), h('td', big(n))),
               h('tr', h('td', `Times we saw ${E.event}`), h('td', big(hits))),
               h('tr', h('td', 'Relative frequency'), h('td', n ? `${big(hits)} / ${big(n)} = ${f.toFixed(4)}` : '–')),
               h('tr', h('td', 'True probability'), h('td', `${E.pTxt} = ${E.p.toFixed(4)}`)),
-              h('tr', h('td', 'Gap from the truth'), h('td', { style: { color: gap < 0.01 ? 'var(--true)' : 'var(--ink)' } }, n ? gap.toFixed(4) : '–')));
+              h('tr', h('td', 'Gap from the truth'), h('td', { style: { color: close ? 'var(--true)' : 'var(--ink)' } }, !n ? '–' : close ? `${gap.toFixed(4)} (under 0.01)` : gap.toFixed(4))));
             rc(chips, ...last.map((o) => h('span', { class: o === E.target ? 'hit' : '' }, E.faces[o])));
             const typ = n ? 2 * Math.sqrt((E.p * (1 - E.p)) / n) : 0;
             note.innerHTML = !n ? 'Press a roll button to start.' : n < 1000
@@ -320,13 +321,7 @@
             ctx.tex(note);
             drawChart();
             drawBars();
-            autoBtn.textContent = timer ? 'Pause' : 'Auto-run';
-            autoBtn.classList.toggle('on', !!timer);
           }
-          function toggleAuto() { if (timer) { stopAuto(); draw(); return; } if (n >= CAP) reset(); timer = setInterval(() => { add(Math.max(1, Math.ceil(n * 0.05))); if (n >= CAP) stopAuto(); draw(); }, 70); draw(); }
-          function stopAuto() { if (timer) clearInterval(timer); timer = null; }
-          autoBtn.classList.add('sm');
-          ctx.onHide(() => { stopAuto(); draw(); });
           reset();
           add(100);
           draw();
@@ -353,7 +348,7 @@
           const simMsg = h('div.small');
           body.append(h('div.split.fill', { style: { minHeight: 0, alignItems: 'start' } },
             h('div.stack', { style: { gap: '0.3rem' } },
-              h('div.legend', h('span', h('span.swatch', { style: { background: 'var(--accent)' } }), 'some pair shares a birthday'), h('span', h('span.swatch', { style: { background: 'var(--fnc)' } }), 'someone shares YOUR birthday')),
+              h('div.legend', h('span', h('span.swatch', { style: { background: 'var(--accent)' } }), 'solid: some pair shares a birthday'), h('span', h('span.swatch', { style: { background: 'var(--fnc)' } }), 'dashed: someone shares YOUR birthday')),
               curve,
               h('div.tiny.mono.muted', 'ONE RANDOM ROOM: EACH ROW IS A MONTH, EACH SQUARE A DAY'), cal),
             h('div.stack', { style: { gap: '0.45rem' } },
@@ -379,14 +374,14 @@
           const yOf = (v) => Y1 - v * (Y1 - Y0);
           function draw() {
             nOut.textContent = `n = ${n}`;
-            const pS = shareProb(n), pY = yoursProb(n), pairs = choose(n, 2);
+            const pS = shareProb(n), pY = yoursProb(n), pairs = M.C(n, 2);
             // curve
             const kids = [s('rect', { x: X0, y: Y0, width: X1 - X0, height: Y1 - Y0, fill: 'var(--sheet)', stroke: 'var(--rule)' })];
             [0, 0.25, 0.5, 0.75, 1].forEach((v) => { kids.push(s('line', { x1: X0, y1: yOf(v), x2: X1, y2: yOf(v), stroke: 'var(--rule)', 'stroke-dasharray': v === 0.5 ? '5 4' : null, 'stroke-width': v === 0.5 ? 1.4 : 1 })); kids.push(s('text', { x: X0 - 5, y: yOf(v) + 4, 'text-anchor': 'end', text: `${v * 100}%` })); });
             [1, 10, 20, 23, 30, 40, 50, 60, 70, 80].forEach((k) => kids.push(s('text', { x: xOf(k), y: Y1 + 14, 'text-anchor': 'middle', 'font-weight': k === 23 ? 700 : 400, fill: k === 23 ? 'var(--ink)' : 'var(--ink-2)', text: String(k) })));
             kids.push(s('text', { x: (X0 + X1) / 2, y: 204, 'text-anchor': 'middle', fill: 'var(--ink-3)', text: 'people in the room' }));
             const path = (f) => Array.from({ length: 80 }, (_, i) => `${i ? 'L' : 'M'}${xOf(i + 1).toFixed(1)} ${yOf(f(i + 1)).toFixed(1)}`).join('');
-            kids.push(s('path', { d: path(yoursProb), fill: 'none', stroke: 'var(--fnc)', 'stroke-width': 2 }));
+            kids.push(s('path', { d: path(yoursProb), fill: 'none', stroke: 'var(--fnc)', 'stroke-width': 2, 'stroke-dasharray': '7 4' }));
             kids.push(s('path', { d: path(shareProb), fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2.4 }));
             kids.push(s('line', { x1: xOf(n), y1: Y0, x2: xOf(n), y2: Y1, stroke: 'var(--ink-3)', 'stroke-width': 1 }));
             kids.push(s('circle', { cx: xOf(n), cy: yOf(pS), r: 5, fill: 'var(--accent)', stroke: 'var(--sheet)', 'stroke-width': 1.5 }));
@@ -405,6 +400,8 @@
               for (let d = 0; d < len; d++, day++) {
                 const c = cnt[day];
                 ck.push(s('rect', { x: 18 + d * 16, y: 3 + m * 12, width: 14, height: 10, rx: 2, fill: c >= 2 ? 'var(--false)' : c === 1 ? 'var(--accent)' : 'var(--paper)', stroke: c ? 'none' : 'var(--rule)', 'stroke-width': 0.8 }));
+                // a shared day also carries its head count, so the match does not depend on color alone
+                if (c >= 2) ck.push(s('text', { x: 18 + d * 16 + 7, y: 3 + m * 12 + 8, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: 'var(--sheet)', text: String(c) }));
               }
             });
             rc(cal, ...ck);
@@ -420,8 +417,8 @@
             const dupDays = cnt.map((c, d) => [c, d]).filter(([c]) => c >= 2);
             const nameDay = (d) => { let m = 0; while (d >= MONTHS[m]) { d -= MONTHS[m]; m++; } return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]} ${d + 1}`; };
             roomMsg.innerHTML = dupDays.length
-              ? `<b class="bad">This room has a match</b> on ${dupDays.slice(0, 3).map(([c, d]) => `${nameDay(d)} (${c} people)`).join(', ')}${dupDays.length > 3 ? ` and ${dupDays.length - 3} more day${dupDays.length > 4 ? 's' : ''}` : ''}. Red squares are shared days.`
-              : '<b>This room has no shared birthday.</b> Press "New random room" a few times and count how often a red square appears.';
+              ? `<b class="bad">This room has a match</b> on ${dupDays.slice(0, 3).map(([c, d]) => `${nameDay(d)} (${c} people)`).join(', ')}${dupDays.length > 3 ? ` and ${dupDays.length - 3} more day${dupDays.length > 4 ? 's' : ''}` : ''}. Shared days are the numbered squares.`
+              : '<b>This room has no shared birthday.</b> Press "New random room" a few times and count how often a numbered square appears.';
             simMsg.innerHTML = sim == null ? '' : `<b>Simulation:</b> ${big(sim)} of 2,000 random rooms of ${n} had a match, a relative frequency of <b>${pct(sim / 2000)}</b>. The formula says <b>${pct(pS)}</b>.`;
           }
           newRoom();
@@ -736,8 +733,8 @@
             kids.push(s('text', { x: (X0 + X1) / 2, y: 258, 'text-anchor': 'middle', fill: 'var(--ink-3)', text: 'k = number of successes' }));
             rc(svg, ...kids);
             const le = probs.slice(0, k + 1).reduce((a, b) => a + b, 0), ge = probs.slice(k).reduce((a, b) => a + b, 0);
-            calc.innerHTML = String.raw`<div>\(P(X = ${k}) = \binom{${n}}{${k}} (${num(p, 2)})^{${k}} (${num(1 - p, 2)})^{${n - k}}\)<br>\(\phantom{P(X = ${k})} = ${bigT(choose(n, k))} \times ${sciT(p ** k)} \times ${sciT((1 - p) ** (n - k))} = \mathbf{${p4T(probs[k])}}\)</div>
-              <div class="muted">\(\binom{${n}}{${k}} = ${bigT(choose(n, k))}\) counts the ways to choose which ${k} of the ${n} trials succeed. Each such sequence has probability \(p^{${k}}(1-p)^{${n - k}}\), and the sequences are mutually exclusive, so their probabilities add.</div>
+            calc.innerHTML = String.raw`<div>\(P(X = ${k}) = \binom{${n}}{${k}} (${num(p, 2)})^{${k}} (${num(1 - p, 2)})^{${n - k}}\)<br>\(\phantom{P(X = ${k})} = ${bigT(M.C(n, k))} \times ${sciT(p ** k)} \times ${sciT((1 - p) ** (n - k))} = \mathbf{${p4T(probs[k])}}\)</div>
+              <div class="muted">\(\binom{${n}}{${k}} = ${bigT(M.C(n, k))}\) counts the ways to choose which ${k} of the ${n} trials succeed. Each such sequence has probability \(p^{${k}}(1-p)^{${n - k}}\), and the sequences are mutually exclusive, so their probabilities add.</div>
               <div>\(P(X \le ${k}) = ${p4T(le)}\), \(\;P(X \ge ${k}) = ${p4T(ge)}\)</div>
               <div>Mean \(\mu = np = ${num(mu, 2)}\), variance \(np(1-p) = ${num(n * p * (1 - p), 3)}\), \(\sigma = ${sd.toFixed(3)}\)</div>`;
             ctx.tex(calc);
@@ -881,7 +878,7 @@
                 const sum = R.int(2, 12), w = ways2(sum);
                 return {
                   prompt: String.raw`Two fair dice are rolled. What is the probability that the sum is \(${sum}\)?`,
-                  answer: w / 36, placeholder: 'a fraction such as 5/36',
+                  answer: w / 36, tol: 0.001, placeholder: 'a fraction such as 5/36, or a decimal to 3 places',
                   hint: 'list the ordered pairs (first die, second die) with this sum. There are 36 equally likely pairs in all.',
                   solution: String.raw`The 36 ordered pairs are equally likely. The pairs with sum ${sum} are ${pairsFor(sum).join(', ')}, which makes ${w}. So \(P = ${w}/36 = ${fr(w, 36)}\).`,
                 };
@@ -892,7 +889,7 @@
                 for (let x = t; x <= 12; x++) { w += ways2(x); parts.push(`${ways2(x)}`); }
                 return {
                   prompt: String.raw`Two fair dice are rolled. What is the probability that the sum is at least \(${t}\)?`,
-                  answer: w / 36, placeholder: 'a fraction',
+                  answer: w / 36, tol: 0.001, placeholder: 'a fraction, or a decimal to 3 places',
                   solution: String.raw`The sums ${t} to 12 are mutually exclusive, so add their counts: ${parts.join(' + ')} = ${w} pairs out of 36. \(P = ${w}/36 = ${fr(w, 36)}\).`,
                 };
               }
@@ -900,7 +897,7 @@
                 const n = R.int(3, 6), k = R.int(0, n), c = M.C(n, k), tot = 2 ** n;
                 return {
                   prompt: String.raw`A fair coin is flipped \(${n}\) times. What is the probability of exactly \(${k}\) heads?`,
-                  answer: c / tot, placeholder: 'a fraction',
+                  answer: c / tot, tol: 0.001, placeholder: 'a fraction such as 3/8, or a decimal to 3 places',
                   hint: `there are 2^${n} equally likely sequences of H and T.`,
                   solution: String.raw`There are \(2^{${n}} = ${tot}\) equally likely sequences. A sequence with exactly ${k} heads is fixed by choosing which ${k} of the ${n} flips are heads: \(\binom{${n}}{${k}} = ${c}\) ways. \(P = ${c}/${tot} = ${fr(c, tot)}\).`,
                 };
@@ -917,8 +914,8 @@
                 ]);
                 return {
                   prompt: `One card is drawn from a well-shuffled standard deck of 52 cards. What is the probability that it is ${what}?`,
-                  answer: cnt / 52, placeholder: 'a fraction',
-                  solution: String.raw`${why} So \(P = ${cnt}/52 = ${fr(cnt, 52)}\).`,
+                  answer: cnt / 52, tol: 0.001, placeholder: 'a fraction, or a decimal to 3 places',
+                  solution: String.raw`${why} So \(P = ${cnt}/52 = ${fr(cnt, 52)} \approx ${num(cnt / 52, 3)}\).`,
                 };
               }
               const n = R.int(2, 4), num6 = 6 ** n - 5 ** n;
@@ -947,7 +944,7 @@
                 ]);
                 return {
                   prompt: String.raw`A survey of ${N} students records whether they practiced daily and whether they passed the final. ${table} One student is chosen at random. Find \(${tex}\).`,
-                  answer: top / bot, placeholder: 'a fraction',
+                  answer: top / bot, tol: 0.001, placeholder: 'a fraction, or a decimal to 3 places',
                   hint: 'the condition after the bar tells you which row or column becomes the new sample space.',
                   solution: String.raw`${how}. It has ${bot} students, and ${top} of them fit. \(${tex} = ${top}/${bot}${fr(top, bot) !== `${top}/${bot}` ? ` = ${fr(top, bot)}` : ''} \approx ${num(top / bot, 3)}\).`,
                 };
@@ -956,14 +953,14 @@
                 const sum = R.pick([4, 6, 8, 10]), w = ways2(sum);
                 return {
                   prompt: String.raw`Two fair dice are rolled. Given that the sum is \(${sum}\), what is the probability that both dice show the same number?`,
-                  answer: 1 / w, placeholder: 'a fraction',
+                  answer: 1 / w, tol: 0.001, placeholder: 'a fraction, or a decimal to 3 places',
                   solution: String.raw`The condition shrinks the sample space to the ${w} pairs with sum ${sum}: ${pairsFor(sum).join(', ')}. Exactly one of them, \((${sum / 2},${sum / 2})\), is doubles. So the answer is \(1/${w}\), compared with \(1/6\) without the information.`,
                 };
               }
               const d = R.int(1, 6);
               return {
                 prompt: String.raw`Two fair dice are rolled. Given that the first die shows \(${d}\), what is the probability that the sum is 7?`,
-                answer: 1 / 6, placeholder: 'a fraction',
+                answer: 1 / 6, tol: 0.001, placeholder: 'a fraction, or a decimal to 3 places',
                 solution: String.raw`Once the first die shows ${d}, the sum is 7 only if the second die shows ${7 - d}, which has probability \(1/6\). This equals the unconditional \(P(\text{sum} = 7) = 6/36 = 1/6\), so "first die is ${d}" and "sum is 7" are independent events.`,
               };
             },
@@ -1001,7 +998,7 @@
                 return {
                   prompt: `A game costs $${cost} to play. You roll a fair die and receive $${prize} if you roll ${what}. What is your expected net gain per game, in dollars? (Round to 2 decimal places; a loss is negative.)`,
                   answer: Math.round(ev * 100) / 100, tol: 0.006, placeholder: 'for example -0.17',
-                  solution: String.raw`You win with probability \(${fr(m, 6)}\). The expected payout is \(${prize} \times ${fr(m, 6)} = ${num((prize * m) / 6, 3)}\) dollars, and you always pay ${cost}. By linearity, \(E[\text{gain}] = ${num((prize * m) / 6, 3)} - ${cost} = ${fr(prize * m - 6 * cost, 6)}${Number.isInteger(ev) ? '' : ` \approx ${num(ev, 2)}`}\). ${ev < 0 ? 'The game favors the house.' : ev > 0 ? 'The game favors the player.' : 'The game is fair.'}`,
+                  solution: String.raw`You win with probability \(${fr(m, 6)}\). The expected payout is \(${prize} \times ${fr(m, 6)} = ${num((prize * m) / 6, 3)}\) dollars, and you always pay ${cost}. By linearity, \(E[\text{gain}] = ${num((prize * m) / 6, 3)} - ${cost} = ${fr(prize * m - 6 * cost, 6)}${Number.isInteger(ev) ? '' : String.raw` \approx ${num(ev, 2)}`}\). ${ev < 0 ? 'The game favors the house.' : ev > 0 ? 'The game favors the player.' : 'The game is fair.'}`,
                 };
               }
               if (kind === 1) {

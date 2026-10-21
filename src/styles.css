@@ -34,36 +34,8 @@
   --rail-w: 15.5rem;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: oklch(25.5% 0.028 168);
-    --sheet: oklch(29% 0.03 168);
-    --grid: oklch(45% 0.03 168 / 0.38);
-    --ink: oklch(95% 0.012 110);
-    --ink-2: oklch(83% 0.02 140);
-    --ink-3: oklch(68% 0.025 150);
-    --rule: oklch(40% 0.03 168);
-    --accent: oklch(86% 0.12 96);
-    --accent-2: oklch(36% 0.045 120);
-    --accent-ink: oklch(24% 0.03 168);
-    --mark: oklch(44% 0.075 110);
-    --mark-ink: oklch(97% 0.03 100);
-    --true: oklch(82% 0.13 150);
-    --true-bg: oklch(34% 0.06 152);
-    --false: oklch(78% 0.13 18);
-    --false-bg: oklch(34% 0.06 20);
-    --warn: oklch(84% 0.12 75);
-    --warn-bg: oklch(35% 0.05 75);
-    --code-bg: oklch(22.5% 0.025 168);
-    --kw: oklch(80% 0.11 320);
-    --str: oklch(84% 0.12 140);
-    --num: oklch(83% 0.11 60);
-    --fnc: oklch(82% 0.09 220);
-    --cmt: oklch(66% 0.03 160);
-    --shadow: 0 1px 0 oklch(20% 0.03 168 / 0.8), 0 8px 20px -12px oklch(5% 0.02 168 / 0.8);
-    color-scheme: dark;
-  }
-}
+/* Dark theme tokens. Written once: the build also emits this block under
+   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` for devices in dark mode. */
 :root[data-theme="dark"] {
   --paper: oklch(25.5% 0.028 168);
   --sheet: oklch(29% 0.03 168);
@@ -96,8 +68,9 @@
 /* ---------- base ---------- */
 html {
   height: 100%;
-  /* 15px at 1280x720, scaling with the smaller of width and height so a slide always fits */
-  font-size: max(13px, min(1.172vw, 2.083vh));
+  /* 15px at 1280x720, scaling with the smaller of width and height so a slide always fits. The floor is
+     in rem so a larger default font size chosen in the browser's settings still enlarges the course. */
+  font-size: max(0.8125rem, min(1.172vw, 2.083vh));
 }
 body {
   height: 100%;
@@ -126,6 +99,9 @@ math[display="block"] { margin: 0.4em 0; }
 svg text { font-family: var(--font-body); }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.notice { grid-area: stage; align-self: start; z-index: 5; margin: 0.6rem 1.6rem 0; padding: 0.45rem 0.8rem; border: 1px solid var(--warn); background: var(--warn-bg); color: var(--ink); border-radius: var(--radius); font-size: 0.86rem; box-shadow: var(--shadow); }
+.slide-head h2:focus { outline: none; }
+.slide-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
 /* ---------- app frame ---------- */
 #app {
@@ -383,6 +359,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .editor pre, .editor textarea { margin: 0; padding: 0.35rem 1rem 0.35rem 3.4rem; font: inherit; line-height: inherit; white-space: pre; tab-size: 4; letter-spacing: normal; }
 .editor pre { pointer-events: none; color: var(--ink); min-height: 100%; }
 .editor textarea { position: absolute; inset: 0; width: 100%; height: 100%; resize: none; border: 0; outline: none; background: transparent; color: transparent; caret-color: var(--ink); overflow: hidden; }
+/* the textarea is transparent, so the editor frame shows keyboard focus instead */
+.cw-main:has(.editor textarea:focus-visible) { box-shadow: inset 0 0 0 2px var(--accent), var(--shadow); }
+.editor:focus-within { outline: none; }
 .editor textarea::selection { background: var(--accent-2); color: transparent; }
 .editor .gutter { position: absolute; left: 0; top: 0; padding: 0.35rem 0; width: 2.6rem; text-align: right; color: var(--ink-3); font-size: 0.8em; line-height: calc(1.55em / 0.8 * 1); user-select: none; pointer-events: none; }
 .tok-kw { color: var(--kw); font-weight: 600; }
@@ -412,8 +391,7 @@ li.on .tok-kw, li.on .tok-str, li.on .tok-num, li.on .tok-fn, li.on .tok-bi, li.
 
 /* ---------- practice + quiz ---------- */
 .pr { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(14rem, 1fr); gap: 0.9rem; align-items: start; }
-.pr-main { max-height: 100%; }
-.pr-main { display: flex; flex-direction: column; gap: 0.6rem; min-height: 0; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.9rem 1.1rem; box-shadow: var(--shadow); overflow: auto; }
+.pr-main { max-height: 100%; display: flex; flex-direction: column; gap: 0.6rem; min-height: 0; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.9rem 1.1rem; box-shadow: var(--shadow); overflow: auto; }
 .pr-prompt { font-size: 1.08rem; line-height: 1.55; }
 .pr-answer { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 .pr-answer .inp { flex: 1 1 14rem; font-family: var(--font-mono); }
@@ -427,16 +405,17 @@ li.on .tok-kw, li.on .tok-str, li.on .tok-num, li.on .tok-fn, li.on .tok-bi, li.
 .pr-score span { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
 .choice-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .qz { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 12rem; gap: 1rem; align-items: start; }
-.qz-card { max-height: 100%; }
-.qz-card { display: flex; flex-direction: column; gap: 0.6rem; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1rem 1.2rem; box-shadow: var(--shadow); min-height: 0; overflow: auto; }
+.qz-card { max-height: 100%; display: flex; flex-direction: column; gap: 0.6rem; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1rem 1.2rem; box-shadow: var(--shadow); min-height: 0; overflow: auto; }
 .qz-q { font-size: 1.1rem; line-height: 1.5; }
 .qz-choices { display: grid; gap: 0.4rem; }
 .qz-choices button { display: grid; grid-template-columns: 1.7rem minmax(0, 1fr); gap: 0.5rem; align-items: start; text-align: left; border: 1px solid var(--rule); background: var(--paper); border-radius: var(--radius); padding: 0.45rem 0.7rem; cursor: pointer; font-size: 0.95rem; line-height: 1.4; }
-.qz-choices button:hover:not(:disabled) { border-color: var(--accent); }
+.qz-choices button:hover:not(:disabled):not([aria-disabled="true"]) { border-color: var(--accent); }
 .qz-choices button .k { font-family: var(--font-mono); font-weight: 600; color: var(--ink-3); }
 .qz-choices button.right { border-color: var(--true); background: var(--true-bg); }
+.qz-choices button.right .k { color: var(--true); }
 .qz-choices button.wrong { border-color: var(--false); background: var(--false-bg); }
-.qz-choices button:disabled { cursor: default; }
+.qz-choices button.wrong .k { color: var(--false); }
+.qz-choices button:disabled, .qz-choices button[aria-disabled="true"] { cursor: default; }
 .qz-nav { display: flex; flex-direction: column; gap: 0.5rem; }
 .qz-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.3rem; }
 .qz-dots button { aspect-ratio: 1; border: 1px solid var(--rule); background: var(--sheet); border-radius: 0.35rem; cursor: pointer; font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-2); max-width: 100%; }
@@ -452,9 +431,8 @@ dialog .dlg-head h2 { font-size: 1.3rem; }
 dialog .dlg-body { padding: 0.8rem 1rem 1rem; overflow: auto; max-height: calc(min(85vh, 44rem) - 3.6rem); }
 .palette-input { width: 100%; font-size: 1.05rem; padding: 0.6rem 0.8rem; }
 .palette-list { list-style: none; padding: 0; margin: 0.6rem 0 0; }
-.palette-list li { margin: 0; }
-.palette-list button { width: 100%; text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.6rem; border: 0; background: transparent; padding: 0.45rem 0.6rem; border-radius: var(--radius); cursor: pointer; }
-.palette-list button:hover, .palette-list button.sel { background: var(--accent-2); }
+.palette-list li { margin: 0; width: 100%; text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.6rem; padding: 0.45rem 0.6rem; border-radius: var(--radius); cursor: pointer; }
+.palette-list li:hover, .palette-list li.sel { background: var(--accent-2); }
 .palette-list .meta { font-size: 0.75rem; color: var(--ink-3); font-family: var(--font-mono); }
 .sym-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.4rem; }
 .sym-grid div { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: 0.5rem; align-items: center; border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.35rem 0.5rem; }
@@ -482,7 +460,30 @@ dialog .dlg-body { padding: 0.8rem 1rem 1rem; overflow: auto; max-height: calc(m
 /* ---------- view transitions ---------- */
 ::view-transition-old(stage), ::view-transition-new(stage) { animation-duration: 0.22s; }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  /* iteration-count 1 keeps an infinite pulse from becoming a per-frame flicker */
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+/* Windows High Contrast drops backgrounds, so state is drawn with borders and outlines there. */
+@media (forced-colors: active) {
+  .seg button.on, .seg button[aria-selected="true"], .seg button[aria-pressed="true"], .dp-list button.on, .rail button.on, .pr-types button.on, .btn.on { outline: 2px solid Highlight; outline-offset: -2px; }
+  .qz-choices button.right, .qz-dots button.right { border: 2px double Highlight; }
+  .qz-choices button.wrong, .qz-dots button.wrong { border: 2px dashed Highlight; }
+  .dots button.seen { border-width: 3px; }
+  .dots button.on { outline: 2px solid Highlight; }
+  .cw-lines li.on { outline: 2px solid Highlight; outline-offset: -2px; }
+  .vars tr.changed td { text-decoration: underline; }
+  .inp:focus { outline: 2px solid Highlight; }
+  .swatch, .figure svg, .map svg { forced-color-adjust: none; }
+}
+
+/* ---------- tablets: the code column is narrow, so code lines shrink a little before they would scroll sideways ---------- */
+@media (min-width: 761px) and (max-width: 1000px) {
+  .cw-lines, .editor { font-size: 0.78rem; }
+  /* a long formula cannot wrap; let it scroll inside its line rather than push the slide wider */
+  body:not(.print-mode) .slide-body .tex { display: inline-block; max-width: 100%; overflow-x: auto; overflow-y: hidden; vertical-align: middle; }
+}
+@media (min-width: 761px) and (max-width: 860px) {
+  .cw-lines, .editor { font-size: 0.72rem; }
 }
 
 /* ---------- narrow screens: drawer rail, stage may scroll ---------- */
@@ -541,4 +542,10 @@ body.print-mode .topbar, body.print-mode .rail, body.print-mode .botbar { displa
   html { font-size: 15px !important; }
   body { background: var(--paper); }
   .print-page { break-inside: avoid; }
+  /* Cmd/Ctrl-P on the interactive page prints the current slide on its own, without the chrome */
+  body:not(.print-mode) { overflow: visible; height: auto; }
+  body:not(.print-mode) #app { display: block; height: auto; }
+  body:not(.print-mode) .topbar, body:not(.print-mode) .rail, body:not(.print-mode) .botbar, body:not(.print-mode) .notice, dialog, #term-pop { display: none !important; }
+  body:not(.print-mode) .stage { overflow: visible; background-image: none; }
+  body:not(.print-mode) .slide:not([hidden]) { position: static; overflow: visible; }
 }

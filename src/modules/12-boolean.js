@@ -18,7 +18,7 @@
   };
 
   /* ---------------- drawing gates and wires ---------------- */
-  // x = left edge of the gate body, cy = vertical centre; pins are where input wires attach
+  // x = left edge of the gate body, cy = vertical center; pins are where input wires attach
   function gateGeom(type, x, cy, nIn) {
     const isNot = type === 'NOT';
     const H = isNot ? 28 : nIn <= 2 ? 44 : Math.max(60, nIn * 15 + 15);
@@ -44,7 +44,7 @@
     if (label) g.append(s('text', { x: x + (fam === 'AND' ? W * 0.42 : W * 0.5), y: cy + 3.5, 'text-anchor': 'middle', 'font-size': 9.5, 'font-weight': 600, fill: 'var(--ink-3)', text: label }));
     return { g, ...G };
   }
-  // lit wires carry 1, grey wires carry 0, dashed wires have not settled yet
+  // lit wires carry 1, gray wires carry 0, dashed wires have not settled yet
   const wireAttrs = (v) => (v == null
     ? { fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 1.5, 'stroke-dasharray': '4 4', opacity: 0.7 }
     : { fill: 'none', stroke: v ? 'var(--true)' : 'var(--ink-3)', 'stroke-width': v ? 3.2 : 1.6, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
@@ -458,7 +458,7 @@
       'maxterm': 'A sum that contains every variable exactly once, such as x + y′ + z. It equals 0 on exactly one row of the truth table.',
       'disjunctive normal form': 'A function written as a sum (OR) of minterms, one for each row where the function is 1. Also called the sum-of-minterms form.',
       'conjunctive normal form': 'A function written as a product (AND) of maxterms, one for each row where the function is 0.',
-      'Karnaugh map': 'A truth table arranged as a grid in Gray-code order, so that neighbouring cells differ in one variable and groups of 1s can be read off as simplified product terms.',
+      'Karnaugh map': 'A truth table arranged as a grid in Gray-code order, so that neighboring cells differ in one variable and groups of 1s can be read off as simplified product terms.',
       'prime implicant': 'A product term that covers only 1s (or don\'t-cares) of a function and cannot be enlarged. On a Karnaugh map it is a group that cannot grow any bigger.',
       'functionally complete': 'A set of gates that can build every Boolean function. {AND, OR, NOT}, {NAND} and {NOR} are functionally complete.',
       'half adder': 'A circuit that adds two bits and outputs a sum bit S = x ⊕ y and a carry bit C = xy.',
@@ -467,7 +467,7 @@
       'multiplexer': 'A circuit that uses select bits to choose which of several data inputs reaches its single output.',
       'propagation delay': 'The time a gate needs to update its output after an input changes. Delays add up along the longest path through a circuit.',
       'perceptron': 'The simplest artificial neuron. It outputs 1 when the weighted sum of its inputs plus a bias is greater than 0, and 0 otherwise.',
-      'linearly separable': 'A labelling of points is linearly separable when one straight line (or flat plane) can put every 1 on one side and every 0 on the other.',
+      'linearly separable': 'A labeling of points is linearly separable when one straight line (or flat plane) can put every 1 on one side and every 0 on the other.',
     },
     symbols: [
       ['x · y, xy', 'AND (Boolean product)', '1 · 0 = 0'],
@@ -615,16 +615,18 @@
       {
         title: 'Lab: a circuit simulator, from half adder to 4-bit adder',
         kind: 'lab',
-        html: String.raw`<p class="muted small">Click the switches at the top of the input wires. Lit green wires carry 1 and thin grey wires carry 0; the small circle after each gate shows its output. A dot joins wires, and wires that cross without a dot are not connected. Click a row of the truth table to load those inputs.</p>`,
+        html: String.raw`<p class="muted small">Click the switches at the top of the input wires. Lit green wires carry 1 and thin gray wires carry 0; the small circle after each gate shows its output. A dot joins wires, and wires that cross without a dot are not connected. Click a row of the truth table to load those inputs.</p>`,
         render(body, ctx) {
           const { h, rc } = ctx;
           let key = 'full';
           const inputs = {};
           Object.entries(CIRCUITS).forEach(([k, c]) => (inputs[k] = { ...c.start }));
           const adder = { a: [1, 0, 1, 1], b: [0, 1, 1, 0], stage: null };
-          let timer = null;
-          const stop = () => { if (timer) clearInterval(timer); timer = null; adder.stage = null; };
-          ctx.onHide(() => { if (timer) { stop(); draw(); } });
+          // the carry ripple advances one column per tick; pausing keeps the current stage, stop() settles the adder
+          let ready = false;
+          const ripple = ctx.ticker({ ms: 700, tick: () => { adder.stage++; if (adder.stage > 3) { adder.stage = null; return false; } draw(); return true; }, onChange: () => { if (ready) draw(); } });
+          const stop = () => { adder.stage = null; ripple.stop(); };
+          ctx.onHide(() => { if (adder.stage != null) stop(); });
           const seg = h('div.seg', { role: 'group', 'aria-label': 'Choose a circuit' });
           const fig = h('div.figure.bl-fig', { style: { flex: '1 1 auto' } });
           const note = h('div.box.small');
@@ -699,18 +701,17 @@
             rc(fig, svg);
             const A = a.join(''), B = b.join(''), S = String(c[4]) + sm.slice().reverse().join('');
             const settled = adder.stage == null;
-            const watch = h('button.btn.primary.sm', { onclick: () => {
-              stop();
-              adder.stage = 0;
-              draw();
-              timer = setInterval(() => { adder.stage++; if (adder.stage > 3) stop(); draw(); }, 700);
-            } }, 'Watch the carry ripple');
+            const watch = h('button.btn.primary.sm', { 'aria-pressed': String(ripple.playing), onclick: () => {
+              if (ripple.playing) { ripple.stop(); return; }
+              if (adder.stage == null) adder.stage = 0;
+              ripple.start();
+            } }, ripple.playing ? '❚❚ Pause' : '▶ Watch the carry ripple');
             const rnd = h('button.btn.sm', { onclick: () => { stop(); adder.a = range(4).map(() => ctx.R.int(0, 1)); adder.b = range(4).map(() => ctx.R.int(0, 1)); draw(); } }, 'Random numbers');
             rc(side,
               h('h3', '4-bit ripple-carry adder'),
               h('p.small', 'Four full adders in a chain add two 4-bit numbers column by column, exactly the way you add by hand. Each carry-out feeds the carry-in of the next column to the left.'),
               h('div.big-math.mono', `${A} + ${B} = ${settled ? S : '…'}`),
-              h('p.small', { html: settled ? `In decimal: <b>${parseInt(A, 2)} + ${parseInt(B, 2)} = ${parseInt(S, 2)}</b>. The circuit agrees with ordinary addition.` : `Stage ${adder.stage + 1} of 4. Column ${adder.stage} is adding. Each full adder must wait for the carry from its right neighbour.` }),
+              h('p.small', { html: settled ? `In decimal: <b>${parseInt(A, 2)} + ${parseInt(B, 2)} = ${parseInt(S, 2)}</b>. The circuit agrees with ordinary addition.` : `Stage ${adder.stage + 1} of 4. Column ${adder.stage} is adding. Each full adder must wait for the carry from its right neighbor.` }),
               h('ol.small', { style: { margin: 0 } }, range(4).map((i) => h('li', { style: { opacity: done(i) ? 1 : 0.45 } }, `Column ${i}: ${a[3 - i]} + ${b[3 - i]} + carry ${cKnown(i) ? c[i] : '?'}`, done(i) ? ` = ${c[i + 1]}${sm[i]}₂, so s${i} = ${sm[i]} and c${i + 1} = ${c[i + 1]}` : ''))),
               h('div.row', watch, rnd));
             note.innerHTML = '<span class="lbl">Propagation delay</span>The carry has to pass through every column in turn, so a 64-bit ripple-carry adder waits through 64 stages. Real processors use <b>carry-lookahead</b> adders that compute all the carries at once from the P and G signals of each column.';
@@ -720,6 +721,7 @@
             if (key === 'add4') drawAdder(); else drawGateLevel();
           }
           draw();
+          ready = true;
         },
       },
       /* ---------------------------------------------------------------- 4 */
@@ -876,7 +878,7 @@
               <div class="ai">Quantized neural networks store weights in 8, 4 or even 1 bit so that inference needs fewer, simpler gates. A 1-bit network replaces multiplication with XNOR gates and bit counting.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">Karnaugh map</span> is a truth table folded into a grid. Rows and columns follow Gray-code order 00, 01, 11, 10, so neighbouring cells differ in exactly one variable. Two neighbouring 1s merge because \(Ax + Ax' = A\).</div>
+              <div class="def">A <span class="term">Karnaugh map</span> is a truth table folded into a grid. Rows and columns follow Gray-code order 00, 01, 11, 10, so neighboring cells differ in exactly one variable. Two neighboring 1s merge because \(Ax + Ax' = A\).</div>
               <div class="thm"><b>Grouping rules.</b>
                 <ol style="margin:0.2rem 0 0">
                   <li>Groups are rectangles of 1, 2, 4, 8 or 16 cells.</li>
@@ -900,7 +902,7 @@
           const { h, s, rc } = ctx;
           const PRE = [
             { name: 'Textbook classic', n: 4, ones: [0, 1, 2, 4, 5, 6, 8, 9, 12, 13, 14], dc: [] },
-            { name: 'Corners and centre', n: 4, ones: [0, 2, 5, 7, 8, 10, 13, 15], dc: [] },
+            { name: 'Corners and center', n: 4, ones: [0, 2, 5, 7, 8, 10, 13, 15], dc: [] },
             { name: 'Odd digits with don\'t-cares', n: 4, ones: [1, 3, 5, 7, 9], dc: [10, 11, 12, 13, 14, 15] },
             { name: 'Majority', n: 3, ones: [3, 5, 6, 7], dc: [] },
             { name: 'Parity', n: 3, ones: [1, 2, 4, 7], dc: [] },
@@ -984,7 +986,7 @@
               names.forEach((v, i) => { const bit = 1 << (n - 1 - i); if (t.mask & bit) fixed.push(`${v} = ${t.val & bit ? 1 : 0}`); else free.push(v); });
               let why;
               if (!t.mask) why = 'The group covers the whole map, so f = 1.';
-              else if (!free.length) why = 'A single cell cannot merge with any neighbour, so it keeps every variable.';
+              else if (!free.length) why = 'A single cell cannot merge with any neighbor, so it keeps every variable.';
               else why = `${listJoin(free)} change${free.length === 1 ? 's' : ''} inside the group, so ${free.length === 1 ? 'it drops' : 'they drop'} out. ${listJoin(fixed)} ${fixed.length === 1 ? 'holds' : 'hold'} in every cell, which gives \\(${termStr(t, names)}\\).`;
               const only = t.covers.find((m) => res.coverers[m].length === 1);
               const need = res.essential.has(t) ? `Essential, because it is the only possible group that covers m${only}.` : `Chosen to cover m${t.covers.find((m) => !res.terms.some((u) => u !== t && res.essential.has(u) && u.covers.includes(m))) ?? t.covers[0]} with the fewest groups.`;
@@ -1265,7 +1267,7 @@
           ['    return (x & y) | (z ^ 1)', '<code>&amp;</code> is bitwise AND, <code>|</code> is bitwise OR, and <code>z ^ 1</code> flips one bit (0 becomes 1, 1 becomes 0), which is NOT for a single bit. So this line is \\(xy + z\'\\). We avoid <code>~z</code> because in Python <code>~1</code> is −2, not 0.'],
           ['', ''],
           ['minterms = []', 'An empty list that will collect one minterm string for each row where the output is 1.'],
-          ['print("x y z | f")', 'Prints the header of the truth table so the columns are labelled.'],
+          ['print("x y z | f")', 'Prints the header of the truth table so the columns are labeled.'],
           ['for x, y, z in product([0, 1], repeat=3):', '<code>product([0, 1], repeat=3)</code> yields the 8 tuples (0,0,0), (0,0,1), …, (1,1,1) in binary counting order, the same order as the rows of a truth table. Each tuple is unpacked into <code>x</code>, <code>y</code> and <code>z</code>.'],
           ['    out = f(x, y, z)', 'Runs the circuit on this row and stores the output bit. On the first row (0,0,0), <code>out</code> is 1 because \\(z\' = 1\\).'],
           ['    print(x, y, z, "|", out)', 'Prints one row of the truth table. <code>print</code> separates its arguments with spaces, so the output looks like <code>0 0 0 | 1</code>.'],
@@ -1433,7 +1435,7 @@
                   return used.length <= res.terms.length && tl <= lits;
                 },
                 hint: 'circle the largest power-of-2 rectangles of 1s; edges wrap around.',
-                solution: `Circle the largest groups on the Gray-code map. Each group keeps only the variables that stay constant inside it. ${res.terms.map((t) => `{${t.cells.map((m) => 'm' + m).join(', ')}} gives \\(${termStr(t, names)}\\)`).join('; ')}${res.terms.some((t) => t.cells.length === 1) ? ' (a lone cell has no neighbouring 1, so it keeps every variable)' : ''}. Minimal answer: \\(f = ${ans}\\), with ${res.terms.length} term${res.terms.length === 1 ? '' : 's'} and ${lits} literal${lits === 1 ? '' : 's'}.`,
+                solution: `Circle the largest groups on the Gray-code map. Each group keeps only the variables that stay constant inside it. ${res.terms.map((t) => `{${t.cells.map((m) => 'm' + m).join(', ')}} gives \\(${termStr(t, names)}\\)`).join('; ')}${res.terms.some((t) => t.cells.length === 1) ? ' (a lone cell has no neighboring 1, so it keeps every variable)' : ''}. Minimal answer: \\(f = ${ans}\\), with ${res.terms.length} term${res.terms.length === 1 ? '' : 's'} and ${lits} literal${lits === 1 ? '' : 's'}.`,
               };
             },
           },
@@ -1483,11 +1485,11 @@
           { q: String.raw`What is the dual of the law \(x + x'y = x + y\)?`, choices: [String.raw`\(x(x' + y) = xy\)`, String.raw`\(x'(x + y') = x'y'\)`, String.raw`\(x + xy = x\)`, String.raw`\(xx' = 0\)`], answer: 0, explain: String.raw`To form a dual, swap \(+\) with \(\cdot\) and 0 with 1, and leave complements alone. \(x + x'y\) becomes \(x \cdot (x' + y)\) and \(x + y\) becomes \(xy\). Duality guarantees the new law is also true.` },
           { q: 'In the correspondence between sets, logic and circuits, which three belong together?', choices: [String.raw`\(A \cap B\), \(p \vee q\), OR gate`, String.raw`\(A \cup B\), \(p \wedge q\), AND gate`, String.raw`\(A \cup B\), \(p \vee q\), OR gate`, String.raw`\(A'\), \(p \wedge q\), NOT gate`], answer: 2, explain: String.raw`Union, "or" and the OR gate are the same operation in three languages. The result includes anything that is in either input. Intersection, "and" and the AND gate form the other pair.` },
           { q: 'A function of x, y, z is 1 exactly on rows 011 and 110. What is its DNF?', choices: [String.raw`\(xy'z' + x'y'z\)`, String.raw`\(x'yz + xyz'\)`, String.raw`\((x + y' + z')(x' + y' + z)\)`, String.raw`\(xy + yz\)`], answer: 1, explain: String.raw`Each 1-row becomes a minterm, where a 1 bit gives the plain variable and a 0 bit gives its complement. 011 gives \(x'yz\) and 110 gives \(xyz'\). Add them.` },
-          { q: 'In a 4-variable Karnaugh map, a group of 4 neighbouring 1-cells produces a product term with how many literals?', choices: ['1', '2', '3', '4'], answer: 1, explain: String.raw`A group of \(2^k\) cells lets \(k\) variables change, and those drop out. \(4 = 2^2\), so 2 of the 4 variables drop and 2 literals remain.` },
+          { q: 'In a 4-variable Karnaugh map, a group of 4 neighboring 1-cells produces a product term with how many literals?', choices: ['1', '2', '3', '4'], answer: 1, explain: String.raw`A group of \(2^k\) cells lets \(k\) variables change, and those drop out. \(4 = 2^2\), so 2 of the 4 variables drop and 2 literals remain.` },
           { q: 'Which set of gates is functionally complete on its own?', choices: ['{AND, OR}', '{XOR}', '{OR}', '{NAND}'], answer: 3, explain: String.raw`NAND can build NOT (\(x \uparrow x\)), AND and OR, so it can build any DNF. {AND, OR} cannot make NOT, because with every input 0 its output is always 0. Circuits of XOR gates only ever compute parity, so they cannot make AND.` },
           { q: 'What does a full adder output for a = 1, b = 1 and carry-in 1?', choices: ['S = 0, Cout = 1', 'S = 1, Cout = 0', 'S = 1, Cout = 1', 'S = 0, Cout = 0'], answer: 2, explain: String.raw`\(1 + 1 + 1 = 3\), which is \(11_2\). The low bit is the sum \(S = 1\) and the high bit is the carry \(C_{out} = 1\).` },
           { q: 'Why can a single perceptron compute AND but not XOR?', choices: ['XOR needs more than two inputs', 'A perceptron cannot output 0', 'XOR is not a Boolean function', "XOR's 1s and 0s cannot be separated by one straight line"], answer: 3, explain: 'A perceptron draws one straight line and outputs 1 on one side. For XOR, the 1s sit at (0,1) and (1,0) and the 0s at (0,0) and (1,1), diagonally opposite, so no line works. Adding a hidden layer fixes this.' },
-          { q: 'A 64-bit ripple-carry adder is much slower than a 4-bit one mainly because…', choices: ['the carry must pass through all 64 full adders, one after another', 'it has more input wires to read', '64-bit numbers need a different kind of gate', 'binary addition is harder for big numbers'], answer: 0, explain: 'Each full adder must wait for the carry from its right neighbour, so the delay grows with the number of bits. Carry-lookahead adders remove this chain by computing all the carries at once.' },
+          { q: 'A 64-bit ripple-carry adder is much slower than a 4-bit one mainly because…', choices: ['the carry must pass through all 64 full adders, one after another', 'it has more input wires to read', '64-bit numbers need a different kind of gate', 'binary addition is harder for big numbers'], answer: 0, explain: 'Each full adder must wait for the carry from its right neighbor, so the delay grows with the number of bits. Carry-lookahead adders remove this chain by computing all the carries at once.' },
         ],
       },
     ],

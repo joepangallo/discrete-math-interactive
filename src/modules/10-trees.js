@@ -1,6 +1,6 @@
 /* Module 10: Trees. Objective 10: describe the use of trees as a data structure in computer science.
-   Labs: rooted-tree anatomy, Kruskal and Prim, a binary search tree playground, expression trees with
-   a postfix stack, and a Huffman code builder. */
+   Labs: rooted-tree anatomy, tree isomorphism, Kruskal and Prim, a binary search tree playground,
+   expression trees with a postfix stack, a Huffman code builder, and minimax on a game tree. */
 (() => {
   const escT = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -47,7 +47,7 @@
   };
 
   /* Draws a binary tree as an SVG string: x = inorder position, y = depth.
-     look(node) -> {cls, badge, sub} lets each lab colour vertices for its own state. */
+     look(node) -> {cls, badge, sub} lets each lab color vertices for its own state. */
   function binSVG(root, o = {}) {
     const dx = o.dx ?? 48, dy = o.dy ?? 62, r = o.r ?? 18, pad = o.pad ?? 30;
     const pos = new Map();
@@ -79,7 +79,7 @@
       if (lk.badge != null) g += `<g class="badge"><circle cx="${x + r * 0.9}" cy="${y - r * 0.9}" r="9" fill="var(--kw)"/><text x="${x + r * 0.9}" y="${y - r * 0.9}" fill="var(--sheet)">${lk.badge}</text></g>`;
       nodes += `<g class="nd ${lk.cls || ''}" data-key="${escT(n.key ?? '')}"${o.focusable ? ` tabindex="0" role="button" aria-label="vertex ${escT(label)}"` : ''}>${g}</g>`;
     }
-    return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escT(o.aria || 'Binary tree')}">${edges}${nodes}</svg>`;
+    return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="${o.focusable ? 'group' : 'img'}" aria-label="${escT(o.aria || 'Binary tree')}">${edges}${nodes}</svg>`;
   }
 
   /* ---------------- arithmetic expressions: + - * / ^ and parentheses ---------------- */
@@ -102,7 +102,7 @@
         continue;
       }
       if ('+-*/^()'.includes(c)) { out.push({ t: c }); i++; continue; }
-      throw new Error(`I don't recognise "${c}". Use numbers, + − * / ^ and parentheses.`);
+      throw new Error(`I don't recognize "${c}". Use numbers, + − * / ^ and parentheses.`);
     }
     return out;
   }
@@ -183,6 +183,189 @@
   const leavesOf = (t) => (t.left ? [...leavesOf(t.left), ...leavesOf(t.right)] : [t.sym]);
   const showSym = (c) => (c === ' ' ? '␣' : c);
 
+  /* ---------------- unrooted trees as adjacency lists over 0..n-1, for the isomorphism slides ---------------- */
+  const range = (n) => Array.from({ length: n }, (_, i) => i);
+  function adjOf(n, edges) { const adj = range(n).map(() => []); for (const [u, v] of edges) { adj[u].push(v); adj[v].push(u); } return adj; }
+  // strip every leaf, again and again; the one or two vertices left standing are the center
+  function centersOf(adj) {
+    const deg = adj.map((a) => a.length);
+    let layer = range(adj.length).filter((v) => deg[v] <= 1), left = adj.length;
+    while (left > 2) {
+      left -= layer.length;
+      const next = [];
+      for (const v of layer) for (const w of adj[v]) if (--deg[w] === 1) next.push(w);
+      layer = next;
+    }
+    return layer;
+  }
+  const cmpName = (a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0);
+  // AHU name of the subtree below v: a leaf is (), any other vertex wraps its children's sorted names
+  const ahu = (adj, v, parent = -1) => '(' + adj[v].filter((w) => w !== parent).map((w) => ahu(adj, w, v)).sort(cmpName).join('') + ')';
+  // the name of an unrooted tree is the smaller of its (at most two) center-rooted names
+  function canonical(adj) {
+    const named = centersOf(adj).map((c) => ({ c, name: ahu(adj, c) })).sort((x, y) => cmpName(x.name, y.name));
+    return { name: named[0].name, root: named[0].c };
+  }
+  // a vertex correspondence between two trees with equal names: pair up children with equal names, top down
+  function isoMap(adjA, adjB) {
+    const A = canonical(adjA), B = canonical(adjB);
+    if (A.name !== B.name) return null;
+    const map = new Map();
+    const kidsBy = (adj, v, p) => adj[v].filter((w) => w !== p).map((w) => ({ w, name: ahu(adj, w, v) })).sort((x, y) => cmpName(x.name, y.name));
+    (function pair(a, pa, b, pb) {
+      map.set(a, b);
+      const ka = kidsBy(adjA, a, pa), kb = kidsBy(adjB, b, pb);
+      ka.forEach((x, i) => pair(x.w, a, kb[i].w, b));
+    })(A.root, -1, B.root, -1);
+    return map;
+  }
+  const degSeq = (adj) => adj.map((a) => a.length).sort((x, y) => y - x);
+  // each vertex's degree followed by its neighbors' degrees; a count that differs between two trees explains why they differ
+  const degProfile = (adj) => adj.map((a) => `${a.length}:${a.map((w) => adj[w].length).sort((x, y) => y - x).join('')}`).sort();
+  function hangFrom(adj, root) {
+    const parent = { [root]: -1 }, depth = { [root]: 0 }, order = [root], kids = {};
+    for (let i = 0; i < order.length; i++) {
+      const u = order[i];
+      kids[u] = [];
+      for (const v of adj[u]) if (!(v in parent)) { parent[v] = u; depth[v] = depth[u] + 1; kids[u].push(v); order.push(v); }
+    }
+    return { parent, depth, order, kids, height: Math.max(...Object.values(depth)) };
+  }
+  // draws an unrooted tree hung from `root`; look(v) -> {cls, badge, sub, aria} decorates vertices
+  function treeSVG(adj, root, o = {}) {
+    const { depth, order, kids, height: ht } = hangFrom(adj, root);
+    const x = {};
+    let next = 0;
+    (function place(v) {
+      const ks = kids[v];
+      if (!ks.length) { x[v] = next++; return; }
+      ks.forEach(place);
+      x[v] = (x[ks[0]] + x[ks[ks.length - 1]]) / 2;
+    })(root);
+    const dx = o.dx ?? 46, dy = o.dy ?? 50, r = o.r ?? 15, pad = o.pad ?? 26;
+    const cw = Math.max(next - 1, 0) * dx + 2 * pad, ch = ht * dy + 2 * pad;
+    const W = Math.max(o.minW ?? 0, cw), H = Math.max(o.minH ?? 0, ch);
+    const ox = (W - cw) / 2 + pad, oy = (H - ch) / 2 + pad;
+    const X = (v) => ox + x[v] * dx, Y = (v) => oy + depth[v] * dy;
+    let g = '';
+    for (const v of order) for (const w of kids[v]) g += `<line class="ed" x1="${X(v)}" y1="${Y(v)}" x2="${X(w)}" y2="${Y(w)}" stroke="var(--ink-3)"/>`;
+    for (const v of order) {
+      const lk = (o.look && o.look(v)) || {};
+      const label = o.label ? o.label(v) : String(v);
+      g += `<g class="nd ${lk.cls || ''}" data-v="${v}"${o.focusable ? ` tabindex="0" role="button" aria-label="${escT(lk.aria || `vertex ${label}`)}"` : ''}>`;
+      g += `<circle cx="${X(v)}" cy="${Y(v)}" r="${r}" fill="var(--sheet)" stroke="var(--ink-3)"/><text x="${X(v)}" y="${Y(v)}" fill="var(--ink)">${escT(label)}</text>`;
+      if (lk.sub != null) g += `<text class="sub" x="${X(v)}" y="${Y(v) + r + 11}" fill="var(--accent)">${escT(lk.sub)}</text>`;
+      if (lk.badge != null) g += `<g class="badge"><circle cx="${X(v) + r * 0.9}" cy="${Y(v) - r * 0.9}" r="8.5" fill="var(--kw)"/><text x="${X(v) + r * 0.9}" y="${Y(v) - r * 0.9}" fill="var(--sheet)">${escT(lk.badge)}</text></g>`;
+      g += '</g>';
+    }
+    return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="${o.focusable ? 'group' : 'img'}" aria-label="${escT(o.aria || 'Tree')}"${o.style ? ` style="${o.style}"` : ''}>${g}</svg>`;
+  }
+  // small trees as edge lists over 0..n-1; the names say what the shape looks like
+  const SHAPES = {
+    path5: { n: 5, e: [[0, 1], [1, 2], [2, 3], [3, 4]], desc: 'a path of 5 vertices' },
+    spider211: { n: 5, e: [[0, 1], [1, 2], [0, 3], [0, 4]], desc: 'a vertex of degree 3 with legs of length 2, 1, 1' },
+    star5: { n: 5, e: [[0, 1], [0, 2], [0, 3], [0, 4]], desc: 'a star with 4 leaves' },
+    spider221: { n: 6, e: [[0, 1], [1, 2], [0, 3], [3, 4], [0, 5]], desc: 'a vertex of degree 3 with legs of length 2, 2, 1' },
+    spider311: { n: 6, e: [[0, 1], [1, 2], [2, 3], [0, 4], [0, 5]], desc: 'a vertex of degree 3 with legs of length 3, 1, 1' },
+    dstar6: { n: 6, e: [[0, 1], [0, 2], [0, 3], [3, 4], [3, 5]], desc: 'two adjacent vertices of degree 3, each with two leaves' },
+    spider411: { n: 7, e: [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [0, 6]], desc: 'a vertex of degree 3 with legs of length 4, 1, 1' },
+    spider321: { n: 7, e: [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5], [0, 6]], desc: 'a vertex of degree 3 with legs of length 3, 2, 1' },
+    spider222: { n: 7, e: [[0, 1], [1, 2], [0, 3], [3, 4], [0, 5], [5, 6]], desc: 'a vertex of degree 3 with legs of length 2, 2, 2' },
+    hubs7a: { n: 7, e: [[0, 1], [0, 2], [0, 3], [3, 4], [3, 5], [5, 6]], desc: 'two adjacent vertices of degree 3, one of them also carrying a leg of length 2' },
+    hubs7b: { n: 7, e: [[0, 1], [0, 2], [0, 3], [3, 4], [4, 5], [4, 6]], desc: 'two vertices of degree 3 joined through a middle vertex of degree 2' },
+  };
+  // pairs with the same degree sequence that are still different trees, and pairs whose degree sequences already differ
+  const LOOKALIKES = [['spider221', 'spider311'], ['spider411', 'spider321'], ['spider321', 'spider222'], ['spider411', 'spider222'], ['hubs7a', 'hubs7b']];
+  const UNALIKE = [['path5', 'spider211'], ['path5', 'star5'], ['spider211', 'star5'], ['dstar6', 'spider221'], ['dstar6', 'spider311'], ['hubs7a', 'spider321'], ['hubs7b', 'spider222'], ['hubs7a', 'spider411']];
+  // a relabeled, reshuffled copy of a shape, so the same tree never looks the same twice
+  function scramble(R, key) {
+    const { n, e } = SHAPES[key];
+    const perm = R.shuffle(range(n));
+    const edges = R.shuffle(e.map(([u, v]) => (R.chance(0.5) ? [perm[u], perm[v]] : [perm[v], perm[u]])));
+    return { key, n, edges, adj: adjOf(n, edges) };
+  }
+  // kind: 'iso' (one tree twice), 'look' (same degree sequence, different trees), 'diff' (different degree sequences)
+  function treePair(R, kind) {
+    const [ka, kb] = kind === 'iso' ? [R.pick(Object.keys(SHAPES))].flatMap((k) => [k, k]) : R.shuffle(R.pick(kind === 'look' ? LOOKALIKES : UNALIKE));
+    return { kind, A: scramble(R, ka), B: scramble(R, kb) };
+  }
+  const LETTERS = 'abcdefg', DIGITS = '1234567';
+  const edgeText = (t, names) => t.edges.map(([u, v]) => `${names[u]}–${names[v]}`).join(', ');
+  // the single fact that tells two non-isomorphic trees apart, in words
+  function whyDifferent(A, B) {
+    const da = degSeq(A.adj), db = degSeq(B.adj);
+    if (da.join() !== db.join()) return `Their degree sequences differ: ${da.join(', ')} for tree A against ${db.join(', ')} for tree B.`;
+    const pa = degProfile(A.adj), pb = degProfile(B.adj);
+    const count = (arr, p) => arr.filter((x) => x === p).length;
+    const p = pa.find((q) => count(pa, q) !== count(pb, q));
+    const names = `The canonical names settle it: ${canonical(A.adj).name} against ${canonical(B.adj).name}.`;
+    if (!p) return `Even the neighbor degrees agree, so only the full structure tells them apart. ${names}`;
+    const [d, nb] = p.split(':');
+    const ca = count(pa, p);
+    return `Same degree sequence, but tree A has ${ca} ${ca === 1 ? 'vertex' : 'vertices'} of degree ${d} whose neighbors have degrees ${[...nb].join(', ')}, and tree B has ${count(pb, p)}. ${names}`;
+  }
+
+  /* ---------------- game trees: nested arrays with numbers at the leaves, MAX to move at the root ---------------- */
+  const minimax = (node, max) => (typeof node === 'number' ? node : (max ? Math.max : Math.min)(...node.map((c) => minimax(c, !max))));
+  // alpha-beta in left-to-right order: how many leaves it must look at before the root value is certain
+  function alphaBetaLeaves(node, max, alpha = -Infinity, beta = Infinity) {
+    if (typeof node === 'number') return { value: node, leaves: 1 };
+    let best = max ? -Infinity : Infinity, leaves = 0;
+    for (const c of node) {
+      const r = alphaBetaLeaves(c, !max, alpha, beta);
+      leaves += r.leaves;
+      if (max) { best = Math.max(best, r.value); alpha = Math.max(alpha, best); } else { best = Math.min(best, r.value); beta = Math.min(beta, best); }
+      if (beta <= alpha) break;
+    }
+    return { value: best, leaves };
+  }
+  // shape [3, 3, 3] = three MIN nodes with three leaves each; [[2, 2], [2, 2]] adds a MAX level in between
+  const randGame = (R, shape) => shape.map((k) => (Array.isArray(k) ? randGame(R, k) : range(k).map(() => R.int(0, 9))));
+  // flattens a game tree into drawable nodes: id (R, A, B, A1, ...), depth, whose turn, value, position
+  function gameNodes(tree, o = {}) {
+    const dy = o.dy ?? 62, lw = o.leafW ?? 30, gap = o.gap ?? 8, top = o.top ?? 16;
+    const pad = o.pad ?? (o.levels === false ? 14 : 42);
+    const nodes = [];
+    let leafX = 0, maxD = 0;
+    (function walk(node, depth, max, id) {
+      const me = { node, depth, max, id, kids: [], leaf: typeof node === 'number', value: minimax(node, max) };
+      maxD = Math.max(maxD, depth);
+      if (me.leaf) { me.x = pad + leafX * (lw + gap) + lw / 2; leafX++; }
+      else {
+        node.forEach((c, i) => me.kids.push(walk(c, depth + 1, !max, depth === 0 ? 'ABCD'[i] : id + (i + 1))));
+        me.x = (me.kids[0].x + me.kids[me.kids.length - 1].x) / 2;
+      }
+      me.y = top + depth * dy;
+      nodes.push(me);
+      return me;
+    })(tree, 0, true, 'R');
+    return { nodes, W: 2 * pad + leafX * (lw + gap) - gap, H: top + maxD * dy + 22, maxD, root: nodes[nodes.length - 1], pad, top, dy };
+  }
+  // text(n) -> what to write in an internal node; cls(n) -> state class; best: highlight the root's chosen move
+  function gameSVG(tree, o = {}) {
+    const { nodes, W, H, maxD, root, top, dy } = gameNodes(tree, o);
+    const best = o.best ? root.kids.find((k) => k.value === root.value) : null;
+    let g = '';
+    if (o.levels !== false) for (let d = 0; d < maxD; d++) g += `<text class="gm-lvl" x="4" y="${top + d * dy}" fill="var(--ink-3)">${d % 2 === 0 ? 'MAX' : 'MIN'}</text>`;
+    for (const n of nodes) for (const k of n.kids) g += `<line class="ed${best && n === root && k === best ? ' on' : ''}" x1="${n.x}" y1="${n.y}" x2="${k.x}" y2="${k.y}" stroke="var(--ink-3)"/>`;
+    for (const n of nodes) {
+      if (n.leaf) { g += `<g class="gm leaf"><rect x="${n.x - 13}" y="${n.y - 11}" width="26" height="22" rx="4" fill="var(--sheet)" stroke="var(--ink-3)"/><text x="${n.x}" y="${n.y}" fill="var(--ink)">${n.node}</text></g>`; continue; }
+      const text = o.text ? o.text(n) : String(n.value);
+      g += `<g class="gm ${n.max ? 'mx' : 'mn'} ${(o.cls && o.cls(n)) || ''}">`;
+      g += n.max ? `<rect x="${n.x - 15}" y="${n.y - 15}" width="30" height="30" rx="6" fill="var(--sheet)" stroke="var(--fnc)"/>` : `<circle cx="${n.x}" cy="${n.y}" r="15" fill="var(--sheet)" stroke="var(--fnc)"/>`;
+      g += `<text x="${n.x}" y="${n.y}" fill="var(--ink)">${escT(text)}</text>`;
+      if (o.ids) g += `<text class="gm-id" x="${n.x - 24}" y="${n.y - 18}" fill="var(--ink-3)">${n.id}</text>`;
+      g += '</g>';
+    }
+    return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escT(o.aria || 'Game tree')}"${o.style ? ` style="${o.style}"` : ''}>${g}</svg>`;
+  }
+  // the concept slide's pair: same degree sequence, same height from the center, different trees
+  const ISO_FIG = (() => {
+    const a = adjOf(6, SHAPES.spider221.e), b = adjOf(6, SHAPES.spider311.e);
+    const opt = { dx: 40, dy: 40, r: 13, pad: 18, minW: 230, minH: 118, label: (v) => LETTERS[v] };
+    return { a: treeSVG(a, canonical(a).root, { ...opt, aria: 'Tree with legs of length 2, 2 and 1' }), b: treeSVG(b, canonical(b).root, { ...opt, aria: 'Tree with legs of length 3, 1 and 1' }), na: canonical(a).name, nb: canonical(b).name };
+  })();
+
   /* ---------------- static figures ---------------- */
   function threeGraphs() {
     const P = [[28, 30], [80, 18], [132, 36], [36, 96], [92, 82], [128, 120]];
@@ -253,7 +436,7 @@
       'tree': 'A connected graph with no cycles. Between any two of its vertices there is exactly one simple path, and a tree with n vertices has n − 1 edges.',
       'forest': 'A graph with no cycles. Each connected piece of a forest is a tree.',
       'rooted tree': 'A tree with one vertex singled out as the root. Every edge then points away from the root, which gives each vertex a parent, children and a level.',
-      'parent': 'In a rooted tree, the parent of v is the neighbour of v one step closer to the root. Every vertex except the root has exactly one parent.',
+      'parent': 'In a rooted tree, the parent of v is the neighbor of v one step closer to the root. Every vertex except the root has exactly one parent.',
       'child': 'In a rooted tree, w is a child of v when v is the parent of w. Children of the same parent are siblings.',
       'ancestor': 'Any vertex on the path from v up to the root (not counting v itself). The root is an ancestor of every other vertex.',
       'descendant': 'w is a descendant of v when v is an ancestor of w: w lies somewhere below v.',
@@ -262,7 +445,7 @@
       'height': 'The height of a rooted tree is the largest level of any vertex: the number of edges on the longest path from the root down to a leaf.',
       'spanning tree': 'A subgraph of a connected graph that contains every vertex and is a tree. It keeps exactly n − 1 of the edges.',
       'minimal spanning tree': 'In a weighted graph, a spanning tree whose total edge weight is as small as possible. Kruskal\'s and Prim\'s algorithms find one.',
-      'binary tree': 'A rooted tree in which every vertex has at most two children, each one labelled as the left child or the right child.',
+      'binary tree': 'A rooted tree in which every vertex has at most two children, each one labeled as the left child or the right child.',
       'full binary tree': 'A binary tree in which every internal vertex has exactly two children. With i internal vertices it has i + 1 leaves.',
       'binary search tree': 'A binary tree with a key in every vertex, arranged so that keys in each left subtree are smaller and keys in each right subtree are larger than the vertex\'s own key.',
       'traversal': 'A procedure that visits every vertex of a tree exactly once in a fixed order, such as preorder, inorder, postorder or level order.',
@@ -270,6 +453,10 @@
       'prefix-free code': 'A code in which no code word is the beginning of another. Such a code can be decoded bit by bit without separators. Huffman codes are prefix-free.',
       'decision tree': 'A rooted tree in which each internal vertex asks a question, each branch is an answer, and each leaf is a final decision or outcome.',
       'minimax': 'A rule for choosing moves in a two-player game tree: the player to move takes the maximum of the children\'s values, the opponent takes the minimum.',
+      'tree isomorphism': 'Two trees are isomorphic when their vertices can be matched one to one so that adjacency is preserved: the same tree drawn twice. For rooted trees the roots must match too.',
+      'center of a tree': 'The one or two vertices left after repeatedly removing all the leaves. Hanging a tree from its center gives it the smallest possible height.',
+      'canonical name': 'A string that is the same for every drawing of a tree: a leaf is (), and any other vertex wraps the sorted names of its children in parentheses. Equal names mean isomorphic trees.',
+      'game tree': 'A rooted tree whose vertices are positions in a two-player game and whose children are the positions one move later. Leaves carry the value of the final position for the first player.',
     },
     symbols: [
       ['n − 1', 'edges in a tree with n vertices', '7 vertices ⇒ 6 edges'],
@@ -279,6 +466,7 @@
       ['⌈log₂ n!⌉', 'least worst-case comparisons to sort n items', 'n = 4 ⇒ 5'],
       ['w(T)', 'total weight of a spanning tree T', 'w(T) = 38'],
       ['T_L, T_R', 'left and right subtrees of a binary tree', 'inorder: T_L, root, T_R'],
+      ['()', 'canonical name of a leaf', '(()()) = a vertex with two leaf children'],
     ],
     css: `
       .tr-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: 0.9rem; grid-template-rows: minmax(0, 1fr); }
@@ -362,6 +550,24 @@
       .tr-kv { display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.7rem; font-size: 0.84rem; }
       .tr-kv b { font-variant-numeric: tabular-nums; }
       .tr-ex-row td:first-child { white-space: nowrap; }
+      .tr-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.6rem; flex: 1 1 auto; min-height: 0; }
+      .tr-two > .tr-col { min-height: 0; }
+      .tr-cmp td:nth-child(4) { white-space: nowrap; font-weight: 600; }
+      .tr-mm { display: flex; flex-direction: column; gap: 0.3rem; }
+      .tr-mm-row { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) 3.6rem 1.2rem; gap: 0.4rem; align-items: center; font-size: 0.85rem; }
+      .tr-mm-row .inp { width: 100%; padding: 0.2rem 0.4rem; text-align: center; }
+      .tr-mm-mark { font-weight: 700; }
+      .tr-mm-mark.ok { color: var(--true); }
+      .tr-mm-mark.bad { color: var(--false); }
+      .tr-svg .gm text { font-size: 13px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+      .tr-svg .gm rect, .tr-svg .gm circle { stroke-width: 1.8; }
+      .tr-svg .gm.leaf text { font-weight: 600; }
+      .tr-svg .gm-lvl { font-size: 11px; font-family: var(--font-mono); fill: var(--ink-3); dominant-baseline: central; }
+      .tr-svg .gm-id { font-size: 10.5px; font-family: var(--font-mono); font-weight: 600; fill: var(--ink-3); }
+      .tr-svg .gm.ok rect, .tr-svg .gm.ok circle { fill: var(--true-bg); stroke: var(--true); stroke-width: 2.8; }
+      .tr-svg .gm.bad rect, .tr-svg .gm.bad circle { fill: var(--false-bg); stroke: var(--false); stroke-width: 2.8; }
+      .tr-svg .gm.best rect, .tr-svg .gm.best circle { fill: var(--mark); stroke: var(--accent); stroke-width: 3; }
+      .tr-svg .gm.best text { fill: var(--mark-ink); }
     `,
     slides: [
       /* ---------------------------------------------------------------- 1 */
@@ -458,7 +664,7 @@
             for (const v of order) {
               g += `<g class="nd ${role(v)}" data-v="${v}" tabindex="0" role="button" aria-label="vertex ${v}${v === root ? ', the root' : ''}"><circle cx="${X(v)}" cy="${Y(v)}" r="${r}" fill="var(--sheet)" stroke="var(--ink-3)"/><text x="${X(v)}" y="${Y(v)}" fill="var(--ink)">${v}</text></g>`;
             }
-            fig.innerHTML = `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rooted tree with root ${root}">${g}</svg>`;
+            fig.innerHTML = `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="Rooted tree with root ${root}">${g}</svg>`;
             const list = (a) => (a.length ? a.join(', ') : 'none');
             const leaves = order.filter((v) => !kids[v].length);
             const rows = [
@@ -486,6 +692,127 @@
       },
       /* ---------------------------------------------------------------- 3 */
       {
+        id: 'tree-isomorphism',
+        title: 'When are two trees the same tree?',
+        kind: 'concept',
+        html: String.raw`
+          <div class="split">
+            <div class="stack">
+              <div class="def">Two trees are <b>isomorphic</b> (<span class="term">tree isomorphism</span>) when one can be relabeled into the other: a one-to-one correspondence between their vertices such that two vertices are adjacent in the first tree exactly when their partners are adjacent in the second. Isomorphic trees are one tree drawn twice. For <b>rooted</b> trees the correspondence must also send root to root, and therefore children to children.</div>
+              <div class="thm">Isomorphic trees agree on every property that ignores the names: the number of vertices and edges, the <span class="term">degree sequence</span>, the length of the longest path, and the height when each is hung from its <span class="term" data-term="center of a tree">center</span>. So a single mismatch proves two trees different. Agreement proves nothing: the two trees on the right share all of these numbers and are still different.</div>
+              <div class="ex">A path of three vertices hung from its middle vertex has height 1; hung from an end it has height 2. As plain trees the two drawings are isomorphic. As rooted trees they are not, because the roots are vertices of different degree.</div>
+            </div>
+            <div class="stack">
+              <div class="card" style="padding:0.45rem 0.6rem">
+                <div class="cols" style="grid-template-columns:1fr 1fr;gap:0.5rem">
+                  <div><div class="tr-concept-fig" style="height:7.4rem">${ISO_FIG.a}</div><p class="tiny muted center">degrees 3, 2, 2, 1, 1, 1 · name <span class="mono">${ISO_FIG.na}</span></p></div>
+                  <div><div class="tr-concept-fig" style="height:7.4rem">${ISO_FIG.b}</div><p class="tiny muted center">degrees 3, 2, 2, 1, 1, 1 · name <span class="mono">${ISO_FIG.nb}</span></p></div>
+                </div>
+                <p class="small" style="margin-top:0.3rem">Both have 6 vertices, 5 edges, the same degree sequence, a longest path of 4 edges and height 2 from the center. Yet on the left the degree-3 vertex touches two vertices of degree 2, on the right only one, and no relabeling can change that.</p>
+              </div>
+              <div class="def" data-label="Canonical name">A <span class="term">canonical name</span> is a string that depends only on the shape. Name a leaf <code>()</code>, and name every other vertex by writing its children's names in sorted order inside one pair of parentheses. Two rooted trees are isomorphic exactly when their roots get the same name. For unrooted trees, first hang each tree from its center (strip all the leaves, repeat, and the last one or two vertices standing are the center), then compare the names.</div>
+              <div class="ai">Canonical forms turn "same structure?" into string equality. Chemical databases match molecules that way, compilers find duplicated code by naming syntax trees, and query engines recognize repeated sub-expressions by their canonical form.</div>
+            </div>
+          </div>`,
+      },
+      /* ---------------------------------------------------------------- 4 */
+      {
+        id: 'same-tree-lab',
+        title: 'Lab: same tree or not?',
+        kind: 'lab',
+        html: String.raw`<p class="muted small">Two trees, drawn differently. Reveal one invariant at a time, then give your verdict. Click a vertex to hang that tree from it: the height changes with the root, which is why the fair comparison hangs both trees from their centers. Some pairs pass every quick check and are still different.</p>`,
+        render(body, ctx) {
+          const { h } = ctx;
+          let pair = null, rootA = 0, rootB = 0, shown = new Set(), verdict = null, mapping = null;
+          const figA = h('div.tr-fig.tr-click', { role: 'group', 'aria-label': 'Tree A. Select a vertex to make it the root.' });
+          const figB = h('div.tr-fig.tr-click', { role: 'group', 'aria-label': 'Tree B. Select a vertex to make it the root.' });
+          const capA = h('div.tiny.muted.mono'), capB = h('div.tiny.muted.mono');
+          const tbody = h('tbody');
+          const fb = h('div.feedback', { 'aria-live': 'polite' });
+          const mapEl = h('div.small.mono', { style: { lineHeight: 1.5 } });
+          const CHECKS = [
+            ['count', 'Vertices, edges', (t) => `${t.n} vertices, ${t.edges.length} edges`],
+            ['deg', 'Degree sequence', (t) => degSeq(t.adj).join(', ')],
+            ['height', 'Height from the center', (t) => String(hangFrom(t.adj, canonical(t.adj).root).height)],
+            ['name', 'Canonical name', (t) => canonical(t.adj).name],
+          ];
+          const revealBtns = CHECKS.map(([k, label]) => h('button.btn.sm', { dataset: { k }, 'aria-pressed': 'false', onclick: () => { shown.add(k); draw(); } }, label));
+          const isoBtn = h('button.btn.primary.sm', { onclick: () => decide(true) }, 'Isomorphic');
+          const notBtn = h('button.btn.primary.sm', { onclick: () => decide(false) }, 'Not isomorphic');
+          const newBtn = h('button.btn.sm', { onclick: () => fresh() }, 'New pair');
+          const centerBtn = h('button.btn.sm', { onclick: () => { rootA = canonical(pair.A.adj).root; rootB = canonical(pair.B.adj).root; draw(); } }, 'Hang both from the center');
+          const onPick = (which) => (e) => {
+            const g = e.target.closest('[data-v]');
+            if (!g) return;
+            if (e.type === 'keydown') { if (e.key !== 'Enter' && e.key !== ' ') return; e.preventDefault(); }
+            if (which === 'A') rootA = +g.dataset.v; else rootB = +g.dataset.v;
+            draw();
+            if (e.type === 'keydown') (which === 'A' ? figA : figB).querySelector(`[data-v="${g.dataset.v}"]`)?.focus({ preventScroll: true });
+          };
+          for (const [fig, w] of [[figA, 'A'], [figB, 'B']]) { fig.addEventListener('click', onPick(w)); fig.addEventListener('keydown', onPick(w)); }
+          body.append(h('div.tr-grid', { style: { gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)' } },
+            h('div.tr-col',
+              h('div.tr-two', h('div.tr-col', capA, figA), h('div.tr-col', capB, figB)),
+              h('div.row', centerBtn, newBtn)),
+            h('div.tr-col',
+              h('div.tiny.mono.muted', 'REVEAL AN INVARIANT'), h('div.row', { style: { gap: '0.35rem' } }, ...revealBtns),
+              h('table.data.tr-tbl.tr-cmp', h('thead', h('tr', h('th', 'Invariant'), h('th', 'Tree A'), h('th', 'Tree B'), h('th', ''))), tbody),
+              h('div.row', h('span.small.muted', 'Your verdict:'), isoBtn, notBtn), fb, mapEl)));
+
+          function fresh() {
+            pair = treePair(ctx.R, ctx.R.pick(['iso', 'iso', 'iso', 'look', 'look', 'diff']));
+            rootA = ctx.R.int(0, pair.A.n - 1);
+            rootB = ctx.R.int(0, pair.B.n - 1);
+            shown = new Set(); verdict = null; mapping = null;
+            draw();
+          }
+          function decide(saysIso) {
+            const iso = pair.kind === 'iso';
+            verdict = saysIso === iso ? 'right' : 'wrong';
+            mapping = iso ? isoMap(pair.A.adj, pair.B.adj) : null;
+            shown = new Set(CHECKS.map(([k]) => k));
+            draw();
+          }
+          function draw() {
+            const { A, B } = pair;
+            const nameA = (v) => LETTERS[v], nameB = (v) => DIGITS[v];
+            const showCenter = shown.has('height') || shown.has('name');
+            const order = mapping ? [...mapping.keys()] : [];
+            const badgeOf = (which, v) => {
+              if (!mapping) return null;
+              const a = which === 'A' ? v : [...mapping.entries()].find(([, b]) => b === v)[0];
+              return String(order.indexOf(a) + 1);
+            };
+            const look = (which, t, root) => { const cs = new Set(centersOf(t.adj)); return (v) => ({ cls: v === root ? 'sel' : showCenter && cs.has(v) ? 'par' : '', badge: badgeOf(which, v), aria: `vertex ${which === 'A' ? nameA(v) : nameB(v)}${v === root ? ', the root' : ''}${showCenter && cs.has(v) ? ', a center' : ''}` }); };
+            figA.innerHTML = treeSVG(A.adj, rootA, { label: nameA, focusable: true, look: look('A', A, rootA), minW: 230, minH: 200, aria: 'Tree A' });
+            figB.innerHTML = treeSVG(B.adj, rootB, { label: nameB, focusable: true, look: look('B', B, rootB), minW: 230, minH: 200, aria: 'Tree B' });
+            capA.textContent = `Tree A · root ${nameA(rootA)} · height ${hangFrom(A.adj, rootA).height}${showCenter ? ' · center ringed' : ''}`;
+            capB.textContent = `Tree B · root ${nameB(rootB)} · height ${hangFrom(B.adj, rootB).height}${showCenter ? ' · center ringed' : ''}`;
+            revealBtns.forEach((b) => { b.setAttribute('aria-pressed', String(shown.has(b.dataset.k))); b.classList.toggle('on', shown.has(b.dataset.k)); });
+            ctx.rc(tbody, ...CHECKS.map(([k, label, fn]) => {
+              if (!shown.has(k)) return h('tr', h('td', label), h('td.muted', '?'), h('td.muted', '?'), h('td'));
+              const a = fn(A), b = fn(B);
+              return h('tr', { class: a === b ? 'in' : 'out' }, h('td', label), h('td.mono', a), h('td.mono', b), h('td', a === b ? 'same' : 'differ'));
+            }));
+            isoBtn.disabled = notBtn.disabled = !!verdict;
+            if (!verdict) { fb.className = 'feedback'; fb.textContent = ''; ctx.rc(mapEl); return; }
+            const iso = pair.kind === 'iso';
+            const lead = verdict === 'right' ? '<b>Correct.</b>' : '<b>Not quite.</b>';
+            fb.className = 'feedback ' + (verdict === 'right' ? 'good' : 'bad');
+            if (iso) {
+              const rootedSame = ahu(A.adj, rootA) === ahu(B.adj, rootB);
+              fb.innerHTML = `${lead} The trees are isomorphic: each is ${SHAPES[A.key].desc}, and the canonical names match. The numbered badges show one correspondence. ${rootedSame ? 'Hung from the vertices drawn on top, they are even isomorphic as rooted trees.' : 'As rooted trees, hung from the vertices drawn on top, they are not isomorphic; hang both from the center to see the same picture.'}`;
+              ctx.rc(mapEl, [...mapping.entries()].map(([a, b]) => `${nameA(a)} ↔ ${nameB(b)}`).join('   '));
+            } else {
+              fb.innerHTML = `${lead} The trees are not isomorphic. ${whyDifferent(A, B)}`;
+              ctx.rc(mapEl);
+            }
+          }
+          fresh();
+        },
+      },
+      /* ---------------------------------------------------------------- 5 */
+      {
         title: 'Spanning trees and minimal spanning trees',
         kind: 'concept',
         html: String.raw`
@@ -504,12 +831,12 @@
                 <li>Start a tree at any vertex.</li>
                 <li>Add the cheapest edge with exactly one end in the tree.</li>
                 <li>Repeat until every vertex is in the tree.</li></ol></div>
-              <div class="ai">Single-link clustering builds an MST over the data points and deletes its \(k - 1\) heaviest edges, which leaves \(k\) clusters. MSTs also plan the cheapest cabling for a data centre or a sensor network.</div>
+              <div class="ai">Single-link clustering builds an MST over the data points and deletes its \(k - 1\) heaviest edges, which leaves \(k\) clusters. MSTs also plan the cheapest cabling for a data center or a sensor network.</div>
               <div class="warn">Greedy is not always safe. Planning a delivery route by always driving to the nearest unvisited city can give a tour far longer than the best one. The cut property is what makes greedy choices correct for spanning trees.</div>
             </div>
           </div>`,
       },
-      /* ---------------------------------------------------------------- 4 */
+      /* ---------------------------------------------------------------- 6 */
       {
         title: 'Lab: Kruskal and Prim, step by step',
         kind: 'lab',
@@ -519,14 +846,15 @@
           const names = Object.keys(MST_V);
           const n = names.length;
           let edges = MST_E.map(([u, v, w]) => ({ u, v, w }));
-          let mode = 'kruskal', start = 'A', st = null, timer = null;
+          let mode = 'kruskal', start = 'A', st = null;
           const fig = h('div.tr-fig.tr-click', { role: 'group', 'aria-label': 'Weighted graph' });
           const modeBtns = {
             kruskal: h('button', { onclick: () => setMode('kruskal') }, 'Kruskal'),
             prim: h('button', { onclick: () => setMode('prim') }, 'Prim'),
           };
           const stepBtn = h('button.btn.primary.sm', { onclick: () => { stop(); step(); draw(); } }, 'Step ▶');
-          const runBtn = h('button.btn.sm', { onclick: () => run() }, 'Run to the end');
+          const runBtn = h('button.btn.sm', { onclick: () => run() });
+          const runner = ctx.ticker({ ms: 650, button: runBtn, tick: () => { step(); draw(); return !st.done; } });
           const resetBtn = h('button.btn.sm', { onclick: () => reset() }, 'Reset');
           const newBtn = h('button.btn.sm', { onclick: () => { const ws = ctx.R.sample(Array.from({ length: 20 }, (_, i) => i + 1), edges.length); edges = edges.map((e, i) => ({ ...e, w: ws[i] })); reset(); } }, 'New weights');
           const msg = h('div.feedback.info', { 'aria-live': 'polite', style: { minHeight: '3.3em' } });
@@ -539,12 +867,11 @@
             h('div.tr-col', h('div.row', h('div.seg', { role: 'group', 'aria-label': 'Algorithm' }, modeBtns.kruskal, modeBtns.prim), stepBtn, runBtn, resetBtn, newBtn), fig, msg),
             h('div.tr-col', h('table.data.tr-tbl', h('thead', h('tr', h('th', 'Edge'), h('th', 'Weight'), h('th', 'Status'))), tbody), totalEl, pieces)));
 
-          const stop = () => { if (timer) clearInterval(timer); timer = null; runBtn.textContent = 'Run to the end'; };
+          const stop = () => runner.stop();
           function run() {
-            if (timer) { stop(); return; }
+            if (runner.playing) { stop(); return; }
             if (st.done) reset();
-            runBtn.textContent = 'Pause';
-            timer = setInterval(() => { step(); draw(); if (st.done) stop(); }, 650);
+            runner.start();
           }
           function chooseStart(v) {
             if (mode !== 'prim') { setMode('prim'); }
@@ -644,7 +971,7 @@
               else { const gi = gs.findIndex((x) => x.includes(v)); if (gi >= 0) cls = 'c' + (gi % 4); }
               g += `<g class="mv ${cls}" data-v="${v}" tabindex="0" role="button" aria-label="vertex ${v}${mode === 'prim' ? ', click to start Prim here' : ''}"><circle cx="${x}" cy="${y}" r="19" fill="var(--sheet)" stroke="var(--ink-2)"/><text x="${x}" y="${y}" fill="var(--ink)">${v}</text></g>`;
             });
-            fig.innerHTML = `<svg class="tr-svg" viewBox="20 14 560 386" role="img" aria-label="Weighted graph for the minimal spanning tree lab">${g}</svg>`;
+            fig.innerHTML = `<svg class="tr-svg" viewBox="20 14 560 386" role="group" aria-label="Weighted graph for the minimal spanning tree lab">${g}</svg>`;
             msg.textContent = st.msg;
             msg.className = 'feedback ' + (st.done ? 'good' : 'info');
             const label = (j) => {
@@ -659,21 +986,20 @@
             if (mode === 'kruskal') pieces.innerHTML = `<span class="muted">Pieces (union-find sets):</span> ${groups().map((x) => `{${x.join(', ')}}`).join(' ')}`;
             else pieces.innerHTML = `<span class="muted">In the tree:</span> {${[...st.inTree].sort().join(', ')}}<br><span class="muted">Dashed blue edges leave the tree; the cheapest one is added next.</span>`;
           }
-          ctx.onHide(stop);
           reset();
         },
       },
-      /* ---------------------------------------------------------------- 5 */
+      /* ---------------------------------------------------------------- 7 */
       {
         title: 'Binary trees and binary search trees',
         kind: 'concept',
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">binary tree</span> is a rooted tree in which every vertex has at most two children, each labelled <b>left child</b> or <b>right child</b>. In a <span class="term">full binary tree</span> every internal vertex has exactly two children.</div>
+              <div class="def">A <span class="term">binary tree</span> is a rooted tree in which every vertex has at most two children, each labeled <b>left child</b> or <b>right child</b>. In a <span class="term">full binary tree</span> every internal vertex has exactly two children.</div>
               <div class="thm">A full binary tree with \(i\) internal vertices has \(i + 1\) leaves and \(2i + 1\) vertices.<br>A binary tree of <span class="term">height</span> \(h\) has at most \(2^h\) leaves, so a binary tree with \(t\) leaves has \(h \ge \lceil \log_2 t \rceil\).</div>
               <p class="small">Why \(2^h\)? Level 0 holds one vertex, and each level can at most double the one above: 1, 2, 4, 8, …. After \(h\) levels there is room for \(2^h\) leaves.</p>
-              <div class="ai">Databases index millions of rows with B-trees, balanced search trees with many children per vertex. Nearest-neighbour search in machine learning libraries uses k-d trees, which split on one coordinate per level, much like a BST.</div>
+              <div class="ai">Databases index millions of rows with B-trees, balanced search trees with many children per vertex. Nearest-neighbor search in machine learning libraries uses k-d trees, which split on one coordinate per level, much like a BST.</div>
             </div>
             <div class="stack">
               <div class="def">A <span class="term">binary search tree</span> (BST) holds a key in each vertex. For every vertex \(v\), all keys in its left subtree are smaller than \(v\)'s key and all keys in its right subtree are larger.</div>
@@ -686,14 +1012,14 @@
             </div>
           </div>`,
       },
-      /* ---------------------------------------------------------------- 6 */
+      /* ---------------------------------------------------------------- 8 */
       {
         title: 'Lab: binary search tree playground',
         kind: 'lab',
         html: String.raw`<p class="muted small">Insert keys, search for one, or play a traversal and watch the visit order. Click any vertex to search for it. Try <b>Sorted 1–10</b> to see a degenerate tree, then <b>Balanced 1–15</b> to see the best case.</p>`,
         render(body, ctx) {
           const { h } = ctx;
-          let root = null, token = 0, travKind = null;
+          let root = null, anim = null, travKind = null;
           let look = new Map(), lit = new Set(), seq = [];
           const insIn = h('input.inp.mono', { value: '45', 'aria-label': 'Keys to insert, separated by commas', style: { width: '8.5rem' } });
           const findIn = h('input.inp.mono', { value: '65', 'aria-label': 'Key to search for', style: { width: '4.5rem' } });
@@ -724,15 +1050,19 @@
                 h('div.legend', { style: { marginTop: 'auto' } }, ...[['On the search path', 'var(--mark)', 'var(--accent)'], ['Found', 'var(--true-bg)', 'var(--true)'], ['Not found', 'var(--false-bg)', 'var(--false)'], ['Just inserted', 'var(--sheet)', 'var(--kw)'], ['Visited (badge = order)', 'var(--accent)', 'var(--accent)']]
                   .map(([t, bg, bd]) => h('span', h('span.swatch', { style: { background: bg, border: `2px solid ${bd}` } }), t))))));
 
-          const cancel = () => { token++; };
+          // one ticker per frame rate (searches and traversals run at different speeds); cancel() stops whichever is running
+          const tickers = new Map();
+          const cancel = () => { anim = null; for (const t of tickers.values()) t.stop(); };
           const clearMarks = () => { look = new Map(); lit = new Set(); seq = []; travKind = null; };
           const say = (kind, text) => { msg.className = 'feedback ' + kind; msg.innerHTML = text; };
           function animate(frames, delay, instant) {
-            const my = ++token;
+            cancel();
             if (instant || ctx.print) { frames.forEach((f) => f()); return; }
-            let i = 0;
-            const tick = () => { if (my !== token) return; frames[i++](); if (i < frames.length) setTimeout(tick, delay); };
-            tick();
+            frames[0]();
+            if (frames.length === 1) return;
+            if (!tickers.has(delay)) tickers.set(delay, ctx.ticker({ ms: delay, tick: () => { if (!anim) return false; anim.frames[anim.i++](); return anim.i < anim.frames.length; } }));
+            anim = { frames, i: 1 };
+            tickers.get(delay).start();
           }
           function loadPreset(name, keys) {
             cancel(); clearMarks();
@@ -825,7 +1155,7 @@
           ctx.onHide(cancel);
         },
       },
-      /* ---------------------------------------------------------------- 7 */
+      /* ---------------------------------------------------------------- 9 */
       {
         title: 'Traversals and expression trees',
         kind: 'concept',
@@ -852,7 +1182,7 @@
             </div>
           </div>`,
       },
-      /* ---------------------------------------------------------------- 8 */
+      /* ---------------------------------------------------------------- 10 */
       {
         title: 'Lab: expression trees and the postfix stack',
         kind: 'lab',
@@ -860,7 +1190,7 @@
         render(body, ctx) {
           const { h } = ctx;
           const presets = ['(3 + 4) * (5 - 2)', '2 + 3 * 4', '(2 + 3) * 4', '10 - 4 - 3', '2 ^ 3 ^ 2', '(8 - 2) / (1 + 2) + 6 * 2'];
-          let tree = null, post = [], steps = [], k = 0, timer = null;
+          let tree = null, post = [], steps = [], k = 0;
           const inp = h('input.inp.mono', { value: presets[0], maxlength: 60, 'aria-label': 'Arithmetic expression', style: { flex: '1 1 15rem', fontSize: '1rem' } });
           inp.addEventListener('input', () => load(inp.value));
           const err = h('div.feedback');
@@ -871,7 +1201,8 @@
           const msg = h('div.feedback.info', { 'aria-live': 'polite', style: { minHeight: '4.4em' } });
           const backBtn = h('button.btn.sm', { onclick: () => { stop(); k = Math.max(0, k - 1); draw(); } }, '◀ Back');
           const stepBtn = h('button.btn.primary.sm', { onclick: () => { stop(); k = Math.min(post.length, k + 1); draw(); } }, 'Step ▶');
-          const playBtn = h('button.btn.sm', { onclick: () => play() }, 'Play');
+          const playBtn = h('button.btn.sm', { onclick: () => play() });
+          const player = ctx.ticker({ ms: 750, button: playBtn, tick: () => { k++; draw(); return k < post.length; } });
           const resetBtn = h('button.btn.sm', { onclick: () => { stop(); k = 0; draw(); } }, 'Reset');
           body.append(
             h('div.row', { style: { gap: '0.45rem' } }, inp, ...presets.slice(1).map((p) => h('button.btn.sm.mono', { onclick: () => { inp.value = p; load(p); } }, p)), err),
@@ -883,13 +1214,12 @@
                 h('div.tiny.mono.muted', 'STACK (BOTTOM → TOP)'), stack, msg,
                 h('div.row', backBtn, stepBtn, playBtn, resetBtn))));
 
-          const stop = () => { if (timer) clearInterval(timer); timer = null; playBtn.textContent = 'Play'; };
+          const stop = () => player.stop();
           function play() {
-            if (timer) { stop(); return; }
+            if (player.playing) { stop(); return; }
             if (!tree) return;
             if (k >= post.length) k = 0;
-            playBtn.textContent = 'Pause';
-            timer = setInterval(() => { k++; draw(); if (k >= post.length) stop(); }, 750);
+            player.start();
             draw();
           }
           function load(src) {
@@ -957,11 +1287,10 @@
               ? `Postfix is read from left to right. There are ${post.length} tokens. Press Step to read the first one.`
               : steps[k - 1].text + (k === post.length ? ` The input is used up and the stack holds exactly one number, ${fmtNum(cur[0])}: the value of the whole expression.` : '');
           }
-          ctx.onHide(stop);
           load(presets[0]);
         },
       },
-      /* ---------------------------------------------------------------- 9 */
+      /* ---------------------------------------------------------------- 11 */
       {
         title: 'Trees that decide: codes, sorting and games',
         kind: 'concept',
@@ -977,12 +1306,12 @@
             <div class="stack">
               <div class="card"><h3>Game trees and minimax</h3>
                 ${minimaxFig()}
-                <p class="small">Vertices are positions and children are the positions one move later. With <span class="term">minimax</span>, the opponent (MIN) takes the smallest child value and you (MAX) take the largest. Here the left move guarantees 3.</p></div>
+                <p class="small">Vertices are positions and children are the positions one move later. With <span class="term">minimax</span>, the opponent (MIN) takes the smallest child value and you (MAX) take the largest. Here the left move guarantees 3. The minimax lab lets you fill in a <span class="term">game tree</span> of your own.</p></div>
               <div class="ai">Gradient-boosted trees and random forests are leading models for tabular data. AlphaGo chose moves with Monte Carlo Tree Search over a game tree. Huffman coding sits inside zip and PNG and is used to compress model weights.</div>
             </div>
           </div>`,
       },
-      /* ---------------------------------------------------------------- 10 */
+      /* ---------------------------------------------------------------- 12 */
       {
         title: 'Lab: Huffman code builder',
         kind: 'lab',
@@ -998,9 +1327,9 @@
           const msg = h('div.feedback.info', { 'aria-live': 'polite', style: { minHeight: '3.3em' } });
           const tbody = h('tbody');
           const statsEl = h('div.stack', { style: { gap: '0.25rem' } });
-          const restartBtn = h('button.btn.sm', { onclick: () => { k = 0; draw(); } }, '⟲ Start over');
+          const restartBtn = h('button.btn.sm', { onclick: () => { k = 0; draw(); } }, 'Reset');
           const backBtn = h('button.btn.sm', { onclick: () => { k = Math.max(0, k - 1); draw(); } }, '◀ Back');
-          const stepBtn = h('button.btn.primary.sm', { onclick: () => { k = Math.min(snaps.length - 1, k + 1); draw(); } }, 'Merge ▶');
+          const stepBtn = h('button.btn.primary.sm', { onclick: () => { k = Math.min(snaps.length - 1, k + 1); draw(); } }, 'Step ▶');
           const allBtn = h('button.btn.sm', { onclick: () => { k = snaps.length - 1; draw(); } }, 'Build all');
           body.append(
             h('div.row', { style: { gap: '0.45rem' } }, h('span.small.muted', 'Text'), inp, ...presets.slice(1).map((p) => h('button.btn.sm.mono', { onclick: () => { inp.value = p; load(p); } }, p)), err),
@@ -1080,7 +1409,7 @@
               h('td.mono', final ? codes.get(c) : h('span.muted', '…' + (codes.get(c) || ''))),
               h('td', final ? String(n * codes.get(c).length) : '–'))));
             const merges = snaps.slice(1, k + 1).map((s) => s.merged.w);
-            if (k === 0) msg.textContent = `Start: ${counts.size} one-vertex trees, one per symbol, weighted by count. Press Merge to join the two lightest.`;
+            if (k === 0) msg.textContent = `Start: ${counts.size} one-vertex trees, one per symbol, weighted by count. Press Step to merge the two lightest.`;
             else {
               const s = snaps[k];
               const desc = (t) => (t.sym != null ? `"${showSym(t.sym)}" (${t.w})` : `the tree {${leavesOf(t).map(showSym).join(', ')}} (${t.w})`);
@@ -1105,13 +1434,92 @@
             ctx.rc(statsEl,
               h('div.tr-kv', { html: `<span>Huffman</span><b>${bits} bits (${(bits / N).toFixed(2)} per symbol)</b><span>8-bit ASCII</span><b>${ascii} bits</b><span>Fixed ${fixedW}-bit code</span><b>${fixedW * N} bits</b><span>vs ASCII</span><b>${(ascii / bits).toFixed(2)} : 1, saving ${(100 * (1 - bits / ascii)).toFixed(1)}%</b><span>Entropy</span><b>${H2.toFixed(2)} bits per symbol</b>` }),
               h('div.tiny.muted', 'Entropy is the smallest average any code can reach for these counts.'),
-              h('div.tiny.mono.muted', 'ENCODED TEXT (ALTERNATE COLOURS = NEXT SYMBOL)'),
+              h('div.tiny.mono.muted', 'ENCODED TEXT (ALTERNATE COLORS = NEXT SYMBOL)'),
               h('div.tr-bits', { html: enc }));
           }
           load(presets[0]);
         },
       },
-      /* ---------------------------------------------------------------- 11 */
+      /* ---------------------------------------------------------------- 13 */
+      {
+        id: 'minimax-lab',
+        title: 'Lab: minimax on a game tree',
+        kind: 'lab',
+        html: String.raw`<p class="muted small">Squares are your turns (MAX) and circles are the opponent's (MIN). Leaves hold the value of the final position for you. Work from the bottom up: type the value of every internal node, then check. The root's value is the best outcome you can force, and the move that reaches it is the one to play.</p>`,
+        render(body, ctx) {
+          const { h } = ctx;
+          const SHAPE = { 2: [3, 3, 3], 3: [[2, 2], [2, 2]] };
+          let depth = 2, tree = null, nodes = null, result = null; // result: Map id -> 'ok' | 'bad', after a check
+          const inputs = new Map();
+          const fig = h('div.tr-fig');
+          const rows = h('div.tr-mm');
+          const fb = h('div.feedback', { 'aria-live': 'polite' });
+          const depthSeg = h('div.seg', { role: 'group', 'aria-label': 'Tree depth' }, ...[2, 3].map((d) => h('button', { dataset: { d }, 'aria-pressed': String(d === depth), onclick: () => { depth = d; fresh(); } }, `Depth ${d} · ${d === 2 ? 9 : 8} leaves`)));
+          const newBtn = h('button.btn.sm', { onclick: () => fresh() }, 'New values');
+          const checkBtn = h('button.btn.primary.sm', { onclick: () => check() }, 'Check');
+          const solBtn = h('button.btn.sm', { onclick: () => { for (const n of internal()) inputs.get(n.id).value = String(n.value); check(); } }, 'Show solution');
+          body.append(h('div.tr-grid', { style: { gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)' } },
+            h('div.tr-col', h('div.row', depthSeg, newBtn), fig, fb),
+            h('div.tr-col', h('div.tiny.mono.muted', 'FILL IN EVERY INTERNAL NODE, DEEPEST FIRST'), rows, h('div.row', checkBtn, solBtn))));
+          const internal = () => nodes.filter((n) => !n.leaf).sort((a, b) => b.depth - a.depth || a.id.localeCompare(b.id));
+          const parse = (v) => { const t = String(v).trim().replace(/[−–]/g, '-'); return /^-?\d+$/.test(t) ? Number(t) : null; };
+          function fresh() {
+            tree = randGame(ctx.R, SHAPE[depth]);
+            nodes = gameNodes(tree).nodes;
+            result = null;
+            inputs.clear();
+            depthSeg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.d === depth)));
+            ctx.rc(rows, ...internal().map((n) => {
+              const inp = h('input.inp.mono', { type: 'text', inputmode: 'numeric', autocomplete: 'off', 'aria-label': `Value of node ${n.id}`, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); check(); } } });
+              inputs.set(n.id, inp);
+              const of = n.kids.every((k) => k.leaf) ? n.kids.map((k) => k.node).join(', ') : n.kids.map((k) => k.id).join(', ');
+              return h('label.tr-mm-row', h('span.mono', { style: { fontWeight: 700 } }, n.id), h('span.small.muted', `${n.max ? 'MAX' : 'MIN'} of ${of}`), inp, h('span.tr-mm-mark', { dataset: { id: n.id } }));
+            }));
+            fb.className = 'feedback';
+            fb.textContent = '';
+            draw();
+          }
+          function check() {
+            result = new Map();
+            let right = 0, blank = 0, firstWrong = null;
+            for (const n of internal()) {
+              const v = parse(inputs.get(n.id).value);
+              const ok = v === n.value;
+              if (v == null) blank++;
+              result.set(n.id, ok ? 'ok' : 'bad');
+              if (ok) right++; else if (!firstWrong) firstWrong = n;
+            }
+            const total = internal().length;
+            const root = nodes[nodes.length - 1];
+            if (right === total) {
+              const best = root.kids.find((k) => k.value === root.value);
+              const ab = alphaBetaLeaves(tree, true);
+              const leaves = nodes.filter((n) => n.leaf).length;
+              fb.className = 'feedback good';
+              fb.innerHTML = `<b>All ${total} correct.</b> The root is worth ${root.value}, so MAX should play the move to ${best.id}: whatever MIN answers, the result is at least ${root.value}. Alpha-beta pruning, reading the leaves left to right, would settle this after looking at ${ab.leaves} of the ${leaves} leaves.`;
+            } else {
+              const n = firstWrong;
+              const of = n.kids.every((k) => k.leaf) ? `its leaves ${n.kids.map((k) => k.node).join(', ')}` : `the values of ${n.kids.map((k) => k.id).join(' and ')}`;
+              fb.className = 'feedback bad';
+              fb.innerHTML = `<b>${right} of ${total} correct${blank ? ` (${blank} blank)` : ''}.</b> Look at ${n.id}: it is a ${n.max ? 'MAX' : 'MIN'} node, so ${n.max ? 'you pick the largest' : 'the opponent picks the smallest'} of ${of}. Fix the deepest mistakes first, because every value above them depends on them.`;
+            }
+            draw();
+          }
+          function draw() {
+            const root = nodes[nodes.length - 1];
+            const done = !!result && [...result.values()].every((v) => v === 'ok');
+            const bestId = done ? root.kids.find((k) => k.value === root.value).id : null;
+            fig.innerHTML = gameSVG(tree, {
+              ids: true, best: done, aria: 'Game tree',
+              text: (n) => { if (!result) return '?'; const v = parse(inputs.get(n.id).value); return v == null ? '?' : String(v); },
+              cls: (n) => (!result ? '' : n.id === bestId ? 'best' : result.get(n.id) || ''),
+            });
+            rows.querySelectorAll('.tr-mm-mark').forEach((m) => { const r = result && result.get(m.dataset.id); m.textContent = r === 'ok' ? '✓' : r === 'bad' ? '✗' : ''; m.className = 'tr-mm-mark ' + (r || ''); });
+          }
+          fresh();
+        },
+      },
+      /* ---------------------------------------------------------------- 14 */
       {
         title: 'Code: a binary search tree in Python',
         kind: 'code',
@@ -1121,7 +1529,7 @@
           what: 'Builds a binary search tree from seven keys with a recursive <code>insert</code>, then lists the keys with a recursive inorder traversal.',
           why: 'Insert shows the search-tree rule in action (smaller goes left, larger goes right). Inorder shows the payoff: reading left subtree, root, right subtree returns the keys already sorted.',
           who: 'Anyone who implements ordered data: database engineers writing indexes, library authors building sorted maps, and students preparing for technical interviews, where BSTs are a classic topic.',
-          where: 'Ordered maps and sets (Java\'s TreeMap, C++\'s std::map), database indexes, schedulers that always need the next event, and k-d trees for nearest-neighbour search in machine learning.',
+          where: 'Ordered maps and sets (Java\'s TreeMap, C++\'s std::map), database indexes, schedulers that always need the next event, and k-d trees for nearest-neighbor search in machine learning.',
           when: 'Use a search tree when you need fast lookups <i>and</i> sorted order or range queries. For lookups alone, a <code>dict</code> or <code>set</code> is simpler and faster.',
         },
         lines: [
@@ -1145,7 +1553,7 @@
         expected: 'inorder: [20, 30, 40, 50, 60, 70, 80]\n',
         tryIt: 'Change the list to <code>[10, 20, 30, 40, 50, 60, 70]</code> and use Trace to count how deep the recursion goes now. Then add a <code>height(t)</code> function that returns <code>-1</code> for <code>None</code> and <code>1 + max(...)</code> otherwise.',
       },
-      /* ---------------------------------------------------------------- 12 */
+      /* ---------------------------------------------------------------- 15 */
       {
         title: 'Code: Huffman coding with a heap',
         kind: 'code',
@@ -1179,7 +1587,7 @@
         expected: "{'a': '0', 'r': '10', 'b': '110', 'c': '1110', 'd': '1111'}\n23 bits\n88 bits in 8-bit ASCII\n",
         tryIt: 'Change the text to <code>"mississippi"</code> and compare the codes with the Huffman lab. Then try a text where every letter appears once, such as <code>"abcdefgh"</code>, and explain why every code has the same length.',
       },
-      /* ---------------------------------------------------------------- 13 */
+      /* ---------------------------------------------------------------- 16 */
       {
         title: 'Design practice: trees in real code',
         kind: 'design',
@@ -1233,7 +1641,7 @@
           },
         ],
       },
-      /* ---------------------------------------------------------------- 14 */
+      /* ---------------------------------------------------------------- 17 */
       {
         title: 'Practice: trees',
         kind: 'practice',
@@ -1383,9 +1791,61 @@
               };
             },
           },
+          {
+            label: 'Minimax',
+            make(R) {
+              const shape = R.pick([[2, 2, 2], [3, 3], [3, 2, 2], [2, 3, 2]]);
+              let tree, mins, unique = false;
+              for (let tries = 0; tries < 20 && !unique; tries++) { // prefer a single clearly best move
+                tree = shape.map((k) => Array.from({ length: k }, () => R.int(-5, 9)));
+                mins = tree.map((g) => Math.min(...g));
+                unique = mins.filter((m) => m === Math.max(...mins)).length === 1;
+              }
+              const val = Math.max(...mins);
+              const names = tree.length === 2 ? ['Left', 'Right'] : ['Left', 'Middle', 'Right'];
+              const bi = mins.indexOf(val);
+              const fig = `<div class="tr-mini" style="height:7.5rem;max-width:22rem">${gameSVG(tree, { aria: 'Game tree with MAX to move at the root', text: () => '?' })}</div>`;
+              const work = `MIN picks the smallest leaf under each move: ${tree.map((g, i) => `${names[i]}: min(${g.join(', ')}) = ${mins[i]}`).join('; ')}. MAX then takes the largest of ${mins.join(', ')}, which is <b>${val}</b>, by playing the ${names[bi].toLowerCase()} move.`;
+              if (!unique || R.chance(0.55)) return { prompt: `MAX moves at the root of this game tree and MIN replies. The leaves show the value for MAX. What is the minimax value of the root?${fig}`, answer: val, hint: 'each circle takes the minimum of its leaves; the root takes the maximum of the circles.', solution: work };
+              return { prompt: `MAX moves at the root of this game tree and MIN replies. The leaves show the value for MAX. Which move should MAX choose?${fig}`, options: names, answer: names[bi], solution: work };
+            },
+          },
+          {
+            label: 'Isomorphic trees',
+            make(R) {
+              if (R.chance(0.3)) {
+                const n = R.pick([3, 4, 5, 6]);
+                const [count, why] = {
+                  3: [1, 'With 3 vertices and 2 edges the only shape is a path.'],
+                  4: [2, 'The degrees add up to 6. The sequences 2, 2, 1, 1 (a path) and 3, 1, 1, 1 (a star) each give exactly one tree.'],
+                  5: [3, 'The degrees add up to 8: 2, 2, 2, 1, 1 (a path), 3, 2, 1, 1, 1 (a vertex of degree 3 with legs 2, 1, 1) and 4, 1, 1, 1, 1 (a star). Each sequence gives one tree.'],
+                  6: [6, 'Sort by degree sequence: 2, 2, 2, 2, 1, 1 gives the path; 3, 2, 2, 1, 1, 1 gives <i>two</i> trees (legs 2, 2, 1 or legs 3, 1, 1); 3, 3, 1, 1, 1, 1 gives two adjacent degree-3 vertices; 4, 2, 1, 1, 1, 1 gives a degree-4 vertex with one leg of length 2; 5, 1, 1, 1, 1, 1 gives the star. Total 1 + 2 + 1 + 1 + 1 = 6.'],
+                }[n];
+                return { prompt: `How many non-isomorphic trees are there with \\(${n}\\) vertices? Count shapes, not labelings.`, answer: count, hint: 'a tree on n vertices has n − 1 edges, so the degrees add up to 2(n − 1); list the possible degree sequences, then the shapes for each.', solution: `${why} Answer: <b>${count}</b>.` };
+              }
+              const pair = treePair(R, R.pick(['iso', 'iso', 'look', 'look', 'diff']));
+              const { A, B } = pair;
+              const nameA = (v) => LETTERS[v], nameB = (v) => DIGITS[v];
+              const opt = { dx: 34, dy: 34, r: 12, pad: 16, minW: 150, minH: 100 };
+              const figs = `<div class="tr-two" style="max-width:24rem;margin-top:0.3rem"><div class="tr-mini" style="height:6.5rem">${treeSVG(A.adj, R.int(0, A.n - 1), { ...opt, label: nameA, aria: 'Tree A' })}</div><div class="tr-mini" style="height:6.5rem">${treeSVG(B.adj, R.int(0, B.n - 1), { ...opt, label: nameB, aria: 'Tree B' })}</div></div>`;
+              const iso = pair.kind === 'iso';
+              let why;
+              if (iso) {
+                const m = isoMap(A.adj, B.adj);
+                why = `Both are ${SHAPES[A.key].desc}, drawn from different roots. The degree sequences agree (${degSeq(A.adj).join(', ')}), the canonical names agree (${canonical(A.adj).name}), and one correspondence is ${[...m.entries()].map(([a, b]) => `${nameA(a)} ↔ ${nameB(b)}`).join(', ')}.`;
+              } else why = whyDifferent(A, B);
+              return {
+                prompt: `Tree A has the edges ${edgeText(A, LETTERS)}. Tree B has the edges ${edgeText(B, DIGITS)}. Are they isomorphic?${figs}`,
+                options: ['Isomorphic', 'Not isomorphic'],
+                answer: iso ? 'Isomorphic' : 'Not isomorphic',
+                hint: 'compare the degree sequences first; if they match, hang both trees from their centers and compare the pictures or the canonical names.',
+                solution: `${why} So the trees are <b>${iso ? 'isomorphic' : 'not isomorphic'}</b>.`,
+              };
+            },
+          },
         ],
       },
-      /* ---------------------------------------------------------------- 15 */
+      /* ---------------------------------------------------------------- 18 */
       {
         title: 'Check yourself: trees',
         kind: 'quiz',
@@ -1400,6 +1860,8 @@
           { q: 'At each step, Huffman\'s algorithm…', choices: ['merges the two trees with the smallest total counts', 'gives the most frequent symbol the code 0', 'merges the two most frequent symbols', 'assigns codes in alphabetical order'], answer: 0, explain: 'Merging the two lightest trees pushes the rarest symbols deepest, where long codes cost the least in total. The most frequent symbol does end up with a short code, but that is a result of the rule, not the rule itself.' },
           { q: 'Any algorithm that sorts 5 distinct items using only comparisons needs, in its worst case, at least how many comparisons?', choices: ['5', '7', '10', '120'], answer: 1, explain: String.raw`Its decision tree needs at least \(5! = 120\) leaves. A binary tree of height \(h\) has at most \(2^h\) leaves, and \(2^6 = 64 \lt 120 \le 128 = 2^7\), so \(h \ge 7\).` },
           { q: 'A recursive BST program works in testing but crashes with <code>RecursionError</code> on 50,000 keys loaded from a sorted file. What is the most likely cause?', choices: ['Python cannot store more than 1000 objects', 'Sorted insertions built a path about 50,000 levels deep', 'Inorder traversal cannot be written recursively', 'Dictionaries cannot hold integer keys'], answer: 1, explain: 'Sorted input makes every key go right, so the tree is a path and the recursion is as deep as the tree. Python stops at about 1000 nested calls. Fix it by balancing (shuffle, a balanced tree, or a sorted list with bisect) or by traversing with an explicit stack.' },
+          { q: 'Two trees both have 6 vertices, 5 edges and degree sequence 3, 2, 2, 1, 1, 1. What can you conclude?', choices: ['They may or may not be isomorphic; matching invariants do not prove it', 'They must be isomorphic', 'They cannot be isomorphic', 'They are isomorphic only if they are drawn with the same root'], answer: 0, explain: 'Invariants can only rule isomorphism out. Two different trees share exactly this degree sequence: a degree-3 vertex with legs of length 2, 2, 1, and one with legs of length 3, 1, 1. To decide, hang both from their centers and compare canonical names, or exhibit a vertex correspondence.' },
+          { q: 'MAX moves at the root of a game tree. Its three children are MIN nodes whose leaves are {3, 8}, {6, 7} and {9, 1}. What is the value of the root?', choices: ['9', '3', '8', '6'], answer: 3, explain: 'MIN takes the smallest leaf under each move: 3, 6 and 1. MAX then takes the largest of those, 6, by playing the middle move. The 9 is a trap, because MIN would answer that move with 1.' },
         ],
       },
     ],

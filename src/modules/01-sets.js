@@ -10,7 +10,7 @@
       if (/[ABCU]/i.test(ch)) toks.push(ch.toUpperCase());
       else if (ch === '(' || ch === ')') toks.push(ch);
       else if (map[ch]) toks.push(map[ch]);
-      else throw new Error(`I don't recognise the symbol "${ch}". Use A, B, C, U, ∪, ∩, −, Δ, ′ and parentheses.`);
+      else throw new Error(`I don't recognize the symbol "${ch}". Use A, B, C, U, ∪, ∩, −, Δ, ′ and parentheses.`);
     }
     return toks;
   }
@@ -365,7 +365,7 @@
           aIn.addEventListener('input', () => { A = split(aIn.value); draw(); });
           bIn.addEventListener('input', () => { B = split(bIn.value); draw(); });
           body.append(h('div.split-narrow.fill', { style: { minHeight: 0, alignItems: 'stretch' } },
-            h('div.stack', h('label.field', 'A (for example, shirt sizes)', aIn), h('label.field', 'B (for example, colours)', bIn), flipBtn, side), grid));
+            h('div.stack', h('label.field', 'A (for example, shirt sizes)', aIn), h('label.field', 'B (for example, colors)', bIn), flipBtn, side), grid));
           function draw() {
             const X = flip ? B : A, Y = flip ? A : B;
             const nx = flip ? 'B' : 'A', ny = flip ? 'A' : 'B';
@@ -427,7 +427,7 @@
         },
         lines: [
           ['doc1 = "the cat sat on the mat"', 'A string holding the first document. In a real system this text would come from a file or a web page.'],
-          ['doc2 = "the dog sat on the log"', 'The second document. It differs from the first in three words: <i>dog</i>, <i>log</i>, and the missing <i>cat</i> and <i>mat</i>.'],
+          ['doc2 = "the dog sat on the log"', 'The second document. Two words changed: <i>dog</i> replaces <i>cat</i> and <i>log</i> replaces <i>mat</i>, so the two word sets differ in four words in total.'],
           ['words1 = set(doc1.split())', '<code>doc1.split()</code> cuts the string at spaces into a list of words: <code>["the", "cat", "sat", "on", "the", "mat"]</code>. <code>set(...)</code> keeps each word once, so the repeated "the" collapses. <code>words1</code> has 5 elements.'],
           ['words2 = set(doc2.split())', 'Same conversion for the second document: <code>{"the", "dog", "sat", "on", "log"}</code>, also 5 elements.'],
           ['shared = words1 & words2', 'Intersection: the words both documents use, \\(A \\cap B = \\{\\text{on, sat, the}\\}\\). This is the numerator of the Jaccard formula.'],
@@ -615,7 +615,7 @@
           { q: String.raw`If \(|A| = 3\) and \(|B| = 5\), what is \(|A \times B|\)?`, choices: ['8', '15', '35', '243'], answer: 1, explain: String.raw`The product rule: every one of the 3 first coordinates pairs with each of the 5 second coordinates, giving \(3 \cdot 5 = 15\) ordered pairs.` },
           { q: '30 people like tea, 20 like coffee, and 8 like both. How many like at least one?', choices: ['50', '42', '38', '58'], answer: 1, explain: String.raw`Inclusion–exclusion: \(30 + 20 - 8 = 42\). Simply adding 30 and 20 counts the 8 tea-and-coffee drinkers twice.` },
           { q: 'You must check millions of incoming e-mail addresses against a block list of 50,000 addresses. Which design is best?', choices: ['Store the block list in a Python list and use <code>in</code>', 'Store the block list in a Python set and use <code>in</code>', 'Sort the incoming addresses first', 'Convert every address to a frozenset'], answer: 1, explain: 'Set membership is a hash lookup that takes about the same time whatever the set size, while list membership scans up to all 50,000 entries for every message.' },
-          { q: String.raw`Which pair of sets is disjoint?`, choices: [String.raw`\(\{1,2\}\) and \(\{2,3\}\)`, String.raw`\(\{a\}\) and \(\{a, b\}\)`, String.raw`\(\{1, 3, 5\}\) and \(\{2, 4\}\)`, String.raw`\(\{x, y\}\) and \(\{y, x\}\)`], answer: 2, explain: String.raw`Disjoint means \(A \cap B = \varnothing\). The odd numbers and the even numbers share nothing. The other pairs share 2, \(a\), and both \(x\) and \(y\) (the last two sets are actually equal).` },
+          { q: String.raw`Which pair of sets is disjoint?`, choices: [String.raw`\(\{1,2\}\) and \(\{2,3\}\)`, String.raw`\(\{a\}\) and \(\{a, b\}\)`, String.raw`\(\{1, 3, 5\}\) and \(\{2, 4\}\)`, String.raw`\(\{x, y\}\) and \(\{y, x\}\)`], answer: 2, explain: String.raw`Disjoint means \(A \cap B = \varnothing\). The odd numbers and the even numbers share nothing. The other pairs share 2, \(a\), and both \(x\) and \(y\) (\(\{x, y\}\) and \(\{y, x\}\) are the same set written two ways).` },
         ],
       },
     ],

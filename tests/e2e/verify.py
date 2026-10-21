@@ -13,14 +13,13 @@ Usage:
          [--trace] [--shots DIR] [--viewport 1280x720] [--mobile]
 """
 import argparse
-import functools
-import http.server
 import json
 import os
 import sys
-import threading
 
 from playwright.sync_api import sync_playwright
+
+from _harness import fonts_ok, launch, serve, slide_key
 
 ap = argparse.ArgumentParser()
 ap.add_argument("html")
@@ -35,18 +34,7 @@ ap.add_argument("--dark", action="store_true")
 ap.add_argument("--query", default="", help="extra query string, e.g. py=brython")
 args = ap.parse_args()
 
-path = os.path.abspath(args.html)
-root, name = os.path.split(path)
-
-
-class Quiet(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *a):
-        pass
-
-
-srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=root))
-threading.Thread(target=srv.serve_forever, daemon=True).start()
-base = f"http://127.0.0.1:{srv.server_address[1]}/{name}"
+srv, base = serve(args.html)
 if args.query:
     base += "?" + args.query
 
@@ -66,21 +54,27 @@ IGNORED_CONSOLE = ("[DM] Pyodide unavailable", "Failed to load resource: net::ER
 
 with sync_playwright() as p:
     w, h = (int(x) for x in args.viewport.split("x"))
-    try:
-        browser = p.chromium.launch()
-    except Exception:  # noqa: BLE001  (bundled browser missing: use installed Chrome)
-        browser = p.chromium.launch(channel="chrome")
-    ctx = browser.new_context(viewport={"width": w, "height": h}, color_scheme="dark" if args.dark else "light")
+    browser = launch(p)
+    # reduced motion keeps the view transition out of the layout measurements
+    ctx = browser.new_context(viewport={"width": w, "height": h}, color_scheme="dark" if args.dark else "light", reduced_motion="reduce")
     page = ctx.new_page()
     page.on("pageerror", lambda e: err(f"pageerror: {e}"))
     page.on("console", lambda m: (m.type == "error" and not any(s in m.text for s in IGNORED_CONSOLE)) and err(f"console.error: {m.text}"))
     page.add_init_script("try { localStorage.clear(); } catch (e) {}")
     page.goto(base)
     page.wait_for_function("document.body.dataset.ready === '1'", timeout=20000)
-    page.wait_for_timeout(400)
+    # measurements need the real fonts and the math renderer, which both arrive asynchronously
+    try:
+        page.wait_for_function("window.katex", timeout=30000)
+    except Exception:  # noqa: BLE001
+        err("KaTeX did not load within 30 s; formulas would be measured as plain text")
+    if not fonts_ok(page):
+        err("the web fonts did not load; layout results would not match what students see")
+    page.wait_for_timeout(300)
 
+    # a slide's key is its id or title slug (see slideKey in core.js); DM.keyOf is the one source of truth
     slides = page.evaluate("""() => DM.modules.flatMap(m => m.slides.map((s, i) => ({
-        key: m.id + '-' + (i + 1), mod: m.id, kind: s.kind || 'concept', title: s.title.replace(/<[^>]+>/g, ''),
+        key: DM.keyOf(m.id, i), mod: m.id, idx: i, kind: s.kind || 'concept', title: s.title.replace(/<[^>]+>/g, ''),
         expected: s.expected ?? null, nlines: s.lines ? s.lines.length : 0 })))""")
     wanted = set(x for x in args.modules.split(",") if x)
     if wanted:
@@ -190,8 +184,8 @@ with sync_playwright() as p:
                 overflow_check("after clicking pointer targets")
         elif kind == "code":
             # every line must have an explanation (blank lines get an automatic one)
-            missing = page.evaluate("""(k) => { const [id, n] = k.split(/-(?=\\d+$)/); const m = DM.modules.find(x => x.id === id); const sl = m.slides[+n-1];
-                return sl.lines.map((l, i) => [i + 1, Array.isArray(l) ? l[0] : l.code, Array.isArray(l) ? l[1] : l.ex]).filter(([i, c, e]) => c.trim() !== '' && !(e && e.trim())).map(x => x[0]); }""", s["key"])
+            missing = page.evaluate("""([id, idx]) => { const m = DM.modules.find(x => x.id === id); const sl = m.slides[idx];
+                return sl.lines.map((l, i) => [i + 1, Array.isArray(l) ? l[0] : l.code, Array.isArray(l) ? l[1] : l.ex]).filter(([i, c, e]) => c.trim() !== '' && !(e && e.trim())).map(x => x[0]); }""", [s["mod"], s["idx"]])
             if missing:
                 err(f"code lines without explanation: {missing}")
             # step through every line in read mode
@@ -308,9 +302,10 @@ with sync_playwright() as p:
                     mobile_check(f"{s['kind']} item {i + 1}")
 
         # Regression: the rightmost qualifications used to be clipped by the stage.
-        if any(s["key"] == "networks-8" for s in slides):
-            current["slide"] = "mobile networks-8"
-            page.evaluate("DM.goTo('networks-8', {instant: true})")
+        if any(s["mod"] == "networks" for s in slides):
+            workers = slide_key(page, "networks", title_re=r"placing workers")
+            current["slide"] = "mobile " + workers
+            page.evaluate("(k) => DM.goTo(k, {instant: true})", workers)
             for job in ("Deploy", "Clean"):
                 button = page.get_by_role("button", name=f"Ava qualified for {job}", exact=True)
                 before = button.get_attribute("aria-pressed")

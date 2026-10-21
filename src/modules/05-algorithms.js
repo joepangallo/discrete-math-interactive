@@ -1,17 +1,108 @@
 /* Module 5: Algorithms. Objective 5: explain the application and analysis of algorithms to solve problems. */
 (() => {
-  const range = (n) => [...Array(n).keys()];
-  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  // pseudocode block: bold keywords, grey comments, nothing else
+  /* Pseudocode blocks: bold keywords, gray comments, nothing else. A slide's html holds a
+     pseudoTag() placeholder and its render calls fillPseudo(), so the engine's ctx.esc does the
+     escaping when the slide is drawn (there is no ctx while the module file loads). */
   const PSEUDO_KW = /\b(for|to|down|while|if|else|return|and|swap)\b/g;
-  function pseudo(src) {
-    return src.replace(/^\n/, '').replace(/\n\s*$/, '').split('\n').map((line) => {
-      const at = line.indexOf('//');
-      const code = at >= 0 ? line.slice(0, at) : line;
-      let out = esc(code).replace(PSEUDO_KW, '<b class="k">$1</b>');
-      if (at >= 0) out += `<span class="c">${esc(line.slice(at))}</span>`;
-      return out;
-    }).join('\n');
+  const PSEUDO = {
+    max: `
+Input:  s[1], s[2], ..., s[n]   (n ≥ 1)
+Output: the largest value
+
+max(s, n) {
+  large = s[1]          // best so far
+  for i = 2 to n
+    if (s[i] > large)
+      large = s[i]      // found a bigger one
+  return large
+}`,
+    linear: `
+linear_search(s, n, key) {
+  for i = 1 to n
+    if (s[i] == key)
+      return i
+  return 0     // not found
+}`,
+    binary: `
+binary_search(s, n, key) {
+  i = 1; j = n
+  while (i ≤ j) {
+    k = ⌊(i + j)/2⌋  // middle
+    if (key == s[k]) return k
+    if (key < s[k]) j = k − 1
+    else i = k + 1
+  }
+  return 0
+}`,
+    text: `
+text_search(p, m, t, n) {
+  for i = 1 to n − m + 1 {
+    j = 1
+    while (j ≤ m and t[i+j−1] == p[j])
+      j = j + 1
+    if (j > m) return i
+  }
+  return 0
+}`,
+    insertion: `
+insertion_sort(s, n) {
+  for i = 2 to n {
+    val = s[i]
+    j = i − 1
+    while (j ≥ 1 and s[j] > val) {
+      s[j+1] = s[j]   // shift right
+      j = j − 1
+    }
+    s[j+1] = val
+  }
+}`,
+    selection: `
+selection_sort(s, n) {
+  for i = 1 to n − 1 {
+    small = i
+    for j = i + 1 to n
+      if (s[j] < s[small])
+        small = j
+    swap(s[i], s[small])
+  }
+}`,
+    shuffle: `
+shuffle(s, n) {
+  for i = n down to 2 {
+    j = rand(1, i)   // 1 ≤ j ≤ i
+    swap(s[i], s[j])
+  }
+}`,
+    nested: `
+for i = 1 to n
+  for j = 1 to i
+    x = x + 1`,
+    factorial: `
+factorial(n) {
+  if (n == 0)    // base case
+    return 1
+  return n * factorial(n − 1)
+}`,
+    bsearch: `
+bsearch(s, i, j, key) {     // search s[i..j]
+  if (i > j) return 0       // base case: empty range
+  k = ⌊(i + j)/2⌋
+  if (key == s[k]) return k
+  if (key < s[k]) return bsearch(s, i, k − 1, key)
+  return bsearch(s, k + 1, j, key)
+}`,
+  };
+  const pseudoTag = (key, style) => `<pre class="m5-pseudo" data-pseudo="${key}"${style ? ` style="${style}"` : ''}></pre>`;
+  function fillPseudo(body, ctx) {
+    for (const pre of body.querySelectorAll('pre[data-pseudo]')) {
+      pre.innerHTML = PSEUDO[pre.dataset.pseudo].replace(/^\n/, '').replace(/\n\s*$/, '').split('\n').map((line) => {
+        const at = line.indexOf('//');
+        const code = at >= 0 ? line.slice(0, at) : line;
+        let out = ctx.esc(code).replace(PSEUDO_KW, '<b class="k">$1</b>');
+        if (at >= 0) out += `<span class="c">${ctx.esc(line.slice(at))}</span>`;
+        return out;
+      }).join('\n');
+    }
   }
   const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '-': '⁻' };
   const sup = (k) => String(k).split('').map((c) => SUP[c] ?? c).join('');
@@ -160,7 +251,6 @@
       'Big-Omega': 'f(n) = Ω(g(n)) means f(n) ≥ C·g(n) for some constant C > 0 and every n ≥ n₀: g is a lower bound on how fast f grows.',
       'Big-Theta': 'f(n) = Θ(g(n)) means f is both O(g(n)) and Ω(g(n)): f and g grow at the same rate, up to constant factors.',
       'growth rate': 'How fast an operation count grows with n. The common rates, slowest first: 1, log n, n, n log n, n², n³, 2ⁿ, n!.',
-      'loop invariant': 'A statement that is true before a loop starts and stays true after every iteration. With the stopping condition it proves the loop correct.',
       'recursive algorithm': 'An algorithm that solves a problem by calling itself on smaller instances of the same problem until it reaches a base case.',
       'base case': 'The smallest input of a recursive algorithm, solved directly without another recursive call. Every call must move toward it.',
     },
@@ -227,22 +317,13 @@
             <div class="stack">
               <div class="card stack" style="gap:0.4rem">
                 <h3>Pseudocode: find the largest value</h3>
-                <pre class="m5-pseudo">${pseudo(`
-Input:  s[1], s[2], ..., s[n]   (n ≥ 1)
-Output: the largest value
-
-max(s, n) {
-  large = s[1]          // best so far
-  for i = 2 to n
-    if (s[i] > large)
-      large = s[i]      // found a bigger one
-  return large
-}`)}</pre>
+                ${pseudoTag('max')}
                 <p class="small"><span class="term">Pseudocode</span> conventions: indentation shows which lines belong to a loop or an <code>if</code>; <code>=</code> stores a value; <code>for i = 2 to n</code> counts up by one; <code>return</code> ends the algorithm and hands back the answer. Like the textbook, pseudocode here numbers positions from 1, while Python starts at 0.</p>
               </div>
               <div class="ex">Trace on \(3, 9, 4\): <code>large</code> starts at 3, becomes 9 (because \(9 \gt 3\)), and stays 9 (because \(4 \gt 9\) is false). The output is 9 after \(n - 1 = 2\) comparisons.</div>
             </div>
           </div>`,
+        render: fillPseudo,
       },
       /* ---------------------------------------------------------------- 2 */
       {
@@ -252,42 +333,17 @@ max(s, n) {
           <div class="cols-3">
             <div class="card stack" style="gap:0.4rem">
               <h3><span class="term">Linear search</span></h3>
-              <pre class="m5-pseudo">${pseudo(`
-linear_search(s, n, key) {
-  for i = 1 to n
-    if (s[i] == key)
-      return i
-  return 0     // not found
-}`)}</pre>
+              ${pseudoTag('linear')}
               <p class="small">Check the items in order. It works on <b>any</b> list. Worst case: \(n\) comparisons, when the key is last or missing.</p>
             </div>
             <div class="card stack" style="gap:0.4rem">
               <h3><span class="term">Binary search</span></h3>
-              <pre class="m5-pseudo">${pseudo(`
-binary_search(s, n, key) {
-  i = 1; j = n
-  while (i ≤ j) {
-    k = ⌊(i + j)/2⌋  // middle
-    if (key == s[k]) return k
-    if (key < s[k]) j = k − 1
-    else i = k + 1
-  }
-  return 0
-}`)}</pre>
+              ${pseudoTag('binary')}
               <p class="small">The list must be <b>sorted</b>. Each comparison discards half of what is left, so at most \(\lfloor \log_2 n \rfloor + 1\) comparisons.</p>
             </div>
             <div class="card stack" style="gap:0.4rem">
               <h3><span class="term">Text search</span></h3>
-              <pre class="m5-pseudo">${pseudo(`
-text_search(p, m, t, n) {
-  for i = 1 to n − m + 1 {
-    j = 1
-    while (j ≤ m and t[i+j−1] == p[j])
-      j = j + 1
-    if (j > m) return i
-  }
-  return 0
-}`)}</pre>
+              ${pseudoTag('text')}
               <p class="small">Slide the pattern \(p\) along the text \(t\). "cad" occurs in "abracadabra" at position 5. Worst case about \((n - m + 1) \cdot m\) character comparisons.</p>
             </div>
           </div>
@@ -295,6 +351,7 @@ text_search(p, m, t, n) {
             <div class="warn">Binary search on unsorted data fails <i>silently</i>: it may report "not found" for a key that is there, because it threw away the half that held it. Sort first, or keep the data sorted as you insert.</div>
             <div class="ai">Nearest-neighbor search compares a query embedding with stored vectors. A linear scan computes all \(n\) distances; vector indexes organize the data so most of it can be skipped, the same idea that makes binary search fast.</div>
           </div>`,
+        render: fillPseudo,
       },
       /* ---------------------------------------------------------------- 3 */
       {
@@ -302,13 +359,14 @@ text_search(p, m, t, n) {
         kind: 'lab',
         html: String.raw`<p class="muted small">Both searches look for the same target in the same sorted array. Each <b>Step</b> makes one comparison in each lane. Faded cells have been ruled out. Type a target, click any cell to search for its value, or try a value that is not there. Drag the size slider and watch the worst-case counts.</p>`,
         render(body, ctx) {
-          const { h, R } = ctx;
-          const valuesFor = (n) => range(n).map((i) => 3 * i + 1 + ((7 * i) % 3));
-          let n = 20, a = valuesFor(n), target = a[15], lin = [], bin = [], k = 0, timer = null;
+          const { h, R, M } = ctx;
+          const valuesFor = (n) => M.range(0, n - 1).map((i) => 3 * i + 1 + ((7 * i) % 3));
+          let n = 20, a = valuesFor(n), target = a[15], lin = [], bin = [], k = 0;
           const nIn = h('input', { type: 'range', min: 5, max: 40, value: n, 'aria-label': 'Array size n', style: { width: '8rem' } });
           const nLbl = h('span.mono.small');
           const tIn = h('input.inp.mono', { value: String(target), inputmode: 'numeric', 'aria-label': 'Target value', style: { width: '4.2rem' } });
-          const playBtn = h('button.btn.sm', { onclick: () => (timer ? stop() : play()) }, '▶ Play');
+          const playBtn = h('button.btn.sm', { onclick: () => player.toggle() }, '▶ Play');
+          const player = ctx.ticker({ ms: 650, button: playBtn, tick: () => step() });
           nIn.addEventListener('input', () => { n = +nIn.value; recompute(); });
           tIn.addEventListener('input', () => { const v = parseInt(tIn.value, 10); if (Number.isFinite(v)) { target = v; recompute(); } });
           const lanes = h('div.stack', { style: { gap: '0.7rem' } });
@@ -324,10 +382,8 @@ text_search(p, m, t, n) {
               h('button.btn.sm', { onclick: () => { stop(); k = 0; draw(); } }, 'Reset')),
             lanes, worst);
           function recompute() { stop(); a = valuesFor(n); lin = linTrace(a, target); bin = binTrace(a, target); k = 0; draw(); }
-          function step() { if (k < Math.max(lin.length, bin.length)) { k++; draw(); return true; } stop(); return false; }
-          function play() { timer = setInterval(() => { if (!step()) stop(); }, 650); playBtn.textContent = '❚❚ Pause'; }
-          function stop() { if (timer) clearInterval(timer); timer = null; playBtn.textContent = '▶ Play'; }
-          ctx.onHide(stop);
+          function step() { if (k < Math.max(lin.length, bin.length)) { k++; draw(); return true; } return false; }
+          function stop() { player.stop(); }
           function lane(title, trace, isBin) {
             const kk = Math.min(k, trace.length), done = kk === trace.length, last = trace[kk - 1];
             const found = done && last && (isBin ? last.res === 'eq' : last.eq);
@@ -415,43 +471,17 @@ text_search(p, m, t, n) {
           <div class="cols-3">
             <div class="card stack" style="gap:0.4rem">
               <h3><span class="term">Insertion sort</span></h3>
-              <pre class="m5-pseudo">${pseudo(`
-insertion_sort(s, n) {
-  for i = 2 to n {
-    val = s[i]
-    j = i − 1
-    while (j ≥ 1 and s[j] > val) {
-      s[j+1] = s[j]   // shift right
-      j = j − 1
-    }
-    s[j+1] = val
-  }
-}`)}</pre>
+              ${pseudoTag('insertion')}
               <p class="small">Like sorting a hand of cards: take the next card and slide it left past every larger card. Invariant: \(s[1..i-1]\) is sorted. Very fast on nearly sorted data.</p>
             </div>
             <div class="card stack" style="gap:0.4rem">
               <h3><span class="term">Selection sort</span></h3>
-              <pre class="m5-pseudo">${pseudo(`
-selection_sort(s, n) {
-  for i = 1 to n − 1 {
-    small = i
-    for j = i + 1 to n
-      if (s[j] < s[small])
-        small = j
-    swap(s[i], s[small])
-  }
-}`)}</pre>
+              ${pseudoTag('selection')}
               <p class="small">Find the smallest remaining item and swap it into position \(i\). Invariant: \(s[1..i-1]\) holds the \(i - 1\) smallest items in final order. Always \(n(n-1)/2\) comparisons but at most \(n - 1\) swaps.</p>
             </div>
             <div class="card stack" style="gap:0.4rem">
               <h3>Shuffle (randomized)</h3>
-              <pre class="m5-pseudo">${pseudo(`
-shuffle(s, n) {
-  for i = n down to 2 {
-    j = rand(1, i)   // 1 ≤ j ≤ i
-    swap(s[i], s[j])
-  }
-}`)}</pre>
+              ${pseudoTag('shuffle')}
               <p class="small">A <span class="term">randomized algorithm</span> makes random choices as it runs. This Fisher–Yates shuffle produces each of the \(n!\) orderings with equal probability. It gives up determinism and keeps correctness.</p>
             </div>
           </div>
@@ -459,6 +489,7 @@ shuffle(s, n) {
             <div class="warn">Picking <code>j = rand(1, n)</code> at every step looks equally random but is biased. It has \(n^n\) equally likely runs, and for \(n \ge 3\) the number \(n^n\) is not a multiple of \(n!\), so some orderings must come up more often than others.</div>
             <div class="ai">Training shuffles the examples before every pass (epoch) so a model cannot learn their order. Random weight initialization, dropout and mini-batch sampling are randomized steps too, which is why fixing the random seed makes experiments reproducible.</div>
           </div>`,
+        render: fillPseudo,
       },
       /* ---------------------------------------------------------------- 6 */
       {
@@ -466,13 +497,14 @@ shuffle(s, n) {
         kind: 'lab',
         html: String.raw`<p class="muted small">Step through either algorithm (or press <kbd>↓</kbd> / <kbd>↑</kbd>). The shaded band is the part covered by the loop invariant. Compare counts across inputs: insertion sort reacts strongly to the input order, selection sort does not react at all.</p>`,
         render(body, ctx) {
-          const { h, s, R } = ctx;
-          let algo = 'ins', kind = 'random', n = 10, base = [], ev = [], k = 0, timer = null;
+          const { h, s, R, M } = ctx;
+          let algo = 'ins', kind = 'random', n = 10, base = [], ev = [], k = 0;
           const segA = h('div.seg'), segK = h('div.seg'), segN = h('div.seg');
           [['ins', 'Insertion sort'], ['sel', 'Selection sort']].forEach(([v, l]) => segA.append(h('button', { dataset: { v }, onclick: () => { algo = v; rebuild(false); } }, l)));
           [['random', 'Random'], ['sorted', 'Sorted'], ['reversed', 'Reversed'], ['nearly', 'Nearly sorted']].forEach(([v, l]) => segK.append(h('button', { dataset: { v }, onclick: () => { kind = v; rebuild(true); } }, l)));
           [6, 8, 10, 12].forEach((v) => segN.append(h('button', { dataset: { v: String(v) }, onclick: () => { n = v; rebuild(true); } }, String(v))));
-          const playBtn = h('button.btn.sm', { onclick: () => (timer ? stop() : play()) }, '▶ Play');
+          const playBtn = h('button.btn.sm', { onclick: () => play() }, '▶ Play');
+          const player = ctx.ticker({ ms: 600, button: playBtn, tick: () => move(1) });
           const chart = h('div.figure', { style: { minHeight: 0 } });
           const panel = h('div.stack', { style: { gap: '0.5rem', minHeight: 0 } });
           body.append(
@@ -484,7 +516,7 @@ shuffle(s, n) {
               h('button.btn.sm', { onclick: () => { kind = 'random'; rebuild(true); } }, 'New random input')),
             h('div.split-wide.fill', { style: { minHeight: 0, alignItems: 'stretch' } }, chart, panel));
           function makeInput() {
-            const vals = R.sample(range(19).map((i) => i + 2), n);
+            const vals = R.sample(M.range(2, 20), n);
             const up = vals.slice().sort((x, y) => x - y);
             if (kind === 'sorted') return up;
             if (kind === 'reversed') return up.reverse();
@@ -493,9 +525,8 @@ shuffle(s, n) {
           }
           function rebuild(newInput) { stop(); if (newInput || !base.length) base = makeInput(); ev = algo === 'ins' ? insEvents(base) : selEvents(base); k = 0; draw(); }
           function move(d) { const k2 = Math.max(0, Math.min(ev.length - 1, k + d)); if (k2 === k) return false; k = k2; draw(); return true; }
-          function play() { if (k >= ev.length - 1) k = 0; timer = setInterval(() => { if (!move(1)) stop(); }, 600); playBtn.textContent = '❚❚ Pause'; }
-          function stop() { if (timer) clearInterval(timer); timer = null; playBtn.textContent = '▶ Play'; }
-          ctx.onHide(stop);
+          function play() { if (player.playing) { stop(); return; } if (k >= ev.length - 1) { k = 0; draw(); } player.start(); }
+          function stop() { player.stop(); }
           ctx.keys = (e) => { if (e.key === 'ArrowDown') { stop(); move(1); return true; } if (e.key === 'ArrowUp') { stop(); move(-1); return true; } return false; };
           function draw() {
             [...segA.children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === algo)));
@@ -567,15 +598,13 @@ shuffle(s, n) {
             </div>
             <div class="stack">
               <div class="ex">How often does the inner line run?
-                <pre class="m5-pseudo" style="margin:0.35rem 0">${pseudo(`
-for i = 1 to n
-  for j = 1 to i
-    x = x + 1`)}</pre>
+                ${pseudoTag('nested', 'margin:0.35rem 0')}
                 For each \(i\) the inner loop runs \(i\) times, so the total is \(1 + 2 + \cdots + n = \frac{n(n+1)}{2}\), the arithmetic sum from Module 4.</div>
               <div class="why">The worst case is a promise: no input of size \(n\) takes longer. Deadlines need that promise. The average describes typical behavior, and the best case is rarely useful, since almost any algorithm is fast on a lucky input.</div>
               <div class="ai">A chat service might promise answers within 200 ms for 99% of requests (its "p99 latency"). That is a worst-case style guarantee; a fast average can hide many slow requests.</div>
             </div>
           </div>`,
+        render: fillPseudo,
       },
       /* ---------------------------------------------------------------- 8 */
       {
@@ -643,7 +672,7 @@ for i = 1 to n
         kind: 'lab',
         html: String.raw`<p class="muted small">To prove \(f(n) = O(g(n))\) you must produce witnesses \(C\) and \(n_0\) with \(f(n) \le C\,g(n)\) for <i>every</i> \(n \ge n_0\). Choose \(f\) and \(g\), then adjust \(C\) and \(n_0\). Red dots mark values of \(n \ge n_0\) where the inequality fails. The panel also checks far beyond the chart.</p>`,
         render(body, ctx) {
-          const { h, s } = ctx;
+          const { h, s, M } = ctx;
           let fk = '3n² + 5n + 2', gk = 'n²', cs = 49, n0 = 1, N = 30, scale = 'linear';
           const cOf = (v) => Number((0.1 * 2000 ** (v / 100)).toPrecision(2));
           const fSel = h('select.inp', { 'aria-label': 'f(n)', onchange: (e) => { fk = e.target.value; autoScale(); draw(); } }, Object.keys(FS).map((k) => h('option', { value: k, selected: k === fk }, k)));
@@ -687,7 +716,7 @@ for i = 1 to n
             [...segS.children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === scale)));
             // chart
             const W = 560, H = 330, pl = 58, pr = 12, pt = 14, pb = 28;
-            const ns = range(N).map((i) => i + 1);
+            const ns = M.range(1, N);
             const fv = ns.map((n) => F.f(n)), gv = ns.map((n) => C * G.f(n));
             const lg = scale === 'log';
             const floor = 0.1;
@@ -701,7 +730,7 @@ for i = 1 to n
               svg.append(s('rect', { x: pl, y: pt, width: Math.max(0, xe - pl), height: H - pt - pb, fill: 'var(--ink-3)', 'fill-opacity': 0.1, stroke: 'none' }));
               svg.append(s('text', { x: pl + 6, y: pt + 30, fill: 'var(--ink-3)', 'font-size': 11, text: n0 <= N ? 'before n₀: ignored' : 'all before n₀' }));
             }
-            const ticks = lg ? range(Math.floor(ymax) - Math.ceil(ymin) + 1).map((i) => 10 ** (Math.ceil(ymin) + i)).filter((t, i, arr) => arr.length <= 7 || i % Math.ceil(arr.length / 6) === 0) : [0, ymax / 2, ymax];
+            const ticks = lg ? M.range(Math.ceil(ymin), Math.floor(ymax)).map((e) => 10 ** e).filter((t, i, arr) => arr.length <= 7 || i % Math.ceil(arr.length / 6) === 0) : [0, ymax / 2, ymax];
             ticks.forEach((t) => {
               svg.append(s('line', { x1: pl, x2: W - pr, y1: Y(t), y2: Y(t), stroke: 'var(--rule)', 'stroke-width': 1, 'stroke-dasharray': '3 4', fill: 'none' }));
               svg.append(s('text', { x: pl - 6, y: Y(t) + 4, 'text-anchor': 'end', fill: 'var(--ink-3)', 'font-size': 11, text: t >= 1e6 || (t > 0 && t < 0.01) ? sci(t) : sig(t) }));
@@ -753,7 +782,7 @@ for i = 1 to n
         kind: 'lab',
         html: String.raw`<p class="muted small">Each curve counts the operations an algorithm of that growth rate performs on an input of size \(n\), on a log scale (each grid line is 100,000 times the one below). The table assumes a fast computer doing \(10^9\) simple operations per second. Move \(n\) and change the time budget.</p>`,
         render(body, ctx) {
-          const { h, s } = ctx;
+          const { h, s, M } = ctx;
           let n = 20, budget = 1;
           const BUDGETS = [[1e-3, '1 millisecond'], [1, '1 second'], [60, '1 minute'], [86400, '1 day'], [3.156e7, '1 year']];
           const nIn = h('input', { type: 'range', min: 1, max: 60, value: n, 'aria-label': 'Input size n', style: { width: '12rem' } });
@@ -784,15 +813,15 @@ for i = 1 to n
             svg.append(s('text', { x: pl + 4, y: Y(lb) - 5, fill: 'var(--false)', 'font-size': 11, 'font-weight': 600, text: `budget: ${BUDGETS.find((b) => b[0] === budget)[1]} of work` }));
             const g = s('g', { 'clip-path': `url(#${clipId})` });
             GROWTH.forEach((G) => {
-              const d = range(NMAX).map((i) => `${i ? 'L' : 'M'}${X(i + 1).toFixed(1)},${Y(G.l10(i + 1)).toFixed(1)}`).join(' ');
+              const d = M.range(1, NMAX).map((m, i) => `${i ? 'L' : 'M'}${X(m).toFixed(1)},${Y(G.l10(m)).toFixed(1)}`).join(' ');
               g.append(s('path', { d, fill: 'none', stroke: G.col, 'stroke-width': 2.4 }));
             });
             svg.append(g);
             // labels: curves that leave the top are named where they exit; the rest at the right edge,
-            // nudged apart so neighbouring labels never overlap
+            // nudged apart so neighboring labels never overlap
             const labels = GROWTH.map((G) => {
-              const exit = range(NMAX).find((i) => G.l10(i + 1) > top);
-              return exit === undefined ? { G, x: W - pr + 4, y: Y(G.l10(NMAX)) + 4, edge: true } : { G, x: X(exit + 1) + 4, y: pt + 10, edge: false };
+              const exit = M.range(1, NMAX).find((m) => G.l10(m) > top);
+              return exit === undefined ? { G, x: W - pr + 4, y: Y(G.l10(NMAX)) + 4, edge: true } : { G, x: X(exit) + 4, y: pt + 10, edge: false };
             });
             const edge = labels.filter((l) => l.edge).sort((p, q) => q.y - p.y);
             edge.forEach((l, i) => { if (i) l.y = Math.min(l.y, edge[i - 1].y - 13); });
@@ -826,22 +855,11 @@ for i = 1 to n
             <div class="stack">
               <div class="def">A <span class="term">recursive algorithm</span> solves a problem by calling itself on a smaller input. The <span class="term">base case</span> is small enough to answer directly, and every call must move toward it.</div>
               <div class="row" style="gap:0.6rem;align-items:stretch;flex-wrap:nowrap">
-                <pre class="m5-pseudo" style="flex:1 1 0">${pseudo(`
-factorial(n) {
-  if (n == 0)    // base case
-    return 1
-  return n * factorial(n − 1)
-}`)}</pre>
+                ${pseudoTag('factorial', 'flex:1 1 0')}
                 <p class="small" style="flex:1 1 0">\(4! = 4 \cdot 3!\), \(3! = 3 \cdot 2!\), …, down to \(0! = 1\). Then the answers multiply on the way back up: \(1, 1, 2, 6, 24\).</p>
               </div>
-              <pre class="m5-pseudo">${pseudo(`
-bsearch(s, i, j, key) {     // search s[i..j]
-  if (i > j) return 0       // base case: empty range
-  k = ⌊(i + j)/2⌋
-  if (key == s[k]) return k
-  if (key < s[k]) return bsearch(s, i, k − 1, key)
-  return bsearch(s, k + 1, j, key)
-}`)}</pre>
+              ${pseudoTag('bsearch')}
+              <p class="small">Euclid's algorithm is the classic recursive example: \(\gcd(a, b) = \gcd(b,\ a \bmod b)\), base case \(\gcd(a, 0) = a\). <span class="m5-euclid-link"></span></p>
               <div class="warn">A missing base case, or a call that does not shrink the input, recurses forever. Python stops it after about 1000 nested calls with <code>RecursionError</code>.</div>
             </div>
             <div class="stack">
@@ -856,6 +874,16 @@ bsearch(s, i, j, key) {     // search s[i..j]
               <div class="ai">Decision-tree learning is recursive: split the data on the best question, then build a subtree for each part, stopping at a base case such as "every example has the same label".</div>
             </div>
           </div>`,
+        render(body, ctx) {
+          fillPseudo(body, ctx);
+          // link to Euclid's algorithm in module 6; the key is looked up so a reordering there cannot break it
+          const numbers = DM.modules.find((m) => m.id === 'numbers');
+          const at = numbers ? numbers.slides.findIndex((sl) => /Euclid/.test(sl.title)) : -1;
+          const slot = body.querySelector('.m5-euclid-link');
+          if (at < 0) { slot.textContent = 'Module 6 works through it step by step.'; return; }
+          const key = `numbers-${numbers.slides[at].id || at + 1}`;
+          slot.append(ctx.h('a', { href: '#' + key, onclick: (e) => { e.preventDefault(); ctx.go(key); } }, 'Open Euclid’s algorithm in Module 6 →'));
+        },
       },
       /* ---------------------------------------------------------------- 13 */
       {
@@ -900,7 +928,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
           {
             name: 'Write the pseudocode first',
             html: '<p>Sketch the algorithm in plain steps before typing Python. Pseudocode makes the loop structure, and therefore the cost, visible at a glance, and it is far cheaper to fix an \\(O(n^2)\\) plan on paper than in a finished program.</p>',
-            good: '# closest pair of scores:\n# 1. sort the scores                 O(n log n)\n# 2. scan once, compare neighbours    O(n)\n# 3. return the pair with least gap\n# total: O(n log n), not O(n²) over all pairs',
+            good: '# closest pair of scores:\n# 1. sort the scores                 O(n log n)\n# 2. scan once, compare neighbors     O(n)\n# 3. return the pair with least gap\n# total: O(n log n), not O(n²) over all pairs',
           },
         ],
       },
@@ -912,7 +940,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         gens: [
           {
             label: 'Searching',
-            make(R) {
+            make(R, M) {
               const kind = R.int(0, 2);
               if (kind === 0) {
                 const n = R.pick([R.int(10, 99), R.int(100, 999), R.int(1000, 99999), R.pick([1024, 4096, 1000000, 1000000000])]);
@@ -920,7 +948,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
                 return { prompt: `What is the largest number of comparisons binary search can make on a sorted list of \\(n = ${n.toLocaleString('en-US')}\\) items?`, answer: c, hint: 'the formula is ⌊log₂ n⌋ + 1.', solution: `\\(2^{${c - 1}} = ${(2 ** (c - 1)).toLocaleString('en-US')} \\le ${n.toLocaleString('en-US')} \\lt 2^{${c}} = ${(2 ** c).toLocaleString('en-US')}\\), so \\(\\lfloor \\log_2 n \\rfloor = ${c - 1}\\) and the worst case is \\(${c - 1} + 1 = ${c}\\) comparisons. Linear search could need all ${n.toLocaleString('en-US')}.` };
               }
               const len = R.int(7, 12);
-              const a = R.sample(range(60).map((i) => i + 1), len).sort((x, y) => x - y);
+              const a = R.sample(M.range(1, 60), len).sort((x, y) => x - y);
               const present = R.chance(0.7);
               let t = present ? R.pick(a) : R.int(1, 61);
               while (!present && a.includes(t)) t = R.int(1, 61);
@@ -956,7 +984,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
           {
             label: 'Big-O',
-            make(R) {
+            make(R, M) {
               if (R.chance(0.45)) {
                 const c = R.int(2, 9), b = R.int(1, 20);
                 const items = [
@@ -974,7 +1002,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
               }
               const CL = [['1', ''], ['log n', '\\log_2 n'], ['n', 'n'], ['n log n', 'n \\log_2 n'], ['n²', 'n^2'], ['n³', 'n^3'], ['2ⁿ', '2^n']];
               const d = R.int(1, 6);
-              const lower = R.sample(range(d), Math.min(d, R.int(1, 2))).sort((x, y) => y - x);
+              const lower = R.sample(M.range(0, d - 1), Math.min(d, R.int(1, 2))).sort((x, y) => y - x);
               const term = (i, c) => (i === 0 ? String(c) : `${c === 1 ? '' : c}${CL[i][1]}`);
               const parts = [term(d, R.int(2, 9)), ...lower.map((i) => term(i, i === 0 ? R.int(5, 99) : R.int(2, 60)))];
               const order = R.shuffle(parts);
@@ -989,8 +1017,8 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
           {
             label: 'Sorting passes',
-            make(R) {
-              const a = R.sample(range(40).map((i) => i + 1), 6);
+            make(R, M) {
+              const a = R.sample(M.range(1, 40), 6);
               const passes = R.int(1, 3);
               const ins = R.chance(0.5);
               const states = [];
@@ -1019,7 +1047,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
           { q: 'A loop starts with <code>x = 1</code>, adds 1 to <code>x</code> each time, and stops when <code>x</code> is negative. Which property fails?', choices: ['Determinism', 'Finiteness', 'Generality', 'Input'], answer: 1, explain: '<code>x</code> only grows, so it never becomes negative and the loop never stops. An algorithm must finish after finitely many steps on every input.' },
           { q: 'What is the largest number of comparisons binary search makes on 1,000,000 sorted items?', choices: ['20', '1,000', '500,000', '1,000,000'], answer: 0, explain: String.raw`\(2^{19} = 524{,}288 \le 10^6 \lt 2^{20}\), so \(\lfloor \log_2 10^6 \rfloor + 1 = 19 + 1 = 20\). Each comparison halves the remaining range.` },
           { q: 'What must be true of a list before binary search can be used on it?', choices: ['It has no duplicates', 'It is sorted', 'Its length is a power of 2', 'It contains the target'], answer: 1, explain: 'Binary search throws away half the list based on one comparison, which is only safe when the list is sorted. Duplicates and odd lengths are fine, and an absent target is reported as not found.' },
-          { q: 'How many comparisons does insertion sort make on a list of \\(n\\) items that is already sorted?', choices: ['\\(1\\)', '\\(n - 1\\)', '\\(n \\log_2 n\\)', '\\(n(n-1)/2\\)'], answer: 1, explain: 'Each of the \\(n - 1\\) passes compares the new item with its left neighbour once, finds it is not smaller, and stops. That is the best case.' },
+          { q: 'How many comparisons does insertion sort make on a list of \\(n\\) items that is already sorted?', choices: ['\\(1\\)', '\\(n - 1\\)', '\\(n \\log_2 n\\)', '\\(n(n-1)/2\\)'], answer: 1, explain: 'Each of the \\(n - 1\\) passes compares the new item with its left neighbor once, finds it is not smaller, and stops. That is the best case.' },
           { q: 'Which is the tightest description of \\(3n^2 + 100n + 7\\)?', choices: ['\\(\\Theta(n)\\)', '\\(\\Theta(n^2)\\)', '\\(\\Theta(n^3)\\)', '\\(\\Theta(100n)\\)'], answer: 1, explain: 'Drop the constant factors and keep the dominant term: \\(n^2\\) eventually outgrows \\(100n\\), so the expression is \\(\\Theta(n^2)\\). \\(O(n^3)\\) would also be true, but it is not tight.' },
           { q: 'Which function grows fastest as \\(n\\) becomes large?', choices: ['\\(n^{10}\\)', '\\(2^n\\)', '\\(n!\\)', '\\(n^2 \\log n\\)'], answer: 2, explain: '\\(n! = 1 \\cdot 2 \\cdots n\\) eventually beats \\(2^n\\) (it has more and more factors larger than 2), and every exponential beats every polynomial.' },
           { q: 'How does the running time of this code grow?<pre class="m5-pseudo" style="margin-top:0.35rem">for i in range(n):\n    for j in range(i):\n        total += 1</pre>', choices: ['\\(\\Theta(n)\\)', '\\(\\Theta(n \\log n)\\)', '\\(\\Theta(n^2)\\)', '\\(\\Theta(2^n)\\)'], answer: 2, explain: 'The inner line runs \\(0 + 1 + \\cdots + (n-1) = n(n-1)/2\\) times. Dropping the constant \\(\\tfrac{1}{2}\\) and the lower-order term leaves \\(\\Theta(n^2)\\).' },

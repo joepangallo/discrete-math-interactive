@@ -93,7 +93,6 @@
     objectives: [8],
     terms: {
       'recurrence relation': 'A rule that defines each term of a sequence from earlier terms, such as aₙ = 2aₙ₋₁ + 1. Together with initial conditions it pins down exactly one sequence.',
-      'sequence': 'An ordered list of numbers a₀, a₁, a₂, … indexed by whole numbers.',
       'initial condition': 'A starting term given outright, such as a₀ = 1. A rule that looks back k steps needs k initial conditions.',
       'closed form': 'A formula that computes aₙ directly from n, without computing the earlier terms first, such as Hₙ = 2ⁿ − 1.',
       'iteration': 'Solving a recurrence by substituting the rule into itself again and again until a pattern appears. Also called unrolling.',
@@ -103,9 +102,8 @@
       'repeated root': 'A root that appears twice in the characteristic equation, as 2 does in (r − 2)² = 0. The closed form is then aₙ = b·rⁿ + d·n·rⁿ.',
       "Binet's formula": 'The closed form of the Fibonacci numbers: Fₙ = (φⁿ − ψⁿ)/√5, where φ = (1 + √5)/2 and ψ = (1 − √5)/2.',
       'golden ratio': 'φ = (1 + √5)/2 ≈ 1.618, the larger root of r² = r + 1. Consecutive Fibonacci numbers have a ratio that approaches φ.',
-      'base case': 'An input for which a recursive function returns an answer directly, without calling itself. It plays the role of the initial condition.',
       'divide and conquer': 'Solving a problem by splitting it into smaller copies of itself, solving those recursively, and combining their answers.',
-      'recursion tree': 'A drawing with one node per recursive call, labelled with the work that call does. Summing level by level solves the recurrence.',
+      'recursion tree': 'A drawing with one node per recursive call, labeled with the work that call does. Summing level by level solves the recurrence.',
       'master theorem': 'A shortcut that solves T(n) = a·T(n/b) + Θ(nᵈ) by comparing d with log_b a.',
       'memoization': 'Storing the result of each function call the first time it is computed, so a repeated call returns the stored answer instead of recomputing it.',
       'dynamic programming': 'Solving a problem by solving each of its overlapping subproblems once, usually by filling a table from the smallest subproblems up.',
@@ -231,7 +229,7 @@
       {
         title: 'Lab: the Tower of Hanoi',
         kind: 'lab',
-        html: String.raw`<p class="muted small">Click a peg to lift its top disk, then click another peg to drop it. A disk may land only on an empty peg or on a larger disk. Press <b>Step</b> or <b>Solve</b> to watch the recursive solution: the panel lists every call that is running and which of its three phases it is in.</p>`,
+        html: String.raw`<p class="muted small">Click a peg to lift its top disk, then click another peg to drop it. A disk may land only on an empty peg or on a larger disk. Press <b>Step</b> or <b>Play</b> to watch the recursive solution: the panel lists every call that is running and which of its three phases it is in.</p>`,
         render(body, ctx) {
           const { h, s, rc } = ctx;
           const COLORS = ['--accent', '--fnc', '--num', '--kw', '--str', '--warn', '--false'];
@@ -239,7 +237,7 @@
           const PX = [110, 300, 490], BASE = 318, W = 600, H = 366;
           const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹', sup = (x) => String(x).split('').map((c) => SUP[c]).join('');
           const SPEED = { Slow: 900, Normal: 420, Fast: 140 };
-          let n = 4, pegs = [], moves = 0, held = null, plan = [], step = 0, onPlan = true, timer = null, speed = 'Normal', last = null;
+          let n = 4, pegs = [], moves = 0, held = null, plan = [], step = 0, onPlan = true, speed = 'Normal', last = null;
 
           function genPlan(k, from, to, via, stack, out) {
             if (k === 0) return;
@@ -258,7 +256,7 @@
           // static scene: base, pegs, labels, and one hit area per peg
           const disksG = s('g');
           const hiG = s('g');
-          const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Three pegs with disks' },
+          const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'group', 'aria-label': 'Three pegs with disks; each peg is a button' },
             s('rect', { x: 14, y: BASE, width: W - 28, height: 12, rx: 4, fill: 'var(--ink-3)' }),
             hiG,
             ...PX.map((x) => s('rect', { x: x - 4, y: 84, width: 8, height: BASE - 84, rx: 3, fill: 'var(--ink-3)' })),
@@ -273,9 +271,12 @@
           const mini = h('div');
           const nSeg = h('div.seg');
           const spSeg = h('div.seg');
-          const solveBtn = h('button.btn.primary.sm', { onclick: () => solve() }, 'Solve ▶');
-          const stepBtn = h('button.btn.sm', { onclick: () => stepOnce() }, 'Step');
-          const resetBtn = h('button.btn.sm', { onclick: () => { pause(); reset(); draw(); } }, 'Reset');
+          const solveBtn = h('button.btn.primary.sm', { onclick: () => solve() });
+          const stepBtn = h('button.btn.sm', { onclick: () => stepOnce() }, 'Step ▶');
+          const resetBtn = h('button.btn.sm', { onclick: () => { player.stop(); reset(); draw(); } }, 'Reset');
+          // the ticker owns the play/pause label; ms is read on every start, so a speed change just restarts it
+          const playOpts = { ms: SPEED[speed], button: solveBtn, tick: () => { if (step >= plan.length) return false; const mv = plan[step++]; apply(mv.from, mv.to); checkWin(); draw(); return step < plan.length; } };
+          const player = ctx.ticker(playOpts);
           const panel = h('div.rc-panel',
             h('div.rc-ctl', h('span', 'Disks'), nSeg, h('span', 'Speed'), spSeg),
             h('div.row', { style: { gap: '0.35rem' } }, stepBtn, solveBtn, resetBtn),
@@ -297,7 +298,7 @@
             last = { disk, from, to };
           }
           function clickPeg(p) {
-            pause();
+            player.stop();
             if (held === null) {
               if (!pegs[p].length) { say('info', `Peg ${NAME[p]} is empty. Pick a peg that has a disk on top.`); return; }
               held = p; say('', '');
@@ -323,11 +324,11 @@
           function say(kind, text) { msg.className = 'feedback' + (kind ? ' ' + kind : ''); msg.textContent = text; }
           function checkWin() {
             if (pegs[2].length !== n) return;
-            pause();
+            player.stop();
             say('good', moves === minMoves() ? `Solved in ${moves} moves, the minimum possible: 2${sup(n)} − 1 = ${minMoves()}.` : `Solved in ${moves} moves. The minimum is ${minMoves()}. Try to match it.`);
           }
           function stepOnce() {
-            pause();
+            player.stop();
             if (!onPlan || held !== null) { reset(); }
             if (step >= plan.length) { reset(); }
             const mv = plan[step++];
@@ -336,23 +337,16 @@
             draw();
           }
           function solve() {
-            if (timer) { pause(); draw(); return; }
+            if (player.playing) { player.stop(); draw(); return; }
             if (!onPlan || held !== null || step >= plan.length) reset();
-            timer = setInterval(() => {
-              if (step >= plan.length) { pause(); draw(); return; }
-              const mv = plan[step++];
-              apply(mv.from, mv.to);
-              checkWin();
-              draw();
-            }, SPEED[speed]);
+            playOpts.ms = SPEED[speed];
+            player.start();
             draw();
           }
-          function pause() { if (timer) clearInterval(timer); timer = null; }
 
           function draw() {
-            rc(nSeg, [1, 2, 3, 4, 5, 6, 7].map((k) => h('button', { 'aria-pressed': String(k === n), onclick: () => { pause(); n = k; reset(); draw(); } }, String(k))));
-            rc(spSeg, Object.keys(SPEED).map((k) => h('button', { 'aria-pressed': String(k === speed), onclick: () => { speed = k; if (timer) { pause(); solve(); } else draw(); } }, k)));
-            solveBtn.textContent = timer ? 'Pause ❚❚' : 'Solve ▶';
+            rc(nSeg, [1, 2, 3, 4, 5, 6, 7].map((k) => h('button', { 'aria-pressed': String(k === n), onclick: () => { player.stop(); n = k; reset(); draw(); } }, String(k))));
+            rc(spSeg, Object.keys(SPEED).map((k) => h('button', { 'aria-pressed': String(k === speed), onclick: () => { speed = k; if (player.playing) { player.stop(); solve(); } else draw(); } }, k)));
             // disks
             const dh = Math.min(32, 218 / n);
             rc(hiG, held !== null ? s('rect', { x: PX[held] - 94, y: 8, width: 188, height: BASE - 8, rx: 10, fill: 'var(--accent-2)' }) : null);
@@ -373,7 +367,7 @@
             // recursion stack
             const cur = onPlan && step > 0 ? plan[step - 1] : null;
             if (!onPlan) {
-              rc(stackBox, h('p.small.muted', 'You are playing by hand. Press Step or Solve to start over from the beginning and follow the recursive plan.'));
+              rc(stackBox, h('p.small.muted', 'You are playing by hand. Press Step or Play to start over from the beginning and follow the recursive plan.'));
             } else if (!cur) {
               rc(stackBox, h('p.small.muted', { html: `Nothing is running yet. The first call will be <code>hanoi(${n}, A→C)</code>: move ${n} disk${n === 1 ? '' : 's'} from A to C using B as the spare.` }));
             } else if (step === plan.length) {
@@ -398,7 +392,6 @@
                 h('tr', h('th', { html: 'H<sub>n</sub>' }), [1, 2, 3, 4, 5, 6, 7].map((k) => h('td', { class: k === n ? 'on' : '' }, String(H[k])))))),
             h('p.tiny.muted', { style: { marginTop: '0.25rem' } }, 'Each value is twice the one before, plus 1: Hₙ = 2Hₙ₋₁ + 1.'));
           }
-          ctx.onHide(pause);
           reset();
           draw();
         },
@@ -647,7 +640,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <p>A <span class="term">recursion tree</span> draws every call as a node labelled with the work it does outside its recursive calls. Add up each level, then add the levels. For merge sort, \(T(n) = 2T(n/2) + n\):</p>
+              <p>A <span class="term">recursion tree</span> draws every call as a node labeled with the work it does outside its recursive calls. Add up each level, then add the levels. For merge sort, \(T(n) = 2T(n/2) + n\):</p>
               <div class="figure">
                 <svg viewBox="0 0 470 196" role="img" aria-label="Recursion tree for merge sort: every level costs n">
                   <g stroke="var(--ink-3)" stroke-width="1.3" fill="none">
@@ -787,7 +780,7 @@
         render(body, ctx) {
           const { h, s, rc } = ctx;
           const PAL = ['--ink-3', '--true', '--num', '--fnc', '--kw', '--str', '--warn', '--accent', '--false'];
-          let n = 6, memo = false, at = 0, timer = null, tree = null;
+          let n = 6, memo = false, at = 0, tree = null;
           function build() {
             const nodes = [], events = [], done = new Set();
             let leaf = 0;
@@ -811,7 +804,9 @@
           const say = h('div.small', { style: { minHeight: '2.6em' }, 'aria-live': 'polite' });
           const modeSeg = h('div.seg');
           const nSeg = h('div.seg');
-          const playBtn = h('button.btn.sm.primary', { onclick: () => play() }, 'Play ▶');
+          const playBtn = h('button.btn.sm.primary', { onclick: () => play() });
+          const playOpts = { ms: 320, button: playBtn, tick: () => { if (at >= tree.events.length) return false; at++; draw(); return at < tree.events.length; } };
+          const player = ctx.ticker(playOpts);
           const counts = h('div.rc-stats');
           const bars = h('div.rc-bars');
           const memoRow = h('div.rc-memo');
@@ -821,26 +816,25 @@
             h('div.rc-panel',
               h('div.rc-ctl', h('span', 'Version'), modeSeg, h('span', 'n'), nSeg),
               h('div.row', { style: { gap: '0.3rem' } },
-                h('button.btn.sm', { onclick: () => { pause(); at = Math.max(0, at - 1); draw(); }, 'aria-label': 'Step back' }, '◀'),
-                h('button.btn.sm', { onclick: () => { pause(); at = Math.min(tree.events.length, at + 1); draw(); } }, 'Step ▶'),
+                h('button.btn.sm', { onclick: () => { player.stop(); at = Math.max(0, at - 1); draw(); } }, '◀ Back'),
+                h('button.btn.sm', { onclick: () => { player.stop(); at = Math.min(tree.events.length, at + 1); draw(); } }, 'Step ▶'),
                 playBtn,
-                h('button.btn.sm', { onclick: () => { pause(); at = tree.events.length; draw(); } }, 'Show all'),
-                h('button.btn.sm', { onclick: () => { pause(); at = 0; draw(); } }, 'Reset')),
+                h('button.btn.sm', { onclick: () => { player.stop(); at = tree.events.length; draw(); } }, 'Show all'),
+                h('button.btn.sm', { onclick: () => { player.stop(); at = 0; draw(); } }, 'Reset')),
               counts,
               h('div', h('div.tiny.mono.muted', { style: { marginBottom: '0.2rem' } }, 'HOW OFTEN EACH CALL HAS RUN SO FAR'), bars),
               h('div', h('div.tiny.mono.muted', { style: { marginBottom: '0.2rem' } }, 'MEMO TABLE'), memoRow),
               note)));
-          function pause() { if (timer) clearInterval(timer); timer = null; playBtn.textContent = 'Play ▶'; }
           function play() {
-            if (timer) { pause(); return; }
+            if (player.playing) { player.stop(); return; }
             if (at >= tree.events.length) at = 0;
-            timer = setInterval(() => { if (at >= tree.events.length) { pause(); draw(); return; } at++; draw(); }, n >= 7 ? 160 : 320);
-            playBtn.textContent = 'Pause ❚❚';
+            playOpts.ms = n >= 7 ? 160 : 320; // bigger trees have more events, so they play faster
+            player.start();
             draw();
           }
           function draw() {
-            rc(modeSeg, [['Naive', false], ['Memoized', true]].map(([lbl, m]) => h('button', { 'aria-pressed': String(m === memo), onclick: () => { pause(); memo = m; build(); draw(); } }, lbl)));
-            rc(nSeg, [2, 3, 4, 5, 6, 7, 8].map((k) => h('button', { 'aria-pressed': String(k === n), onclick: () => { pause(); n = k; build(); draw(); } }, String(k))));
+            rc(modeSeg, [['Naive', false], ['Memoized', true]].map(([lbl, m]) => h('button', { 'aria-pressed': String(m === memo), onclick: () => { player.stop(); memo = m; build(); draw(); } }, lbl)));
+            rc(nSeg, [2, 3, 4, 5, 6, 7, 8].map((k) => h('button', { 'aria-pressed': String(k === n), onclick: () => { player.stop(); n = k; build(); draw(); } }, String(k))));
             const { nodes, events, leaves, depth } = tree;
             const W = 620, H = 380, padX = 14, top = 22, bottom = 24;
             const sp = (W - 2 * padX) / leaves;
@@ -891,7 +885,6 @@
               ? `With memoization each fib(k) is computed once: ${n + 1} computations plus ${Math.max(0, n - 2)} cache hits, ${total} calls in all, growing linearly with n. <span class="term">Dynamic programming</span> goes one step further: fill the table from f0 upward with a loop and no recursion at all.`
               : `The counts in the bars are Fibonacci numbers: fib(1) runs F${n} = ${fibs[n]} times. The total ${total} = 2F${n + 1} − 1 roughly multiplies by 1.618 each time n grows by 1, the golden ratio from Binet's formula.`;
           }
-          ctx.onHide(pause);
           build();
           draw();
         },

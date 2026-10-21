@@ -2,76 +2,9 @@
    techniques in discrete mathematics and computer science. Rules of inference, direct and indirect proof,
    cases, counterexamples, induction, strong induction, and proofs about programs. */
 (() => {
-  // ---- propositional formulas for the argument checker: p q r s with ¬ ∧ ∨ ⊕ → ↔ (or ~ & | ^ -> <->) ----
-  const VARS = ['p', 'q', 'r', 's'];
-  const SYMS = [['<->', '↔'], ['↔', '↔'], ['->', '→'], ['→', '→'], ['∧', '∧'], ['&', '∧'], ['∨', '∨'], ['|', '∨'],
-    ['⊕', '⊕'], ['^', '⊕'], ['¬', '¬'], ['~', '¬'], ['!', '¬'], ['(', '('], [')', ')']];
-  function lex(src) {
-    const s = String(src);
-    const toks = [];
-    let i = 0;
-    outer: while (i < s.length) {
-      if (/\s/.test(s[i])) { i++; continue; }
-      for (const [k, v] of SYMS) if (s.startsWith(k, i)) { toks.push(v); i += k.length; continue outer; }
-      if (VARS.includes(s[i])) { toks.push(s[i++]); continue; }
-      throw new Error(`I don't recognise "${s[i]}". Use p, q, r, s with ¬ ∧ ∨ → ↔ (or ~ & | -> <->).`);
-    }
-    return toks;
-  }
-  const BIN = ['↔', '→', '⊕', '∨', '∧'];
-  function parse(src) {
-    const t = lex(src);
-    let i = 0;
-    if (!t.length) throw new Error('Each premise and the conclusion needs a formula.');
-    function level(k) {
-      if (k === BIN.length) return unary();
-      const op = BIN[k];
-      const left = level(k + 1);
-      if (t[i] !== op) return left;
-      i++;
-      if (op === '→') return { op, a: left, b: level(k) };
-      let n = { op, a: left, b: level(k + 1) };
-      while (t[i] === op) { i++; n = { op, a: n, b: level(k + 1) }; }
-      return n;
-    }
-    function unary() {
-      if (t[i] === '¬') { i++; return { op: '¬', a: unary() }; }
-      const tok = t[i++];
-      if (tok === '(') { const n = level(0); if (t[i++] !== ')') throw new Error('A "(" is missing its ")".'); return n; }
-      if (VARS.includes(tok)) return { v: tok };
-      throw new Error(tok ? `"${tok}" cannot start a formula here.` : 'A formula ends too early.');
-    }
-    const tree = level(0);
-    if (i < t.length) throw new Error(`Something is missing before "${t[i]}".`);
-    return tree;
-  }
-  function ev(n, env) {
-    if (n.v) return env[n.v];
-    const a = ev(n.a, env);
-    if (n.op === '¬') return !a;
-    const b = ev(n.b, env);
-    return n.op === '∧' ? a && b : n.op === '∨' ? a || b : n.op === '⊕' ? a !== b : n.op === '→' ? !a || b : a === b;
-  }
-  const TEXOP = { '∧': '\\land', '∨': '\\lor', '⊕': '\\oplus', '→': '\\to', '↔': '\\leftrightarrow' };
-  function toTex(n, parent) {
-    if (n.v) return n.v;
-    if (n.op === '¬') return '\\neg ' + toTex(n.a, '¬');
-    const s = toTex(n.a, n.op) + ' ' + TEXOP[n.op] + ' ' + toTex(n.b, n.op);
-    return !parent || (parent === n.op && (n.op === '∧' || n.op === '∨')) ? s : '(' + s + ')';
-  }
-  function collect(n, acc) { if (n.v) acc.add(n.v); if (n.a) collect(n.a, acc); if (n.b) collect(n.b, acc); return acc; }
-  const varsOf = (trees) => { const acc = new Set(); trees.forEach((t) => collect(t, acc)); return VARS.filter((v) => acc.has(v)); };
-  function assignments(vars) {
-    const out = [];
-    for (let m = 0; m < 2 ** vars.length; m++) {
-      const env = {};
-      vars.forEach((v, j) => { env[v] = !((m >> (vars.length - 1 - j)) & 1); });
-      out.push(env);
-    }
-    return out;
-  }
-  const L = (b) => (b ? 'T' : 'F');
-  const tf = (b) => `<span class="pill ${b ? 't' : 'f'}">${L(b)}</span>`;
+  // ---- propositional formulas for the argument checker come from DM.logic (src/lib/logic.js) ----
+  const { ev, toTex, varsOf, assignments, L, tf } = DM.logic;
+  const parse = (src) => DM.logic.parse(src, { empty: 'Each premise and the conclusion needs a formula.' });
   const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
   // ---- number helpers for the conjecture tester and the practice generators ----
@@ -322,7 +255,7 @@
     { p: 'it rains', np: 'it does not rain', q: 'the match is cancelled', nq: 'the match is not cancelled', r: 'tickets are refunded' },
     { p: 'the input is valid', np: 'the input is not valid', q: 'the function returns a result', nq: 'the function returns no result', r: 'the report is generated' },
     { p: 'n is divisible by 4', np: 'n is not divisible by 4', q: 'n is even', nq: 'n is odd', r: 'n² is even' },
-    { p: 'the model overfits', np: 'the model does not overfit', q: 'validation accuracy drops', nq: 'validation accuracy does not drop', r: 'we add regularisation' },
+    { p: 'the model overfits', np: 'the model does not overfit', q: 'validation accuracy drops', nq: 'validation accuracy does not drop', r: 'we add regularization' },
   ];
   const FORMS = [
     ['Modus ponens', (t) => [`If ${t.p}, then ${t.q}.`, `${cap(t.p)}.`], (t) => `${cap(t.q)}.`, 'p → q, p ∴ q', true],
@@ -435,7 +368,8 @@
       .pf-dom text { font-family: var(--font-mono); }
       .pf-dom .domino { transform-box: fill-box; transform-origin: 100% 100%; transition: transform 0.28s ease-in; }
       .pf-dom .domino.down { transform: rotate(68deg); }
-      .pf-dom .gap { cursor: pointer; }
+      .pf-dom .gap { cursor: pointer; outline: none; }
+      .pf-dom .gap:focus-visible { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; }
       .pf-algebra { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15rem 0.8rem; align-items: baseline; font-size: 0.9rem; }
       .pf-algebra .pf-why { font-size: 0.78rem; color: var(--ink-2); }
       .pf-grid rect { cursor: pointer; }
@@ -788,19 +722,20 @@
       {
         title: 'Lab: induction dominoes',
         kind: 'lab',
-        html: String.raw`<p class="muted small">Choose a claim, then push the first domino. A domino falls only if the one before it fell <i>and</i> the inductive step links them. Click a gap to break a link, or skip the base case, and see why induction needs both parts. The mark above each domino says whether \(P(n)\) is actually true.</p>`,
+        html: String.raw`<p class="muted small">Choose a claim, then push the first domino. A domino falls only if the one before it fell <i>and</i> the inductive step links them. Click a gap between dominoes (or focus it and press Enter) to break a link, or skip the base case, and see why induction needs both parts. The mark above each domino says whether \(P(n)\) is actually true.</p>`,
         render(body, ctx) {
           const { h, s } = ctx;
           const COUNT = 12;
           let ci = 0, skipBase = false, shown = 1;
           let broken = new Set();
           let fallen = new Array(COUNT).fill(false);
-          let timers = [];
+          let next = 0;
           let msg = '';
+          let refocus = null;
           const tabs = h('div.seg', { role: 'tablist', 'aria-label': 'Choose a claim' });
           CLAIMS.forEach((c, i) => tabs.append(h('button', { 'aria-pressed': String(i === 0), onclick: () => { ci = i; shown = 1; broken = new Set(); skipBase = false; stand(); } }, c.key)));
           const claimEl = h('div', { style: { fontSize: '1.05rem' } });
-          const svg = s('svg', { viewBox: '0 0 640 112', class: 'pf-dom', role: 'img', 'aria-label': 'A row of twelve dominoes', style: { width: '100%', height: '6.6rem', flex: 'none' } });
+          const svg = s('svg', { viewBox: '0 0 640 112', class: 'pf-dom', role: 'group', 'aria-label': 'A row of twelve dominoes; the gap between each pair is a button that breaks or repairs that link', style: { width: '100%', height: '6.6rem', flex: 'none' } });
           const pushBtn = h('button.btn.primary', { onclick: () => push() }, 'Push the first domino');
           const standBtn = h('button.btn', { onclick: () => stand() }, 'Stand them up');
           const baseBtn = h('button.btn', { onclick: () => { skipBase = !skipBase; stand(); } });
@@ -810,11 +745,26 @@
           body.append(h('div.row', { style: { gap: '0.8rem' } }, tabs, claimEl), svg,
             h('div.row', { style: { gap: '0.4rem' } }, pushBtn, standBtn, baseBtn, h('span.tiny.muted', 'Click a gap between dominoes to break or repair that link.')),
             msgEl, h('div.split-narrow', { style: { gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)' } }, baseCard, stepCard));
-          const stop = () => { timers.forEach(clearTimeout); timers = []; };
-          ctx.onHide(stop);
-          function stand() { stop(); fallen.fill(false); msg = ''; draw(); }
+          // one domino falls per tick; the ticker stops itself at a broken link or at the end of the row
+          const player = ctx.ticker({ ms: 150, tick: () => fall() });
+          function stand() { player.stop(); fallen.fill(false); msg = ''; draw(); }
+          function fall() {
+            const C = CLAIMS[ci];
+            const i = next;
+            fallen[i] = true;
+            const link = i + 1 < COUNT && C.step && !broken.has(i);
+            if (link) next = i + 1;
+            else {
+              const n = C.n0 + i;
+              if (i === COUNT - 1) msg = `All ${COUNT} fell, and the row never ends: the base case starts the chain and the step passes it on forever. So P(n) holds for every n ≥ ${C.n0}.`;
+              else if (!C.step) msg = `Only the first domino fell. P(1) to P(12) all check out (✓), but nothing links P(k) to P(k + 1), so induction proves nothing past n = 1. And indeed P(40) is false.`;
+              else msg = `The chain stopped at n = ${n} because you broke the link P(${n}) → P(${n + 1}). The step must hold for every k, or nothing past the break is proved.`;
+            }
+            draw();
+            return link;
+          }
           function push() {
-            stop();
+            player.stop();
             fallen.fill(false);
             const C = CLAIMS[ci];
             if (skipBase || !C.base) {
@@ -823,21 +773,10 @@
               draw();
               return;
             }
-            let i = 0;
-            const tick = () => {
-              fallen[i] = true;
-              const link = i + 1 < COUNT && C.step && !broken.has(i);
-              if (link) { i++; timers.push(setTimeout(tick, 150)); }
-              else {
-                const n = C.n0 + i;
-                if (i === COUNT - 1) msg = `All ${COUNT} fell, and the row never ends: the base case starts the chain and the step passes it on forever. So P(n) holds for every n ≥ ${C.n0}.`;
-                else if (!C.step) msg = `Only the first domino fell. P(1) to P(12) all check out (✓), but nothing links P(k) to P(k + 1), so induction proves nothing past n = 1. And indeed P(40) is false.`;
-                else msg = `The chain stopped at n = ${n} because you broke the link P(${n}) → P(${n + 1}). The step must hold for every k, or nothing past the break is proved.`;
-              }
-              draw();
-            };
-            tick();
+            next = 0;
+            if (fall()) player.start();   // the first domino falls at once; the rest follow every 150 ms
           }
+          function flip(i) { if (broken.has(i)) broken.delete(i); else broken.add(i); refocus = i; stand(); }
           function draw() {
             const C = CLAIMS[ci];
             [...tabs.children].forEach((b, i) => b.setAttribute('aria-pressed', String(i === ci)));
@@ -846,6 +785,7 @@
             baseBtn.textContent = skipBase ? 'Restore the base case' : 'Skip the base case';
             baseBtn.classList.toggle('on', skipBase);
             const kids = [s('line', { x1: 10, y1: 90, x2: 630, y2: 90, stroke: 'var(--ink-3)', 'stroke-width': 2 })];
+            const gaps = [];
             for (let i = 0; i < COUNT; i++) {
               const x = 26 + i * 50;
               const n = C.n0 + i;
@@ -857,10 +797,19 @@
                 const gx = x + 14, bad = broken.has(i) || !C.step;
                 kids.push(s('line', { x1: gx + 6, y1: 60, x2: gx + 30, y2: 60, stroke: bad ? 'var(--false)' : 'var(--ink-3)', 'stroke-width': 2, 'stroke-dasharray': bad ? '3 3' : 'none' }));
                 if (bad) kids.push(s('text', { x: gx + 18, y: 54, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: 'var(--false)', text: '✗' }));
-                kids.push(s('rect', { class: 'gap', x: gx, y: 24, width: 36, height: 70, fill: 'none', 'pointer-events': 'all', onclick: () => { if (broken.has(i)) broken.delete(i); else broken.add(i); stand(); } }, s('title', { text: `link P(${n}) → P(${n + 1})` })));
+                // the gap is a toggle button: pressed means the link is broken
+                const gap = s('rect', {
+                  class: 'gap', x: gx, y: 24, width: 36, height: 70, fill: 'none', 'pointer-events': 'all',
+                  tabindex: 0, role: 'button', 'aria-pressed': String(broken.has(i)), 'aria-label': `Break the link P(${n}) → P(${n + 1})`,
+                  onclick: () => flip(i),
+                  onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(i); } },
+                }, s('title', { text: `link P(${n}) → P(${n + 1})${broken.has(i) ? ' (broken)' : ''}` }));
+                gaps[i] = gap;
+                kids.push(gap);
               }
             }
             ctx.rc(svg, kids);
+            if (refocus !== null) { if (gaps[refocus]) gaps[refocus].focus(); refocus = null; }
             msgEl.textContent = msg || (C.step ? 'Ready. Press "Push the first domino".' : 'Ready. This claim has no valid inductive step: every link is broken.');
             msgEl.className = 'feedback ' + (!msg ? 'info' : fallen.every(Boolean) ? 'good' : 'bad');
             ctx.rc(baseCard,
@@ -1083,7 +1032,7 @@
       {
         title: 'Practice: proofs',
         kind: 'practice',
-        html: String.raw`<p class="muted small">Name rules of inference, set up proofs, practise the inductive step, and hunt for counterexamples. Each problem has a worked solution.</p>`,
+        html: String.raw`<p class="muted small">Name rules of inference, set up proofs, practice the inductive step in both ordinary and strong induction, and hunt for counterexamples. Each problem has a worked solution.</p>`,
         gens: [
           {
             label: 'Name the rule',
@@ -1132,6 +1081,78 @@
             },
           },
           {
+            label: 'Strong induction',
+            make(R, M) {
+              const kind = R.int(0, 3);
+              if (kind <= 1) {
+                // stamps worth a¢ and b¢ with gcd 1: every amount from (a − 1)(b − 1) on can be paid, the step
+                // adds one a¢ stamp, so it reaches back a cents and needs a consecutive base cases
+                const [a, b] = R.pick([[3, 5], [3, 7], [3, 8], [4, 5], [4, 7], [5, 6], [5, 7], [5, 8]]);
+                const N = (a - 1) * (b - 1);
+                const pay = (n) => { for (let j = 0; j * b <= n; j++) if ((n - j * b) % a === 0) return [...new Array((n - j * b) / a).fill(a), ...new Array(j).fill(b)]; return [n]; };
+                const bases = M.range(N, N + a - 1).map((n) => `${n} = ${pay(n).join(' + ')}`).join(', ');
+                const setup = String.raw`Stamps come in ${a}¢ and ${b}¢. Claim: every amount of ${N}¢ or more can be paid exactly. The strong-induction step pays \(k + 1\) cents by paying \(k + 1 - ${a}\) cents and adding one ${a}¢ stamp.`;
+                if (kind === 0) {
+                  const k1 = N + a + R.int(0, 3 * a);
+                  return {
+                    prompt: String.raw`${setup} Which earlier amount does the step for \(k + 1 = ${k1}\) rely on?`,
+                    answer: k1 - a,
+                    hint: `the step removes one ${a}¢ stamp from the amount it is building.`,
+                    solution: String.raw`The step uses \(P(${k1} - ${a}) = P(${k1 - a})\): once ${k1 - a}¢ can be paid, one more ${a}¢ stamp pays ${k1}¢. Strong induction may assume every case from ${N} up to \(k\), so reaching back ${a} is allowed because \(${k1 - a} \ge ${N}\). Base cases: ${bases}.`,
+                  };
+                }
+                return {
+                  prompt: String.raw`${setup} How many base cases must be checked by hand before the step can take over?`,
+                  answer: a,
+                  hint: 'the step reaches back a fixed distance; every amount within that distance of the start must be checked directly.',
+                  solution: String.raw`The step reaches back ${a} cents, so it can only be used once \(k + 1 - ${a} \ge ${N}\), that is, from \(k + 1 = ${N + a}\) on. The amounts ${N} through ${N + a - 1}, which is ${a} of them, must be paid by hand: ${bases}. Every larger amount then follows by adding ${a}¢ stamps.`,
+                };
+              }
+              if (kind === 2) {
+                // the product-of-primes proof: k + 1 = ab splits into two earlier cases, neither of them k
+                const m = R.pick(M.range(12, 99).filter((n) => !M.isPrime(n)));
+                let a = 2;
+                while (m % a) a++;
+                const b = m / a;
+                const nums = (inp) => String(inp).replace(/[{}()[\]]/g, ' ').split(/[,\s]+/).filter(Boolean).map(Number);
+                return {
+                  prompt: String.raw`In the strong-induction proof that every integer \(n \ge 2\) is a product of primes, the step for \(k + 1 = ${m}\) writes it as a product of two smaller integers and applies the hypothesis to both. Which earlier cases does the step use? Give the two factors as a set, such as <code>{4, 6}</code>.`,
+                  answer: a === b ? [a] : [a, b],
+                  format: 'set',
+                  check: (inp) => { const xs = nums(inp); const [x, y] = xs.length === 1 ? [xs[0], xs[0]] : xs; return xs.length >= 1 && xs.length <= 2 && [x, y].every((v) => Number.isInteger(v) && v >= 2 && v < m) && x * y === m; },
+                  hint: `find any two integers, both at least 2, whose product is ${m}.`,
+                  solution: String.raw`\(${m} = ${a} \times ${b}\), so the step uses \(P(${a})\) and \(P(${b})\)${a === b ? ' (the same earlier case twice)' : ''}. Ordinary induction would only offer \(P(${m - 1})\), which says nothing about ${a} or ${b}; strong induction may assume every case from 2 up to \(k = ${m - 1}\). Any other factorization of ${m} into two factors works just as well.`,
+                };
+              }
+              // a recurrence that reaches back more than one step needs that many base cases
+              const RECS = [
+                { tex: 'a_n = a_{n-1} + a_{n-2}', lags: [1, 2] }, { tex: 'a_n = a_{n-1} + 2a_{n-2}', lags: [1, 2] },
+                { tex: 'a_n = a_{n-2} + a_{n-3}', lags: [2, 3] }, { tex: 'a_n = 2a_{n-1} - a_{n-3}', lags: [1, 3] }, { tex: 'a_n = a_{n-1} + a_{n-2} + a_{n-3}', lags: [1, 2, 3] },
+              ];
+              const rec = R.pick(RECS);
+              const depth = Math.max(...rec.lags);
+              const given = depth === 2 ? 'a_0, a_1' : 'a_0, a_1, a_2';
+              if (R.chance(0.5)) {
+                const k1 = depth + R.int(2, 12);
+                const used = rec.lags.map((l) => k1 - l);
+                const rhs = rec.tex.split('=')[1].trim().replace(/n-(\d)/g, (_, d) => String(k1 - d));
+                return {
+                  prompt: String.raw`A sequence is defined by \(${rec.tex}\) for \(n \ge ${depth}\), with \(${given}\) given. To prove a property of \(a_n\) for every \(n\) by strong induction, which earlier cases does the step for \(n = ${k1}\) rely on? Answer as a set of indices.`,
+                  answer: used,
+                  format: 'set',
+                  hint: `read the subscripts on the right-hand side with n = ${k1}.`,
+                  solution: String.raw`With \(n = ${k1}\) the recurrence reads \(a_{${k1}} = ${rhs}\), so the step uses ${used.map((u) => String.raw`\(P(${u})\)`).join(' and ')}. Ordinary induction offers only \(P(${k1 - 1})\); strong induction lets the step reach back to every case already proved.`,
+                };
+              }
+              return {
+                prompt: String.raw`A sequence is defined by \(${rec.tex}\) for \(n \ge ${depth}\). A proof by strong induction that every \(a_n\) has some property follows the recurrence in its step. How many base cases must be checked directly?`,
+                answer: depth,
+                hint: 'the step can only be used once every index it reaches back to has already been proved.',
+                solution: String.raw`The step for \(n\) uses \(${rec.lags.map((l) => `a_{n-${l}}`).join(', ')}\), reaching back ${depth}. For \(n = ${depth}\) that reaches \(a_0\); for any smaller \(n\) it would reach a negative index. So \(${given}\), that is ${depth} base cases, must be checked by hand, exactly the values the definition had to supply.`,
+              };
+            },
+          },
+          {
             label: 'Find the counterexample',
             make(R) {
               const B = R.pick(BREAKABLE);
@@ -1153,16 +1174,16 @@
         title: 'Check yourself: proofs',
         kind: 'quiz',
         questions: [
-          { q: String.raw`From "If the server is down, an alert is sent" and "No alert was sent", you conclude "The server is not down". Which rule is this?`, choices: ['Modus ponens', 'Modus tollens', 'Disjunctive syllogism', 'Affirming the consequent'], answer: 1, explain: String.raw`The form is \(p \to q\), \(\neg q\), therefore \(\neg p\): modus tollens. It is valid because a conditional is equivalent to its contrapositive \(\neg q \to \neg p\).` },
-          { q: '"If it rained, the street is wet. The street is wet. Therefore it rained." What is wrong with this argument?', choices: ['Nothing, it is modus ponens', 'It affirms the consequent', 'It denies the antecedent', 'Its premises contradict each other'], answer: 1, explain: String.raw`The form \(p \to q\), \(q\), therefore \(p\) is the fallacy of affirming the consequent. A street cleaner could have wet the street: premises true, conclusion false.` },
-          { q: String.raw`To prove "if \(n^2\) is odd, then \(n\) is odd" by contrapositive, what do you assume?`, choices: [String.raw`\(n^2\) is odd`, String.raw`\(n\) is even`, String.raw`\(n^2\) is even`, String.raw`\(n^2\) is odd and \(n\) is even`], answer: 1, explain: String.raw`The contrapositive is "if \(n\) is even, then \(n^2\) is even", so you assume \(n\) is even and derive that \(n^2\) is even. Choice D is how a proof by contradiction would start.` },
+          { q: String.raw`From "If the server is down, an alert is sent" and "No alert was sent", you conclude "The server is not down". Which rule is this?`, choices: ['Modus ponens', 'Disjunctive syllogism', 'Affirming the consequent', 'Modus tollens'], answer: 3, explain: String.raw`The form is \(p \to q\), \(\neg q\), therefore \(\neg p\): modus tollens. It is valid because a conditional is equivalent to its contrapositive \(\neg q \to \neg p\).` },
+          { q: '"If it rained, the street is wet. The street is wet. Therefore it rained." What is wrong with this argument?', choices: ['It affirms the consequent', 'Nothing, it is modus ponens', 'It denies the antecedent', 'Its premises contradict each other'], answer: 0, explain: String.raw`The form \(p \to q\), \(q\), therefore \(p\) is the fallacy of affirming the consequent. A street cleaner could have wet the street: premises true, conclusion false.` },
+          { q: String.raw`To prove "if \(n^2\) is odd, then \(n\) is odd" by contrapositive, what do you assume?`, choices: [String.raw`\(n^2\) is odd`, String.raw`\(n\) is even`, String.raw`\(n^2\) is even`, String.raw`\(n^2\) is odd and \(n\) is even`], answer: 1, explain: String.raw`The contrapositive is "if \(n\) is even, then \(n^2\) is even", so you assume \(n\) is even and derive that \(n^2\) is even. Assuming that \(n^2\) is odd and \(n\) is even is how a proof by contradiction would start.` },
           { q: String.raw`A proof that \(\sqrt2\) is irrational begins "Suppose \(\sqrt2 = a/b\) in lowest terms." What kind of proof is it?`, choices: ['Direct proof', 'Proof by cases', 'Proof by contradiction', 'Mathematical induction'], answer: 2, explain: 'It assumes the opposite of the claim (that √2 is rational) and derives that a and b are both even, which contradicts "lowest terms". The assumption must be false.' },
           { q: String.raw`\(n^2 + n + 41\) is prime for \(n = 0, 1, \dots, 39\). What can you conclude about all \(n \ge 0\)?`, choices: ['It is prime for all n, by the pattern', 'It is prime for all n, by induction', 'Nothing yet; and in fact n = 40 gives 41²', 'It is never prime after 39'], answer: 2, explain: 'Examples never prove a universal claim. n = 40 gives 1681 = 41 × 41, a counterexample. (It is also not "never prime" afterward: n = 42 gives 1847, which is prime.)' },
-          { q: 'In a proof by induction, what does the inductive step establish?', choices: ['P(k) is true for every k', 'P(k) → P(k + 1) for every k ≥ n₀', 'P(n₀) is true', 'P(k + 1) → P(k) for every k'], answer: 1, explain: 'The inductive step proves the implication P(k) → P(k + 1) for an arbitrary k. Combined with the base case P(n₀), it topples every domino. Assuming P(k) for every k would be circular.' },
+          { q: 'In a proof by induction, what does the inductive step establish?', choices: ['P(n₀) is true', 'P(k) is true for every k', 'P(k + 1) → P(k) for every k', 'P(k) → P(k + 1) for every k ≥ n₀'], answer: 3, explain: 'The inductive step proves the implication P(k) → P(k + 1) for an arbitrary k. Combined with the base case P(n₀), it topples every domino. Assuming P(k) for every k would be circular.' },
           { q: 'How does strong induction differ from ordinary induction?', choices: ['It needs no base case', 'Its inductive step may assume P(n₀), …, P(k) all together', 'It works only for prime numbers', 'It proves P(k + 1) → P(k)'], answer: 1, explain: 'Strong induction lets you use any earlier case. That is what the prime-factorization proof needs, because k + 1 = ab splits into factors a and b that are smaller than k but not equal to k.' },
           { q: 'Using only 4¢ and 5¢ stamps, what is the largest amount that cannot be paid?', choices: ['7¢', '11¢', '12¢', '15¢'], answer: 1, explain: '11 cannot be written with 4s and 5s, while 12, 13, 14 and 15 can. From those four base cases, strong induction (add a 4¢ stamp to n − 4) covers every amount from 12 up.' },
           { q: 'In a loop-invariant proof, which check plays the role of the base case?', choices: ['Termination', 'Maintenance', 'Initialization', 'The loop condition'], answer: 2, explain: 'Initialization shows the invariant holds before the first iteration, like P(n₀). Maintenance is the inductive step, and termination combines the invariant with the exit condition to get the final result.' },
-          { q: String.raw`In Euclid's proof, \(N = p_1 p_2 \cdots p_k + 1\). Must \(N\) itself be prime?`, choices: ['Yes, always', 'No: 2·3·5·7·11·13 + 1 = 30031 = 59 × 509', 'Only when k is even', 'Only when k is odd'], answer: 1, explain: 'The proof only needs N to have some prime factor, and that factor cannot be on the list. N itself can be composite, as 30031 = 59 × 509 shows. Believing that N must be prime is a common misreading of the proof.' },
+          { q: String.raw`In Euclid's proof, \(N = p_1 p_2 \cdots p_k + 1\). Must \(N\) itself be prime?`, choices: ['No: 2·3·5·7·11·13 + 1 = 30031 = 59 × 509', 'Yes, always', 'Only when k is even', 'Only when k is odd'], answer: 0, explain: 'The proof only needs N to have some prime factor, and that factor cannot be on the list. N itself can be composite, as 30031 = 59 × 509 shows. Believing that N must be prime is a common misreading of the proof.' },
         ],
       },
     ],

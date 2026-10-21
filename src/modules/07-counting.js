@@ -3,10 +3,7 @@
    repetition (multisets, stars and bars), Pascal's triangle, the Binomial Theorem, pigeonhole. */
 (() => {
   // ---- counting helpers shared by the labs and the practice generators ----
-  const fact = (n) => { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };
-  const C = (n, k) => { if (k < 0 || k > n) return 0; k = Math.min(k, n - k); let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return Math.round(r); };
-  const P = (n, k) => { if (k < 0 || k > n) return 0; let r = 1; for (let i = 0; i < k; i++) r *= n - i; return r; };
-  const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
+  const { fact, C, P, gcd } = globalThis.DMUtil.M; // the same helpers the practice generators receive as M
   const lcm = (a, b) => (a / gcd(a, b)) * b;
   const fmt = (x) => Number(x).toLocaleString('en-US');
   const tfmt = (x) => fmt(x).replace(/,/g, '{,}'); // thousands separators inside TeX
@@ -308,7 +305,7 @@
             }[k2];
             gen.innerHTML = '';
             if (!impossible) {
-              const firsts = (order ? (rep ? product(n, r) : perms(n, r)) : rep ? multisets(n, r) : combos(n, r)).slice(0, 5).map((ix) => ix.map((i) => LET[i]).join(''));
+              const firsts = items.slice(0, 5).map(label);
               gen.append(h('div.tiny.mono.muted', 'HOW A PROGRAM GENERATES THIS LIST'), h('p', { style: { margin: '0.2rem 0' } }, rule), h('div.mono', { style: { color: 'var(--accent)' } }, firsts.join(' → ') + ' → …'));
             }
             const grouped = !order && !rep && r <= 3 && r > 1;
@@ -899,7 +896,7 @@
         questions: [
           { q: 'How many 4-digit PINs are possible if each digit is 0 to 9 and digits may repeat?', choices: ['10,000', '5,040', '210', '40'], answer: 0, explain: String.raw`Four positions with 10 choices each: \(10^4 = 10{,}000\) by the product rule. 5,040 would be the count without repeats, \(P(10, 4)\).` },
           { q: 'In how many ways can 8 runners take gold, silver and bronze?', choices: ['56', '336', '512', '24'], answer: 1, explain: String.raw`Order matters and nobody wins twice: \(P(8, 3) = 8 \cdot 7 \cdot 6 = 336\). 56 is \(C(8, 3)\), which ignores who got which medal.` },
-          { q: 'How many 5-card hands can be dealt from a 52-card deck?', choices: ['2,598,960', '311,875,200', '380,204,032', '260'], answer: 0, explain: String.raw`A hand is unordered: \(C(52, 5) = 311{,}875{,}200 / 5! = 2{,}598{,}960\). The second choice counts ordered deals; the third allows the same card twice.` },
+          { q: 'How many 5-card hands can be dealt from a 52-card deck?', choices: ['2,598,960', '311,875,200', '380,204,032', '260'], answer: 0, explain: String.raw`A hand is unordered: \(C(52, 5) = 311{,}875{,}200 / 5! = 2{,}598{,}960\). The count 311,875,200 is \(P(52, 5)\), which treats the same five cards dealt in a different order as a different hand; 380,204,032 is \(52^5\), which allows the same card to be dealt twice.` },
           { q: 'How many different arrangements do the letters of BANANA have?', choices: ['720', '60', '120', '36'], answer: 1, explain: String.raw`Six letters with A three times and N twice: \(6!/(3!\,2!) = 720/12 = 60\).` },
           { q: 'In how many ways can you buy 6 donuts from 4 flavors (order does not matter, flavors may repeat)?', choices: ['84', '4,096', '15', '360'], answer: 0, explain: String.raw`Stars and bars: 6 stars and 3 bars, so \(C(9, 3) = 84\). 4,096 is \(4^6\), which counts ordered sequences.` },
           { q: String.raw`Which binomial coefficient equals \(\binom{9}{3} + \binom{9}{4}\)?`, choices: [String.raw`\(\binom{10}{4}\)`, String.raw`\(\binom{9}{7}\)`, String.raw`\(\binom{18}{7}\)`, String.raw`\(\binom{10}{7}\)`], answer: 0, explain: String.raw`Pascal's identity with \(n = 9\), \(k = 4\): \(\binom{9}{3} + \binom{9}{4} = \binom{10}{4} = 84 + 126 = 210\).` },

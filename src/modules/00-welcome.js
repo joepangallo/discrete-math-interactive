@@ -9,6 +9,14 @@ DM.module({
     'bit': 'A binary digit: a single 0 or 1. Eight bits make a byte.',
   },
   symbols: [],
+  css: `
+    .map svg.wm-wide .node text { font-size: 14px; }
+    .map svg.wm-wide .node .k { font-size: 11px; }
+    .map svg.wm-tall .node text { font-size: 12px; }
+    .map svg.wm-tall .node .k { font-size: 9.5px; }
+    .map svg.wm-tall { display: none; }
+    @media (max-width: 760px) { .map svg.wm-wide { display: none; } .map svg.wm-tall { display: block; } }
+  `,
   slides: [
     {
       title: 'Computers count. They never measure.',
@@ -79,63 +87,97 @@ DM.module({
     {
       title: 'Course map: how the ideas build on each other',
       kind: 'lab',
-      html: String.raw`<p class="muted small">This map is itself a <b>directed graph</b> (Module 9). An arrow from one module to another means the first supplies ideas the second uses. Hover a module to light up its prerequisites; click it to jump there. A green outline means you have opened every slide in that module.</p>`,
+      html: String.raw`<p class="muted small">This map is itself a <b>directed graph</b> (Module 9). An arrow from one module to another means the first supplies ideas the second uses. Hover or focus a module to light up its prerequisites; click it, or press Enter, to jump there. A green outline means you have opened every slide in that module.</p>`,
       render(body, ctx) {
         const { h, s } = ctx;
+        // [level in the prerequisite order, vertical slot within that level]
         const layout = {
           sets: [0, 1.5], logic: [1, 0.4], relations: [1, 1.6], counting: [1, 2.8],
           proofs: [2, 0], boolean: [2, 0.95], graphs: [2, 1.95], probability: [2, 3],
           algorithms: [3, 0.55], trees: [3, 1.75], networks: [3, 2.7],
           numbers: [4, 0.35], recurrences: [4, 1.45], design: [5, 1.5],
         };
-        const short = { relations: 'Functions & Relations', numbers: 'Integers & Numbers', counting: 'Counting & Binomial', boolean: 'Boolean & Circuits', recurrences: 'Recurrences', proofs: 'Proof Techniques', networks: 'Network Flows' };
         const edges = [['sets', 'logic'], ['sets', 'relations'], ['sets', 'counting'], ['logic', 'proofs'], ['logic', 'boolean'], ['relations', 'graphs'], ['counting', 'probability'],
           ['proofs', 'algorithms'], ['relations', 'algorithms'], ['graphs', 'trees'], ['graphs', 'networks'], ['algorithms', 'numbers'], ['proofs', 'numbers'], ['algorithms', 'recurrences'], ['counting', 'recurrences'],
           ['numbers', 'design'], ['recurrences', 'design'], ['trees', 'design'], ['networks', 'design'], ['boolean', 'design'], ['probability', 'design']];
+        // short labels that fit the boxes; the full title is in the tooltip and the accessible name
+        const SHORT = {
+          wide: { relations: 'Relations', numbers: 'Number Theory', counting: 'Counting', boolean: 'Boolean Algebra', recurrences: 'Recurrences', proofs: 'Proof Techniques', networks: 'Network Flows' },
+          tall: { relations: 'Relations', numbers: 'Numbers', counting: 'Counting', boolean: 'Boolean', recurrences: 'Recurrences', proofs: 'Proofs', networks: 'Networks' },
+        };
         const mods = Object.fromEntries(DM.modules.map((m) => [m.id, m]));
-        const W = 1140, H = 400, bw = 150, bh = 50;
-        const pos = (id) => [12 + layout[id][0] * ((W - bw - 24) / 5), 16 + layout[id][1] * ((H - bh - 32) / 3)];
-        const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Course map of modules and their prerequisites' });
-        const edgeEls = [];
-        for (const [a, b] of edges) {
-          if (!mods[a] || !mods[b]) continue;
-          const [x1, y1] = pos(a), [x2, y2] = pos(b);
-          const sx = x1 + bw, sy = y1 + bh / 2, ex = x2, ey = y2 + bh / 2, mx = (sx + ex) / 2;
-          const p = s('path', { class: 'edge' + (b === 'design' ? ' cap' : ''), d: `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex - 6},${ey}`, 'marker-end': 'url(#arr)' });
-          p.dataset.to = b; p.dataset.from = a;
-          edgeEls.push(p);
-          svg.append(p);
-        }
-        svg.prepend(s('defs', {}, s('marker', { id: 'arr', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,0 L10,5 L0,10 z', fill: 'var(--ink-3)' }))));
-        const visited = new Set(ctx.store.get('visited', []));
-        for (const id of Object.keys(layout)) {
-          const m = mods[id];
-          if (!m) continue;
-          const [x, y] = pos(id);
-          const done = m.slides.every((_, j) => visited.has(`${m.id}-${j + 1}`));
-          const label = short[id] || m.title;
-          const g = s('g', { class: 'node' + (done ? ' done' : ''), tabindex: 0, role: 'link', 'aria-label': `Module ${m.num}: ${m.title}` },
-            s('rect', { x, y, width: bw, height: bh, rx: 8 }),
-            s('text', { class: 'k', x: x + 10, y: y + 17, text: m.num >= 14 ? 'CAPSTONE' : `MODULE ${m.num}` }),
-            s('text', { x: x + 10, y: y + 37, text: label }));
-          const lite = (on) => edgeEls.forEach((e) => e.classList.toggle('lit', on && e.dataset.to === id));
-          g.addEventListener('pointerenter', () => lite(true));
-          g.addEventListener('pointerleave', () => lite(false));
-          g.addEventListener('focus', () => lite(true));
-          g.addEventListener('blur', () => lite(false));
-          g.addEventListener('click', () => ctx.go(id));
-          g.addEventListener('keydown', (e) => { if (e.key === 'Enter') ctx.go(id); });
-          svg.append(g);
-        }
-        body.append(h('div.figure.fill.map', svg));
-        ctx.onShow(() => {
-          const v = new Set(ctx.store.get('visited', []));
-          svg.querySelectorAll('.node').forEach((g, i) => {
-            const id = Object.keys(layout).filter((k) => mods[k])[i];
+        const ids = Object.keys(layout).filter((id) => mods[id]);
+        const levels = Math.max(...ids.map((id) => layout[id][0])) + 1;
+        const svgs = [];
+        /* The same graph is drawn twice: levels run left to right on a wide screen and top to bottom on
+           a phone, where the 1140-unit-wide picture would shrink every label to a few pixels. The module
+           CSS shows whichever one fits the viewport. */
+        function build(tall) {
+          const W = tall ? 400 : 1140, H = tall ? 600 : 400;
+          const pos = {}, size = {};
+          if (tall) {
+            const bh = 46, gap = 8, margin = 8;
+            for (let lv = 0; lv < levels; lv++) {
+              const row = ids.filter((id) => layout[id][0] === lv).sort((a, b) => layout[a][1] - layout[b][1]);
+              const n = row.length;
+              const bw = Math.min(124, Math.floor((W - 2 * margin - gap * (n - 1)) / n));
+              const x0 = (W - (n * bw + (n - 1) * gap)) / 2;   // the row is centered
+              row.forEach((id, i) => { pos[id] = [x0 + i * (bw + gap), 12 + lv * ((H - bh - 24) / Math.max(1, levels - 1))]; size[id] = [bw, bh]; });
+            }
+          } else {
+            const bw = 150, bh = 50;
+            // Math.max(1, …): a build with a single level (welcome plus one module) must not divide by zero
+            for (const id of ids) { pos[id] = [12 + layout[id][0] * ((W - bw - 24) / Math.max(1, levels - 1)), 16 + layout[id][1] * ((H - bh - 32) / 3)]; size[id] = [bw, bh]; }
+          }
+          const marker = tall ? 'wm-arr-tall' : 'wm-arr-wide';
+          const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: tall ? 'wm-tall' : 'wm-wide', role: 'group', 'aria-label': 'Course map: every module, with an arrow from each prerequisite to the module that uses it' });
+          svg.append(s('defs', {}, s('marker', { id: marker, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0,0 L10,5 L0,10 z', fill: 'var(--ink-3)' }))));
+          const edgeEls = [];
+          for (const [a, b] of edges) {
+            if (!mods[a] || !mods[b]) continue;
+            const [x1, y1] = pos[a], [x2, y2] = pos[b], [w1, h1] = size[a], [w2, h2] = size[b];
+            let d;
+            if (tall) { const sx = x1 + w1 / 2, sy = y1 + h1, ex = x2 + w2 / 2, ey = y2, my = (sy + ey) / 2; d = `M${sx},${sy} C${sx},${my} ${ex},${my} ${ex},${ey - 6}`; }
+            else { const sx = x1 + w1, sy = y1 + h1 / 2, ex = x2, ey = y2 + h2 / 2, mx = (sx + ex) / 2; d = `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex - 6},${ey}`; }
+            const p = s('path', { class: 'edge' + (b === 'design' ? ' cap' : ''), d, 'marker-end': `url(#${marker})` });
+            p.dataset.to = b; p.dataset.from = a;
+            edgeEls.push(p);
+            svg.append(p);
+          }
+          for (const id of ids) {
             const m = mods[id];
-            g.classList.toggle('done', m.slides.every((_, j) => v.has(`${m.id}-${j + 1}`)));
-          });
-        });
+            const [x, y] = pos[id], [bw, bh] = size[id];
+            const label = SHORT[tall ? 'tall' : 'wide'][id] || m.title;
+            const g = s('g', { class: 'node', tabindex: 0, role: 'link', 'aria-label': `Module ${m.num}: ${m.title}` },
+              s('title', { text: `Module ${m.num}: ${m.title}` }),
+              s('rect', { x, y, width: bw, height: bh, rx: 8 }),
+              s('text', { class: 'k', x: x + 8, y: y + (tall ? 16 : 18), text: m.num >= 14 ? 'CAPSTONE' : `MODULE ${m.num}` }),
+              s('text', { x: x + 8, y: y + (tall ? 35 : 38), text: label }));
+            g.dataset.id = id;
+            const lite = (on) => edgeEls.forEach((e) => e.classList.toggle('lit', on && e.dataset.to === id));
+            g.addEventListener('pointerenter', () => lite(true));
+            g.addEventListener('pointerleave', () => lite(false));
+            g.addEventListener('focus', () => lite(true));
+            g.addEventListener('blur', () => lite(false));
+            g.addEventListener('click', () => ctx.go(id));
+            g.addEventListener('keydown', (e) => { if (e.key === 'Enter') ctx.go(id); });
+            svg.append(g);
+          }
+          svgs.push(svg);
+          return svg;
+        }
+        body.append(h('div.figure.fill.map', build(false), build(true)));
+        const mark = () => {
+          const v = new Set(ctx.store.get('visited', []));
+          for (const svg of svgs) {
+            svg.querySelectorAll('.node').forEach((g) => {
+              const m = mods[g.dataset.id];
+              g.classList.toggle('done', m.slides.every((sl, j) => v.has(DM.keyOf(m.id, j))));
+            });
+          }
+        };
+        mark();
+        ctx.onShow(mark);
       },
     },
     {

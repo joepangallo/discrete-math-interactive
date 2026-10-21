@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Also run the full browser suite with live Python on every slide (slow)"
+        type: boolean
+        default: false
+
+# The workflow only reads the repository; it never needs to write or to use secrets.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Actions are pinned to reviewed commits (the v4 / v5 tags as of 2026-10-21) so a moved tag cannot change what runs.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Unit, content and build-parity tests
+        run: npm test
+      - name: Install Playwright
+        run: |
+          pip install -r requirements.txt
+          python3 -m playwright install --with-deps chromium
+      - name: Browser checks (layout, generators, math regressions)
+        run: npm run e2e:quick
+      - name: Python runner robustness on both engines (downloads Pyodide and Brython from their CDNs)
+        run: npm run e2e:runner
+      - name: Full browser suite with live Python and Trace mode
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
+        run: python3 tests/e2e/verify.py discrete-math-interactive.html --python --trace --dark
+      - name: Upload the built page
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: course-page
+          path: |
+            discrete-math-interactive.html
+            index.html

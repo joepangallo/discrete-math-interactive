@@ -1,9 +1,9 @@
 /* Module 4: Functions, Sequences & Relations. Objective 4: describe the use of functions, sequences and
    relations in computer science and engineering. */
 (() => {
+  const { M } = DMUtil; // shared number helpers (range, fact, fmtSet, …), the same object practice generators receive
   const LET = ['a', 'b', 'c', 'd', 'e'];
-  const range = (n) => [...Array(n).keys()];
-  const fmt = (arr) => (arr.length ? '{' + arr.join(', ') + '}' : '∅');
+  const range = (n) => M.range(0, n - 1); // the indices 0 … n−1; M.range itself is inclusive on both ends
   const texSet = (arr) => (arr.length ? '\\{' + arr.join(', ') + '\\}' : '\\varnothing');
   const CLASS_COLORS = ['var(--fnc)', 'var(--num)', 'var(--kw)', 'var(--str)', 'var(--accent)', 'var(--warn)'];
   const STROKE = { base: 'var(--ink-3)', acc: 'var(--accent)', bad: 'var(--false)', good: 'var(--true)', inv: 'var(--fnc)' };
@@ -205,7 +205,9 @@
     if (Math.abs(x) >= 1e15 || (x !== 0 && Math.abs(x) < 1e-4)) return x.toExponential(4).replace('e+', '×10^').replace('e-', '×10^-');
     return String(parseFloat(x.toFixed(6)));
   };
-  const fact = (n) => { let r = 1; for (let k = 2; k <= n; k++) r *= k; return r; };
+  // ±∞ and NaN only arise when a custom term overflows double precision (i^i^i does by i = 5)
+  const plainNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? 'undefined' : x > 0 ? '∞' : '−∞');
+  const texNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? '\\text{undefined}' : x > 0 ? '\\infty' : '-\\infty');
 
   DM.module({
     id: 'relations',
@@ -561,7 +563,7 @@
             { f: '1/2^i', m: 0, n: 10, cf: (m, n) => ({ sym: '2^{1-m} - 2^{-n}', val: 2 ** (1 - m) - 2 ** -n }) },
           ];
           const PRODS = [
-            { f: 'i', m: 1, n: 8, cf: (m, n) => (m >= 1 ? { sym: '\\frac{n!}{(m-1)!}', val: fact(n) / fact(m - 1) } : null) },
+            { f: 'i', m: 1, n: 8, cf: (m, n) => (m >= 1 ? { sym: '\\frac{n!}{(m-1)!}', val: M.fact(n) / M.fact(m - 1) } : null) },
             { f: '2', m: 1, n: 10, cf: (m, n) => ({ sym: '2^{\\,n-m+1}', val: 2 ** (n - m + 1) }) },
             { f: '1 + 1/i', m: 1, n: 10, cf: (m, n) => (m >= 1 ? { sym: '\\frac{n+1}{m}', val: (n + 1) / m } : null) },
             { f: '2i - 1', m: 1, n: 7, cf: null },
@@ -612,15 +614,19 @@
             const sym = isSum ? '\\sum' : '\\prod';
             const a = texF(tree);
             const head = `${sym}_{i=${m}}^{${n}} ${tree.op && PREC[tree.op] <= (isSum ? 1 : 2) ? `\\left(${a}\\right)` : a}`;
-            const show = (v) => (v < 0 ? `(${num(v)})` : num(v));
+            const show = (v) => (v < 0 ? `(${texNum(v)})` : texNum(v));
             const vals = terms.map((t) => show(t.v));
             const joiner = isSum ? ' + ' : ' \\cdot ';
             const expanded = !terms.length ? (isSum ? '0' : '1') : vals.length <= 8 ? vals.join(joiner) : vals.slice(0, 4).join(joiner) + joiner + '\\cdots' + joiner + vals.slice(-2).join(joiner);
-            // chart of running totals
+            // chart of running totals; a custom term such as i^i^i overflows double precision, and a bar
+            // with an infinite end would have NaN coordinates, so those bars are skipped and marked ∞
+            const finite = (r) => Number.isFinite(r.prev) && Number.isFinite(r.tot);
+            const drawn = run.filter(finite);
+            const overflow = run.length - drawn.length;
             const W = 560, H = 300, pl = 54, pr = 10, pt = 14, pb = 30;
             const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Bar chart of the running totals' });
-            if (run.length) {
-              const all = run.flatMap((r) => [r.prev, r.tot]);
+            if (drawn.length) {
+              const all = drawn.flatMap((r) => [r.prev, r.tot]);
               const useLog = !isSum && all.every((v) => v > 0) && Math.max(...all) / Math.min(...all) > 1000;
               const tf = useLog ? Math.log10 : (v) => v;
               const lo = useLog ? Math.min(...all.map(tf)) - 0.3 : Math.min(0, ...all), hi = useLog ? Math.max(...all.map(tf)) + 0.1 : Math.max(0, ...all);
@@ -637,15 +643,21 @@
               run.forEach((r, k) => {
                 const x = pl + k * bw + bw * 0.14, w = bw * 0.72;
                 const g = s('g');
-                const yPrev = Y(r.prev), yTot = Y(r.tot);
-                g.append(s('rect', { x, width: w, y: Math.min(base, yPrev), height: Math.abs(base - yPrev), fill: 'var(--accent-2)', stroke: 'none' }));
-                const down = r.tot < r.prev;
-                g.append(s('rect', { x, width: w, y: Math.min(yPrev, yTot), height: Math.max(1.5, Math.abs(yPrev - yTot)), fill: down ? 'var(--false)' : 'var(--accent)', stroke: 'none' }));
+                if (finite(r)) {
+                  const yPrev = Y(r.prev), yTot = Y(r.tot);
+                  g.append(s('rect', { x, width: w, y: Math.min(base, yPrev), height: Math.abs(base - yPrev), fill: 'var(--accent-2)', stroke: 'none' }));
+                  const down = r.tot < r.prev;
+                  g.append(s('rect', { x, width: w, y: Math.min(yPrev, yTot), height: Math.max(1.5, Math.abs(yPrev - yTot)), fill: down ? 'var(--false)' : 'var(--accent)', stroke: 'none' }));
+                } else {
+                  g.append(s('text', { x: x + w / 2, y: base - 6, 'text-anchor': 'middle', fill: 'var(--false)', 'font-size': 14, 'font-weight': 700, text: '∞' }));
+                }
                 if (run.length <= 21) g.append(s('text', { x: x + w / 2, y: H - pb + 15, 'text-anchor': 'middle', fill: 'var(--ink-2)', 'font-size': 11, text: String(r.i) }));
-                g.append(s('title', { text: `i = ${r.i}: term ${num(r.v)}, running ${isSum ? 'sum' : 'product'} ${num(r.tot)}` }));
+                g.append(s('title', { text: `i = ${r.i}: term ${plainNum(r.v)}, running ${isSum ? 'sum' : 'product'} ${plainNum(r.tot)}` }));
                 svg.append(g);
               });
               svg.append(s('text', { x: W - pr, y: H - 2, 'text-anchor': 'end', fill: 'var(--ink-3)', 'font-size': 11, text: useLog ? 'index i · log scale (values grow too fast for a straight scale)' : 'index i' }));
+            } else if (run.length) {
+              svg.append(s('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--ink-2)', 'font-size': 15, text: `Every running ${isSum ? 'sum' : 'product'} is too large to draw.` }));
             } else {
               svg.append(s('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--ink-2)', 'font-size': 15, text: `No terms: the lower limit ${m} is above the upper limit ${n}.` }));
             }
@@ -656,12 +668,13 @@
             const agree = cf && Math.abs(cf.val - total) <= 1e-9 * Math.max(1, Math.abs(total));
             const py = `${isSum ? 'sum' : 'math.prod'}(${pyF(tree)} for i in range(${m}, ${n + 1}))`;
             ctx.rc(panel,
-              h('div', { html: terms.length ? String.raw`\[${head} = ${expanded} = ${num(total)}\]` : String.raw`\[${head} = ${num(total)} \quad \text{(no terms)}\]` }),
-              terms.length ? h('div.small', { html: `<b>${terms.length}</b> term${terms.length === 1 ? '' : 's'} (from \\(i = ${m}\\) to \\(i = ${n}\\)). Running ${isSum ? 'sums' : 'products'}: ${run.slice(0, 10).map((r) => num(r.tot)).join(', ')}${run.length > 10 ? ', …' : ''}` }) : null,
+              h('div', { html: terms.length ? String.raw`\[${head} = ${expanded} = ${texNum(total)}\]` : String.raw`\[${head} = ${num(total)} \quad \text{(no terms)}\]` }),
+              terms.length ? h('div.small', { html: `<b>${terms.length}</b> term${terms.length === 1 ? '' : 's'} (from \\(i = ${m}\\) to \\(i = ${n}\\)). Running ${isSum ? 'sums' : 'products'}: ${run.slice(0, 10).map((r) => plainNum(r.tot)).join(', ')}${run.length > 10 ? ', …' : ''}` }) : null,
               !terms.length ? h('div.small', { html: `An empty ${isSum ? 'sum is 0' : 'product is 1'}: that value changes nothing when you ${isSum ? 'add' : 'multiply'} it in, so loops that start from it work for every input.` }) : null,
+              overflow ? h('div.feedback.info.small', { html: `${overflow} of the ${run.length} running ${isSum ? 'sums' : 'products'} exceed the largest number this page can hold (about \\(1.8 \\times 10^{308}\\)), so they are shown as \\(\\infty\\) and left off the chart. The ${isSum ? 'sum' : 'product'} itself is a finite number; only the page's arithmetic ran out of room.` }) : null,
               cf ? h('div.box.small', { html: String.raw`<b>Closed form:</b> \(${cf.sym} = ${num(cf.val)}\) <span class="${agree ? 'ok' : 'bad'}">${agree ? '✓ agrees with the term-by-term total' : '✗ disagrees'}</span>` })
                 : h('div.small.muted', { html: preset && preset.cf === null ? 'This product has no short closed form; it is computed term by term.' : !preset ? 'Custom formula: computed term by term. Pick a preset to see a closed form.' : '' }),
-              h('div', h('div.tiny.mono.muted', 'SAME THING IN PYTHON'), h('pre', { html: (isSum ? '' : ctx.hlPy('import math') + '\n') + ctx.hlPy(py) + '\n' + ctx.hlPy(`# ${num(total)}`) })),
+              h('div', h('div.tiny.mono.muted', 'SAME THING IN PYTHON'), h('pre', { html: (isSum ? '' : ctx.hlPy('import math') + '\n') + ctx.hlPy(py) + '\n' + ctx.hlPy(Number.isFinite(total) ? `# ${num(total)}` : '# the exact value is too large for this page to compute') })),
               h('p.small.muted', { html: `<code>range(${m}, ${n + 1})</code> stops <i>before</i> its second argument, so the upper limit ${n} becomes ${n + 1}. A generator expression feeds the terms one at a time to <code>${isSum ? 'sum' : 'math.prod'}</code>.` }));
             ctx.tex(panel);
           }
@@ -812,7 +825,7 @@
             const have = new Set(w.have.map(key)), miss = new Set(w.miss.map(key));
             const eq = !p.refl && !p.sym && !p.trans, po = !p.refl && !p.anti && !p.trans;
             if (!po) view = 'digraph';
-            // equivalence classes for colouring
+            // equivalence classes for coloring
             const cls = new Array(n).fill(-1);
             const classes = [];
             if (eq) range(n).forEach((i) => { if (cls[i] < 0) { const c = range(n).filter((j) => M[i][j]); c.forEach((j) => { cls[j] = classes.length; }); classes.push(c.map((j) => j + 1)); } });
@@ -853,7 +866,7 @@
               h('span.pill.' + (p[k] ? 'f' : 't'), p[k] ? '✗' : '✓'), h('span', h('b', info[k][0]), ' ', info[k][1]))));
             let struct;
             if (eq && po) struct = '<b>Both</b> an equivalence relation and a partial order. Only equality (just the loops) manages that.';
-            else if (eq) struct = `<b>Equivalence relation.</b> Its classes ${classes.map((c) => fmt(c)).join(', ')} partition A; the colours on the digraph show the blocks.`;
+            else if (eq) struct = `<b>Equivalence relation.</b> Its classes ${classes.map((c) => ctx.M.fmtSet(c)).join(', ')} partition A; the colors on the digraph show the blocks.`; // ctx.M: the lab's M is the matrix
             else if (po) {
               const inc = range(n).flatMap((i) => range(n).filter((j) => j > i && !M[i][j] && !M[j][i]).map((j) => [i + 1, j + 1]))[0];
               struct = `<b>Partial order.</b> ${inc ? `Not total: ${inc[0]} and ${inc[1]} are incomparable.` : 'Every pair is comparable, so it is a total order.'} Switch the picture to its Hasse diagram.`;
@@ -938,7 +951,7 @@
               h('table.data', h('thead', h('tr', t.cols.map((c) => h('th', { class: active && keep.includes(c) ? 'keep' : '' }, c)))),
                 h('tbody', t.rows.map((r, i) => h('tr', { class: hits.has(i) ? 'hit' : '' }, r.map((v) => h('td', String(v))))))));
             ctx.rc(left, srcTable(T.S, hitS, q.src !== 'E'), srcTable(T.E, hitE, q.src !== 'S'),
-              h('p.tiny.muted', 'Highlighted rows feed the result; coloured headers mark the columns kept.'));
+              h('p.tiny.muted', 'Highlighted rows feed the result; colored headers mark the columns kept.'));
             // result and step counts
             const steps = [];
             if (q.src === 'J') steps.push(`<b>Join:</b> checked ${T.S.rows.length} × ${T.E.rows.length} = ${T.S.rows.length * T.E.rows.length} (student, enrollment) pairs; ${T.J.rows.length} share a sid. Eli (sid 5) has no enrollment, so no joined tuple mentions Eli.`);
@@ -1199,7 +1212,7 @@
           { q: 'Which relation on a set of people is an equivalence relation?', choices: ['"is a parent of"', '"has the same birthday as"', '"is taller than"', '"is a friend of"'], answer: 1, explain: 'Same birthday is reflexive, symmetric and transitive, and its classes are the 366 possible birthdays. "Parent of" is not reflexive or transitive, "taller than" is not reflexive or symmetric, and friendship is usually not transitive.' },
           { q: 'The relation "divides" on the positive integers is a partial order. Which property does it lack?', choices: ['Reflexive', 'Symmetric', 'Antisymmetric', 'Transitive'], answer: 1, explain: String.raw`\(2 \mid 4\) but \(4 \nmid 2\), so it is not symmetric. It is reflexive (\(a \mid a\)), antisymmetric (\(a \mid b\) and \(b \mid a\) force \(a = b\) for positive integers) and transitive.` },
           { q: String.raw`Let \(R = \{(1,2), (2,3), (3,4)\}\) on \(\{1, 2, 3, 4\}\). How many pairs does the transitive closure of \(R\) contain?`, choices: ['3', '5', '6', '10'], answer: 2, explain: String.raw`The closure adds a shortcut for every path: \((1,3)\), \((2,4)\) and \((1,4)\). That gives 6 pairs, which is exactly the relation \(\lt\) on \(\{1, 2, 3, 4\}\).` },
-          { q: String.raw`Three students in the <code>Student</code> table major in AI. How many rows does \(\pi_{\text{major}}(\sigma_{\text{major = 'AI'}}(\text{Student}))\) contain?`, choices: ['3', '1', '0', 'It is an error, because major is not a key'], answer: 1, explain: 'Selection keeps the three AI rows; projecting onto <code>major</code> turns them into three copies of the tuple (AI). A relation is a set, so the copies collapse into one tuple. SQL would print three rows unless you write SELECT DISTINCT.' },
+          { q: String.raw`Two students in the <code>Student</code> table of the database lab, Ana and Chloe, major in AI. How many rows does \(\pi_{\text{major}}(\sigma_{\text{major = 'AI'}}(\text{Student}))\) contain?`, choices: ['2', '1', '0', 'It is an error, because major is not a key'], answer: 1, explain: 'Selection keeps the two AI rows (Ana and Chloe); projecting onto <code>major</code> turns them into two copies of the tuple (AI). A relation is a set, so the copies collapse into one tuple. SQL would print two rows unless you write SELECT DISTINCT.' },
         ],
       },
     ],

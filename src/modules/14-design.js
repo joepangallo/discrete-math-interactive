@@ -25,7 +25,7 @@
     return ctx.h('a.ds-mod', { href: '#' + id, onclick: (e) => { e.preventDefault(); ctx.go(id); } }, label);
   }
   const modLinks = (ctx, ids) => ctx.h('span.ds-mods', ids.map((id) => modLink(ctx, id)));
-  const labelled = (ctx, sel, html, label) => { const el = ctx.rich(sel, html); el.dataset.label = label; return el; };
+  const labeled = (ctx, sel, html, label) => { const el = ctx.rich(sel, html); el.dataset.label = label; return el; };
 
   /* ---------- number formatting that survives astronomically large values ---------- */
   const SUPS = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
@@ -312,10 +312,8 @@
       'precondition': 'A condition that must be true before a function runs. The caller is responsible for it.',
       'postcondition': 'A condition the function guarantees when it returns, provided the precondition held when it started.',
       'invariant': 'A statement that stays true throughout a computation, for example at the start of every pass through a loop, or for every object of a class.',
-      'loop invariant': 'A statement that is true before a loop starts and stays true after every pass. Together with the exit condition it proves what the loop computed.',
       'Hoare triple': 'The notation {P} S {Q}: if P is true before statement S runs, and S finishes, then Q is true afterwards.',
       'contract': 'The precondition and postcondition of a function taken together: an agreement between the function and every caller.',
-      'growth rate': 'How fast the running time of an algorithm grows as the input size n grows, described with Big-O notation.',
       'complexity budget': 'The number of basic steps you can afford: the speed of the machine (steps per second) times the time available.',
       'search space': 'The set of all candidate solutions an algorithm might have to examine. Counting tells you its size.',
       'collision': 'Two different items that receive the same ID or hash value.',
@@ -370,6 +368,7 @@
       .ds-choices button.wrong { border-color: var(--false); background: var(--false-bg); }
       .ds-choices button.close { border-color: var(--warn); background: var(--warn-bg); }
       .ds-choices button:disabled:not(.right):not(.wrong):not(.close) { opacity: 0.5; }
+      .ds-choices button b .ds-tag { font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink); margin-left: 0.35rem; white-space: nowrap; }
       .ds-fb { color: var(--ink) !important; display: flex; flex-direction: column; gap: 0.35rem; }
       .ds-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; text-align: center; }
       .ds-tiles div { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.3rem 0.2rem; }
@@ -377,9 +376,10 @@
       .ds-tiles span { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
       .ds-deck { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0.22rem; margin-top: 0.25rem; }
       .ds-deck i { display: block; aspect-ratio: 1; border-radius: 0.2rem; border: 1px solid var(--rule); background: var(--sheet); }
+      /* three grades, three patterns: solid, striped, hollow (so the deck reads without color) */
       .ds-deck i.right { background: var(--true); border-color: var(--true); }
-      .ds-deck i.close { background: var(--warn); border-color: var(--warn); }
-      .ds-deck i.wrong { background: var(--false); border-color: var(--false); }
+      .ds-deck i.close { background: repeating-linear-gradient(45deg, var(--warn) 0 2px, var(--sheet) 2px 4px); border-color: var(--warn); }
+      .ds-deck i.wrong { background: var(--sheet); border: 2px solid var(--false); }
       .ds-deck i.cur { outline: 2px solid var(--accent); outline-offset: 1px; }
       .ds-ask { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
       .ds-ask td { padding: 0.1rem 0.3rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
@@ -486,7 +486,7 @@
               h('h3', st.name),
               ctx.rich('p.ds-q', 'Ask: ' + st.q),
               ctx.rich('p', st.do),
-              labelled(ctx, 'div.ex.small', st.ex, 'Running example: reject duplicate sign-ups'),
+              labeled(ctx, 'div.ex.small', st.ex, 'Running example: reject duplicate sign-ups'),
               h('div.row', { style: { gap: '0.4rem' } }, h('span.tiny.mono.muted', 'LEARN IT IN'), modLinks(ctx, st.mods)));
           }
           show(0);
@@ -528,7 +528,8 @@
             let streak = 0;
             for (let j = answered - 1; j >= 0 && grade(j) === 'right'; j--) streak++;
             rc(tiles, tile(right, 'Correct'), tile(answered, 'Answered'), tile(streak, 'Streak'));
-            rc(deckEl, deck.map((_, j) => h('i', { class: [grade(j), j === i ? 'cur' : ''].join(' ').trim() || null, title: `Scenario ${j + 1}` })));
+            const GRADE_WORD = { right: 'best model', close: 'close second', wrong: 'not the best fit' };
+            rc(deckEl, deck.map((_, j) => h('i', { class: [grade(j), j === i ? 'cur' : ''].join(' ').trim() || null, title: `Scenario ${j + 1}${grade(j) ? `: ${GRADE_WORD[grade(j)]}` : ''}` })));
             if (i >= deck.length) {
               const missed = {};
               deck.forEach((sc, j) => { if (picks[j] !== sc.best) missed[sc.best] = (missed[sc.best] || 0) + 1; });
@@ -544,10 +545,11 @@
             }
             const sc = deck[i], picked = picks[i], g = grade(i);
             const choices = h('div.ds-choices', ORDER.map((id) => {
-              const b = h('button', { disabled: picked != null, onclick: () => { picks[i] = id; draw(); } }, h('b', STRUCT[id].name), h('span', STRUCT[id].cue));
-              if (picked != null) {
-                if (id === sc.best) b.classList.add('right');
-                else if (id === picked) b.classList.add(g);
+              const name = h('b', STRUCT[id].name);
+              const b = h('button', { disabled: picked != null, onclick: () => { picks[i] = id; draw(); } }, name, h('span', STRUCT[id].cue));
+              if (picked != null) { // a word next to the name, so the verdict does not rest on the border color
+                if (id === sc.best) { b.classList.add('right'); name.append(h('span.ds-tag', 'best fit')); }
+                else if (id === picked) { b.classList.add(g); name.append(h('span.ds-tag', g === 'close' ? 'close second' : 'your pick')); }
               }
               return b;
             }));
@@ -741,7 +743,7 @@
               (groups.no.length ? `<span class="bad">Hopeless: ${groups.no.join(', ')}.</span>` : '');
             ctx.tex(summary);
             noteText.textContent = pi >= 0 ? BUD_PRESETS[pi].note
-              : 'Custom input size. Green rows fit the budget. Amber rows miss it by less than 1000×, so a faster machine, parallel workers or a smaller n might rescue them. Red rows miss by more than that and need a better algorithm.';
+              : 'Custom input size. Rows marked "fits" finish inside the budget. Rows marked "over budget" miss it by less than 1000×, so a faster machine, parallel workers or a smaller n might rescue them. Rows marked "hopeless" miss by more than that and need a better algorithm.';
           }
           draw(true);
         },
@@ -1021,12 +1023,12 @@
             btns.forEach((b, j) => { b.classList.toggle('on', j === i); b.setAttribute('aria-selected', String(j === i)); });
             const st = PIPE[i];
             rc(detail, h('div.split', { style: { alignItems: 'start' } },
-              h('div.stack', h('h3', { style: { fontSize: '1.25rem' } }, `${i + 1}. ${st.name}`), ctx.rich('p', st.what), labelled(ctx, 'div.ex', st.ex, 'Concrete example')),
+              h('div.stack', h('h3', { style: { fontSize: '1.25rem' } }, `${i + 1}. ${st.name}`), ctx.rich('p', st.what), labeled(ctx, 'div.ex', st.ex, 'Concrete example')),
               h('div.stack',
                 h('div.card.stack', { style: { gap: '0.45rem' } },
                   h('div.tiny.mono.muted', 'DISCRETE STRUCTURES AT WORK'), h('div.ds-chips', st.tags.map((t) => h('span.chip', t))),
                   h('div.tiny.mono.muted', 'LEARN THEM IN'), modLinks(ctx, st.mods)),
-                labelled(ctx, 'div.tip', st.check, 'Design check'))));
+                labeled(ctx, 'div.tip', st.check, 'Design check'))));
           }
           show(0);
           ctx.keys = (e) => {
@@ -1166,7 +1168,7 @@
                 return {
                   prompt: String.raw`<b>Number theory.</b> Compute \(${a} \bmod ${n}\), the remainder in \(\{0, 1, \dots, ${n - 1}\}\). This is what Python's <code>${a} % ${n}</code> returns.`,
                   answer: r,
-                  solution: String.raw`Write \(${a} = (${q}) \cdot ${n} + ${r}\) with \(0 \le ${r} \lt ${n}\).${a < 0 ? ` For a negative number the quotient rounds down, to \(${q}\), so the remainder stays non-negative.` : ''} So \(${a} \bmod ${n} = ${r}\). (Module 6)`,
+                  solution: String.raw`Write \(${a} = (${q}) \cdot ${n} + ${r}\) with \(0 \le ${r} \lt ${n}\).${a < 0 ? String.raw` For a negative number the quotient rounds down, to \(${q}\), so the remainder stays non-negative.` : ''} So \(${a} \bmod ${n} = ${r}\). (Module 6)`,
                 };
               }
               if (kind === 2) {
@@ -1262,34 +1264,34 @@
         kind: 'quiz',
         questions: [
           { q: 'A checkout service must answer "has this coupon code been redeemed?" for 20 million codes, thousands of times per second. Which model and data structure fit best?',
-            choices: ['A list of redeemed codes, searched with <code>in</code>', 'A set of redeemed codes (a hash set)', 'A tree of codes ordered by redemption date', 'A flow network from codes to customers'], answer: 1,
+            choices: ['A list of redeemed codes, searched with <code>in</code>', 'A tree of codes ordered by redemption date', 'A set of redeemed codes (a hash set)', 'A flow network from codes to customers'], answer: 2,
             explain: 'Only membership matters, so the model is a set. A hash set answers <code>in</code> in constant average time, while searching a 20-million-item list can take 20 million comparisons per request.' },
           { q: 'A planner tries every ordering of 15 delivery stops, checking about \\(10^7\\) orderings per second in Python. Roughly how long does it run?',
-            choices: ['About 0.1 seconds', 'About a day and a half', 'About 40 years', 'Longer than the age of the universe'], answer: 1,
+            choices: ['About 0.1 seconds', 'About a day and a half', 'About 40 years', 'Longer than the age of the universe'], answer: 1, fixed: true,
             explain: '\\(15! \\approx 1.3 \\times 10^{12}\\) orderings divided by \\(10^7\\) per second is about \\(1.3 \\times 10^5\\) seconds, or 36 hours. Estimating first warns you that 16 stops would take over three weeks and 20 stops thousands of years, so use dynamic programming or a heuristic.' },
           { q: 'Your function passes 10,000 randomly generated tests. Which statement is correct?',
-            choices: ['The function is now proven correct', 'It is very likely correct on inputs like the ones tested, but only a proof covers every input', 'Tests are pointless once you have a proof', 'Five hand-picked tests would have been better'], answer: 1,
+            choices: ['The function is now proven correct', 'Tests are pointless once you have a proof', 'Five hand-picked tests would have been better', 'It is very likely correct on inputs like the ones tested, but only a proof covers every input'], answer: 3,
             explain: 'Testing samples the input space and a proof covers all of it. Professionals use both: proofs or carefully stated invariants for the core logic, and many automated tests, because proofs can contain mistakes too and tests catch them cheaply.' },
           { q: 'Which statement about a loop invariant is correct?',
-            choices: ['It is true only after the loop ends', 'It is true before the first pass and stays true after every pass, so it still holds when the loop exits', 'It is a variable whose value never changes', 'It only needs to hold on the last pass'], answer: 1,
+            choices: ['It is true only after the loop ends', 'It is a variable whose value never changes', 'It is true before the first pass and stays true after every pass, so it still holds when the loop exits', 'It only needs to hold on the last pass'], answer: 2,
             explain: 'An invariant is proved like an induction: it holds at the start (base case) and every pass preserves it (inductive step). Combined with the exit condition it gives the postcondition. In binary search, "if x is in the list, it lies between lo and hi" plus "lo > hi" proves that x is absent.' },
           { q: 'A system assigns random 32-bit IDs. About how many IDs can it issue before a collision becomes more likely than not?',
             choices: ['About 77,000', 'About 2 billion', 'About 4.3 billion', 'None can collide until all 4.3 billion are used'], answer: 0,
-            explain: 'The birthday bound puts the 50% point at \\(k \\approx 1.18\\sqrt{N} = 1.18 \\times 2^{16} \\approx 77{,}000\\). The number of pairs grows like \\(k^2/2\\), so collisions arrive long before the space fills up. The last choice confuses "guaranteed" (the pigeonhole principle) with "likely".' },
+            explain: 'The birthday bound puts the 50% point at \\(k \\approx 1.18\\sqrt{N} = 1.18 \\times 2^{16} \\approx 77{,}000\\). The number of pairs grows like \\(k^2/2\\), so collisions arrive long before the space fills up. "None can collide until all 4.3 billion are used" confuses "guaranteed" (the pigeonhole principle) with "likely".' },
           { q: 'Why do careful experiments call <code>random.seed(...)</code>, or create <code>random.Random(seed)</code>, before generating random data?',
             choices: ['It makes the numbers more random', 'It makes the run reproducible: the same seed produces the same sequence, so others can rerun and check the result', 'It makes the generator faster', 'It guarantees the results are statistically significant'], answer: 1,
             explain: 'A pseudo-random generator is a deterministic recurrence started from the seed (Module 8), so the same seed reproduces the same run, bugs included. Significance is a separate question: for that, repeat with several seeds and report the spread.' },
           { q: 'You must suggest an order for taking courses so that every prerequisite comes first. Which model and algorithm fit?',
-            choices: ['A tree and an in-order traversal', 'A directed acyclic graph and a topological sort', 'A set and a union', 'A probability model and random sampling'], answer: 1,
+            choices: ['A tree and an in-order traversal', 'A set and a union', 'A probability model and random sampling', 'A directed acyclic graph and a topological sort'], answer: 3,
             explain: '"A before B" is a directed edge. The prerequisite graph must have no cycles, and a topological sort lists the vertices so every edge points forward. A tree does not fit because a course can have several prerequisites.' },
           { q: 'An order\'s status must be one of PENDING, SHIPPED or DELIVERED. Which design rejects an invalid status when the order is created?',
-            choices: ['A string field plus a comment listing the legal values', 'An <code>Enum</code> with those three members, checked by the constructor', 'A string field that a script checks once a month', 'An integer field that accepts any number'], answer: 1,
+            choices: ['An <code>Enum</code> with those three members, checked by the constructor', 'A string field plus a comment listing the legal values', 'A string field that a script checks once a month', 'An integer field that accepts any number'], answer: 0,
             explain: 'The Enum defines the legal statuses, and the constructor checks that the supplied value is one of its members. A raw string such as "SHIPED" is rejected immediately. Python type hints alone do not run this check; the explicit validation enforces it.' },
           { q: 'An \\(O(n^2)\\) report takes 3 seconds on 10,000 rows. Estimate the time for 100,000 rows.',
-            choices: ['30 seconds', '300 seconds', '3,000 seconds', '30,000 seconds'], answer: 1,
+            choices: ['30 seconds', '300 seconds', '3,000 seconds', '30,000 seconds'], answer: 1, fixed: true,
             explain: 'Ten times the rows means \\(10^2 = 100\\) times the work for an \\(n^2\\) algorithm: \\(3 \\times 100 = 300\\) seconds, five minutes. A job that scaled like \\(n\\,\\log\\,n\\) would grow by a factor of about 12.5 instead, to roughly 40 seconds.' },
           { q: 'In a language model, what stops position 5 from using the token at position 8 during training?',
-            choices: ['A random seed', 'A Boolean mask that lets position \\(i\\) use position \\(j\\) only when \\(j \\le i\\)', 'Sorting the tokens alphabetically', 'A spanning tree of the tokens'], answer: 1,
+            choices: ['A random seed', 'Sorting the tokens alphabetically', 'A Boolean mask that lets position \\(i\\) use position \\(j\\) only when \\(j \\le i\\)', 'A spanning tree of the tokens'], answer: 2,
             explain: 'Causal attention applies a lower-triangular Boolean mask built from the order relation \\(j \\le i\\) (Modules 4 and 12), so each position only uses earlier positions. Without it the model could peek at the very token it is learning to predict.' },
         ],
       },

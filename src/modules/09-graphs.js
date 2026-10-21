@@ -35,10 +35,10 @@
   const FIG_W = fig(170, 92, [['x', 25, 66], ['y', 85, 20], ['z', 145, 66]], [[0, 1, 4], [1, 2, 7], [2, 0, 2]], { aria: 'Weighted triangle' });
   const FIG_REP = fig(190, 120, [['a', 30, 30], ['b', 30, 95], ['c', 105, 62], ['d', 170, 62]], [[0, 1], [0, 2], [1, 2], [2, 3]], { aria: 'Graph with edges ab, ac, bc, cd' });
   const PENT = ring(5, 70, 66, 48, ['1', '2', '3', '4', '5']);
-  const FIG_C5 = fig(140, 130, PENT, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0]], { aria: 'Five-cycle drawn as a pentagon' });
-  const FIG_STAR = fig(140, 130, ring(5, 70, 66, 48, ['a', 'b', 'c', 'd', 'e']), [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]], { aria: 'Five-cycle drawn as a star' });
-  const FIG_K4X = fig(120, 120, [['', 20, 20], ['', 100, 20], ['', 100, 100], ['', 20, 100]], [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2], [1, 3]], { r: 7, aria: 'K4 drawn with a crossing' });
-  const FIG_K4P = fig(120, 120, [['', 60, 14], ['', 108, 100], ['', 12, 100], ['', 60, 70]], [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], { r: 7, aria: 'K4 drawn without crossings' });
+  const FIG_C5 = fig(140, 130, PENT, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0]], { aria: 'Five-cycle drawn as a pentagon', style: 'width:7.4rem' });
+  const FIG_STAR = fig(140, 130, ring(5, 70, 66, 48, ['a', 'b', 'c', 'd', 'e']), [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]], { aria: 'Five-cycle drawn as a star', style: 'width:7.4rem' });
+  const FIG_K4X = fig(120, 120, [['', 20, 20], ['', 100, 20], ['', 100, 100], ['', 20, 100]], [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2], [1, 3]], { r: 7, aria: 'K4 drawn with a crossing', style: 'width:6rem' });
+  const FIG_K4P = fig(120, 120, [['', 60, 14], ['', 108, 100], ['', 12, 100], ['', 60, 70]], [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], { r: 7, aria: 'K4 drawn without crossings', style: 'width:6rem' });
 
   /* ---------- graph algorithms shared by labs and generators ---------- */
   function componentsOf(ids, nbrs) {
@@ -81,6 +81,53 @@
   }
   const pathTo = (prev, src, t) => { const p = [t]; while (p[0] !== src && prev[p[0]]) p.unshift(prev[p[0]]); return p[0] === src ? p : null; };
 
+  /* ---------- invariants, isomorphism and Hamiltonian cycles on small graphs (vertices 0..n-1) ---------- */
+  const edgeKey = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);
+  const nbrsOf = (E) => (u) => E.filter(([a, b]) => a === u || b === u).map(([a, b]) => (a === u ? b : a));
+  function degrees(n, E) { const d = Array(n).fill(0); for (const [a, b] of E) { d[a]++; d[b]++; } return d; }
+  function triangles(n, E) {
+    const has = new Set(E.map(([a, b]) => edgeKey(a, b)));
+    let t = 0;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (has.has(edgeKey(i, j))) for (let k = j + 1; k < n; k++) if (has.has(edgeKey(i, k)) && has.has(edgeKey(j, k))) t++;
+    return t;
+  }
+  function permutations(n) { const out = []; const rec = (pre, left) => { if (!left.length) { out.push(pre); return; } left.forEach((x, i) => rec([...pre, x], left.filter((_, j) => j !== i))); }; rec([], Array.from({ length: n }, (_, i) => i)); return out; }
+  /** a relabeling f (f[i] = image of vertex i) that carries every edge of G onto an edge of H, or null; brute force, fine up to 7 vertices */
+  function isomorphism(n, EG, EH) {
+    if (EG.length !== EH.length) return null;
+    const has = new Set(EH.map(([a, b]) => edgeKey(a, b)));
+    const dG = degrees(n, EG), dH = degrees(n, EH);
+    for (const f of permutations(n)) {
+      if (dG.some((d, i) => d !== dH[f[i]])) continue; // a vertex must map to one of the same degree
+      if (EG.every(([a, b]) => has.has(edgeKey(f[a], f[b])))) return f;
+    }
+    return null;
+  }
+  /** one Hamiltonian cycle starting at vertex 0, found by backtracking, or null when none exists */
+  function hamiltonCycle(n, E) {
+    const nb = nbrsOf(E);
+    const adj = Array.from({ length: n }, (_, v) => nb(v).sort((a, b) => a - b));
+    const path = [0], used = new Set([0]);
+    const go = () => {
+      const v = path[path.length - 1];
+      if (path.length === n) return adj[v].includes(0);
+      for (const w of adj[v]) { if (used.has(w)) continue; used.add(w); path.push(w); if (go()) return true; path.pop(); used.delete(w); }
+      return false;
+    };
+    return n >= 3 && go() ? path.slice() : null;
+  }
+  /** two-coloring by BFS: the color (0 or 1) of every vertex when the graph is bipartite, otherwise null */
+  function bipartition(n, E) {
+    const nb = nbrsOf(E), col = Array(n).fill(-1);
+    for (let st = 0; st < n; st++) {
+      if (col[st] >= 0) continue;
+      col[st] = 0;
+      const q = [st];
+      while (q.length) { const u = q.shift(); for (const w of nb(u)) { if (col[w] < 0) { col[w] = 1 - col[u]; q.push(w); } else if (col[w] === col[u]) return null; } }
+    }
+    return col;
+  }
+
   DM.module({
     id: 'graphs',
     num: 9,
@@ -107,6 +154,11 @@
       'adjacency list': 'A representation that stores, for each vertex, the list (or set) of its neighbors.',
       'isomorphic': 'Two graphs are isomorphic when a one-to-one correspondence between their vertices preserves adjacency: they are the same graph drawn differently.',
       'planar graph': 'A graph that can be drawn in the plane with no edges crossing.',
+      'face': 'One of the regions that a crossing-free drawing of a planar graph cuts the plane into, including the unbounded outer region.',
+      'degree sequence': 'The degrees of all the vertices listed in decreasing order, such as 3, 3, 2, 2, 2. Isomorphic graphs have the same degree sequence.',
+      'graph invariant': 'A property that isomorphic graphs must share: the numbers of vertices and edges, the degree sequence, the number of triangles or components. One differing invariant proves two graphs are not isomorphic.',
+      "Kuratowski's theorem": 'A graph is planar exactly when it contains no subdivision of K₅ or K₃,₃ as a subgraph. Those two graphs are the only obstacles to planarity.',
+      "Dirac's theorem": 'If a simple graph has n ≥ 3 vertices and every vertex has degree at least n/2, the graph has a Hamiltonian cycle. The condition is sufficient, not necessary.',
     },
     symbols: [
       ['G = (V, E)', 'graph with vertex set V and edge set E', 'V = {a, b, c}'],
@@ -118,6 +170,7 @@
       ['w(u, v)', 'weight of the edge joining u and v', 'w(A, C) = 2'],
       ['Aᵏ', 'k-th power of the adjacency matrix: counts walks of length k', '(A²)ᵢⱼ'],
       ['V − E + F = 2', "Euler's formula for connected planar graphs", 'cube: 8 − 12 + 6 = 2'],
+      ['E ≤ 3V − 6', 'edge bound for a simple planar graph with V ≥ 3', 'K₅: 10 > 9, not planar'],
     ],
     css: `
       .gr-lab { display: grid; gap: 0.9rem; min-height: 0; align-items: stretch; }
@@ -207,7 +260,7 @@
                 <div><div>${FIG_DIR}</div><div class="gr-cap">directed</div></div>
                 <div><div>${FIG_W}</div><div class="gr-cap">weighted</div></div>
               </div>
-              <div class="ai">A <b>knowledge graph</b> stores facts as directed, labelled edges such as <span class="mono small">Paris —capital of→ France</span>. Search engines and AI assistants follow these edges to answer questions, and graph neural networks learn from the same structure.</div>
+              <div class="ai">A <b>knowledge graph</b> stores facts as directed, labeled edges such as <span class="mono small">Paris —capital of→ France</span>. Search engines and AI assistants follow these edges to answer questions, and graph neural networks learn from the same structure.</div>
             </div>
           </div>`,
       },
@@ -445,7 +498,7 @@
           const bridges = () => BR.filter((b) => eight || !b.extra);
           const other = (b, at) => (b.u === at ? b.v : b.u);
           const avail = () => (pos ? bridges().filter((b) => !used.includes(b.id) && (b.u === pos || b.v === pos)) : []);
-          const svg = s('svg', { viewBox: '0 0 600 380', role: 'img', 'aria-label': 'Map of Königsberg with river, land masses and bridges' });
+          const svg = s('svg', { viewBox: '0 0 600 380', role: 'group', 'aria-label': 'Map of Königsberg with river, land masses and bridges; land masses and bridges are buttons' });
           const side = h('div.gr-panel');
           body.append(h('div.gr-lab.fill', { style: { gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)' } }, h('div.figure', { style: { minHeight: 0, alignItems: 'start' } }, svg), side));
           function cross(b) {
@@ -578,7 +631,7 @@
           const adj = Object.fromEntries(NAMES.map((v) => [v, []]));
           ED.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
           NAMES.forEach((v) => adj[v].sort());
-          let mode = 'BFS', start = 'A', steps = [], at = 0, timer = null;
+          let mode = 'BFS', start = 'A', steps = [], at = 0;
           function simulate(m, st0) {
             const out = [];
             if (m === 'BFS') {
@@ -608,15 +661,16 @@
             }
             return out;
           }
-          const svg = s('svg', { class: 'gr-svg', viewBox: '0 0 540 370', role: 'img', 'aria-label': 'Graph being searched' });
+          const svg = s('svg', { class: 'gr-svg', viewBox: '0 0 540 370', role: 'group', 'aria-label': 'Graph being searched; every vertex is a button that restarts the search there' });
           const side = h('div.gr-panel');
           body.append(h('div.gr-lab.fill', { style: { gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)' } }, h('div.figure', { style: { minHeight: 0, alignItems: 'start' } }, svg), side));
           function reset() { steps = simulate(mode, start); at = 0; }
-          function pause() { if (timer) clearInterval(timer); timer = null; }
+          const playBtn = h('button.btn.sm.primary', { onclick: () => play() });
+          const player = ctx.ticker({ ms: 750, button: playBtn, tick: () => { if (at >= steps.length - 1) return false; at++; draw(); return at < steps.length - 1; } });
           function play() {
-            if (timer) { pause(); draw(); return; }
+            if (player.playing) { player.stop(); draw(); return; }
             if (at >= steps.length - 1) at = 0;
-            timer = setInterval(() => { if (at >= steps.length - 1) { pause(); draw(); return; } at++; draw(); }, 750);
+            player.start();
             draw();
           }
           function draw() {
@@ -631,7 +685,7 @@
             for (const v of NAMES) {
               const [x, y] = P[v];
               const isV = visited.has(v), isC = inCont.has(v), cur = st.cur === v;
-              const go = () => { pause(); start = v; reset(); draw(); };
+              const go = () => { player.stop(); start = v; reset(); draw(); };
               kids.push(s('g', { class: 'gv', tabindex: 0, role: 'button', 'aria-label': `Start at ${v}`, onclick: go, onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } } },
                 cur ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2, 'stroke-dasharray': st.skip ? '4 3' : null }) : null,
                 s('circle', { cx: x, cy: y, r: 20, fill: 'var(--paper)', stroke: 'none' }),
@@ -648,13 +702,13 @@
               : h('div.gr-box', h('span.end', 'bottom'), st.cont.length ? st.cont.map((v) => h('span.cell', { class: visited.has(v) ? 'stale' : '' }, v)) : h('span.small.muted', 'empty'), h('span.end', '← top'));
             rc(side,
               h('div.gr-ctl',
-                h('span', 'Search'), h('div.seg', ['BFS', 'DFS'].map((m) => h('button', { 'aria-pressed': String(m === mode), onclick: () => { pause(); mode = m; reset(); draw(); } }, m === 'BFS' ? 'Breadth-first (queue)' : 'Depth-first (stack)'))),
-                h('span', 'Start'), h('div.seg', NAMES.map((v) => h('button', { 'aria-pressed': String(v === start), onclick: () => { pause(); start = v; reset(); draw(); } }, v)))),
+                h('span', 'Search'), h('div.seg', ['BFS', 'DFS'].map((m) => h('button', { 'aria-pressed': String(m === mode), onclick: () => { player.stop(); mode = m; reset(); draw(); } }, m === 'BFS' ? 'Breadth-first (queue)' : 'Depth-first (stack)'))),
+                h('span', 'Start'), h('div.seg', NAMES.map((v) => h('button', { 'aria-pressed': String(v === start), onclick: () => { player.stop(); start = v; reset(); draw(); } }, v)))),
               h('div.row', { style: { gap: '0.3rem' } },
-                h('button.btn.sm', { onclick: () => { pause(); at = Math.max(0, at - 1); draw(); }, 'aria-label': 'Step back' }, '◀'),
-                h('button.btn.sm', { onclick: () => { pause(); at = Math.min(steps.length - 1, at + 1); draw(); } }, 'Step ▶'),
-                h('button.btn.sm.primary', { onclick: play }, timer ? 'Pause ❚❚' : 'Play ▶'),
-                h('button.btn.sm', { onclick: () => { pause(); at = 0; draw(); } }, 'Reset'),
+                h('button.btn.sm', { onclick: () => { player.stop(); at = Math.max(0, at - 1); draw(); } }, '◀ Back'),
+                h('button.btn.sm', { onclick: () => { player.stop(); at = Math.min(steps.length - 1, at + 1); draw(); } }, 'Step ▶'),
+                playBtn,
+                h('button.btn.sm', { onclick: () => { player.stop(); at = 0; draw(); } }, 'Reset'),
                 h('span.tiny.muted', `step ${at} of ${steps.length - 1}`)),
               h('div', h('div.tiny.mono.muted', mode === 'BFS' ? 'QUEUE: FIRST IN, FIRST OUT' : 'STACK: LAST IN, FIRST OUT (crossed out = already visited)'), cont),
               h('div', h('div.tiny.mono.muted', 'VISIT ORDER'), h('div.gr-order', st.order.length ? st.order.map((v, i) => h('span', h('b', String(i + 1)), v)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing visited yet'))),
@@ -664,7 +718,6 @@
                 ? 'BFS reaches vertices in order of distance, so the thick tree edges are shortest paths (fewest edges) from the start. Use it for "fewest hops" questions: degrees of separation, network routing, and solving puzzles in the fewest moves.'
                 : 'DFS follows one branch to its end before trying another, so the thick tree edges form long paths. Use it to detect cycles, find connected components, order tasks with dependencies (topological sort), and solve mazes.'));
           }
-          ctx.onHide(pause);
           reset();
           draw();
         },
@@ -710,12 +763,12 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">Hamiltonian cycle</span> visits every <i>vertex</i> exactly once and returns to the start. It is named after William Rowan Hamilton, who sold a puzzle in 1857 that asked for such a tour of the corners of a dodecahedron.</div>
+              <div class="def">A <span class="term">Hamiltonian cycle</span> visits every <i>vertex</i> exactly once and returns to the start. It is named after William Rowan Hamilton, who sold a puzzle in 1857 that asked for such a tour of the corners of a dodecahedron. Try to build one yourself on the next slide.</div>
               <table class="tt" style="width:100%;font-size:0.84rem">
                 <thead><tr><th class="l"></th><th>Euler cycle</th><th>Hamiltonian cycle</th></tr></thead>
                 <tbody>
                   <tr><td class="l">uses each…</td><td>edge exactly once</td><td>vertex exactly once</td></tr>
-                  <tr><td class="l">simple test?</td><td>yes: every degree even</td><td>none known</td></tr>
+                  <tr><td class="l">simple test?</td><td>yes: every degree even</td><td>none known; <span class="term">Dirac's theorem</span> is only a sufficient condition</td></tr>
                   <tr><td class="l">fast algorithm?</td><td>yes, linear time</td><td>none known</td></tr>
                 </tbody>
               </table>
@@ -742,6 +795,126 @@
           </div>`,
       },
       /* ---------------------------------------------------------------- 10 */
+      {
+        id: 'hamilton-lab',
+        title: 'Lab: find a Hamiltonian cycle',
+        kind: 'lab',
+        html: String.raw`<p class="muted small">Click a vertex to start, then click neighbors one at a time to build a cycle that visits every vertex once and returns to the start. Dashed edges lead to the legal next moves. Some of these graphs have no Hamiltonian cycle at all: <b>Explain</b> says why, and the panel checks <span class="term">Dirac's theorem</span>, the one easy guarantee.</p>`,
+        render(body, ctx) {
+          const { h, s, rc } = ctx;
+          const sq = (cx, cy, r) => [[cx - r, cy - r], [cx + r, cy - r], [cx + r, cy + r], [cx - r, cy + r]];
+          const ringXY = (k, rad) => ring(k, 270, 190, rad, Array(k).fill('')).map(([, x, y]) => [x, y]);
+          const GRAPHS = {
+            'Prism': { v: [[270, 40], [60, 330], [480, 330], [270, 150], [175, 275], [365, 275]], e: [[0, 1], [1, 2], [2, 0], [3, 4], [4, 5], [5, 3], [0, 3], [1, 4], [2, 5]] },
+            'Cube': { v: [...sq(270, 185, 150), ...sq(270, 185, 65)], e: [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]] },
+            'Octahedron': { v: [[270, 30], [50, 335], [490, 335], [270, 270], [205, 180], [335, 180]], e: [[0, 1], [1, 2], [2, 0], [3, 4], [4, 5], [5, 3], [3, 1], [3, 2], [4, 0], [4, 1], [5, 0], [5, 2]] },
+            '3 × 3 grid': { v: [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => [150 + c * 120, 65 + r * 120])), e: [[0, 1], [1, 2], [3, 4], [4, 5], [6, 7], [7, 8], [0, 3], [3, 6], [1, 4], [4, 7], [2, 5], [5, 8]] },
+            'K₂,₃': { v: [[170, 70], [370, 70], [90, 300], [270, 300], [450, 300]], e: [[0, 2], [0, 3], [0, 4], [1, 2], [1, 3], [1, 4]] },
+            'Petersen': { v: [...ringXY(5, 160), ...ringXY(5, 70)], e: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [0, 5], [1, 6], [2, 7], [3, 8], [4, 9], [5, 7], [7, 9], [9, 6], [6, 8], [8, 5]] },
+          };
+          let name, G, n, adj, info, path = [], closed = false, explain = false, msg = null;
+          const L = (i) => LET[i];
+          function load(k) {
+            name = k; G = GRAPHS[k]; n = G.v.length;
+            const nb = nbrsOf(G.e);
+            adj = Array.from({ length: n }, (_, v) => nb(v).sort((a, b) => a - b));
+            const minDeg = Math.min(...degrees(n, G.e));
+            info = { minDeg, dirac: 2 * minDeg >= n, cycle: hamiltonCycle(n, G.e), parts: bipartition(n, G.e) };
+            path = []; closed = false; explain = false; msg = null;
+          }
+          const legalMoves = () => (path.length && !closed ? adj[path[path.length - 1]].filter((w) => !path.includes(w) || (w === path[0] && path.length === n)) : []);
+          function clickVertex(v) {
+            msg = null;
+            const last = path[path.length - 1];
+            if (closed) msg = ['info', 'The cycle is complete. Press Restart to look for a different one, or pick another graph.'];
+            else if (!path.length) path.push(v);
+            else if (v === last) msg = ['info', `You are at ${L(v)}. Click one of its neighbors, or Undo.`];
+            else if (!adj[last].includes(v)) msg = ['bad', `${L(last)} and ${L(v)} are not adjacent. A cycle can only follow edges.`];
+            else if (v === path[0]) {
+              if (path.length === n) { closed = true; msg = ['good', `A Hamiltonian cycle: ${path.map(L).join(' → ')} → ${L(v)}. Every vertex once, and back where you started.`]; }
+              else msg = ['bad', `Closing the loop now would leave ${n - path.length} ${n - path.length === 1 ? 'vertex' : 'vertices'} unvisited. Keep going.`];
+            } else if (path.includes(v)) msg = ['bad', `${L(v)} is already on the path, and a Hamiltonian cycle visits each vertex only once.`];
+            else path.push(v);
+            draw();
+          }
+          function explanation() {
+            const { cycle, parts, minDeg, dirac } = info;
+            const diracLine = dirac
+              ? `Dirac's theorem: every degree is at least ${minDeg}, and ${minDeg} ≥ ${n}/2, so a Hamiltonian cycle is guaranteed before you try a single move.`
+              : `Dirac's theorem does not apply: the smallest degree is ${minDeg}, below ${n}/2 = ${n / 2}. The theorem is a sufficient condition, not a necessary one, so this alone decides nothing.`;
+            if (cycle) return `${diracLine}${dirac ? '' : ' A cycle exists anyway; press Show a cycle.'}`;
+            if (parts) {
+              const sideOf = (c) => parts.map((p, i) => (p === c ? L(i) : null)).filter(Boolean);
+              const A = sideOf(0), B = sideOf(1);
+              if (A.length !== B.length) return `This graph is bipartite: every edge joins side 1 {${A.join(', ')}} to side 2 {${B.join(', ')}}. A cycle alternates between the sides, so a Hamiltonian cycle needs both sides equal. Here they have ${A.length} and ${B.length} vertices, so no such cycle exists. ${diracLine}`;
+            }
+            return `An exhaustive search over every route from ${L(0)} finds no Hamiltonian cycle.${name === 'Petersen' ? ' The Petersen graph is the classic example: every degree 3, highly symmetric, and still no cycle. It does have a Hamiltonian path, so try to visit all ten vertices without closing the loop.' : ''} ${diracLine}`;
+          }
+          const svg = s('svg', { class: 'gr-svg', viewBox: '0 0 540 370', role: 'group', 'aria-label': 'Graph; every vertex is a button' });
+          const side = h('div.gr-panel');
+          body.append(h('div.gr-lab.fill', { style: { gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)' } }, h('div.figure', { style: { minHeight: 0, alignItems: 'start' } }, svg), side));
+          function draw() {
+            const last = path[path.length - 1];
+            const legal = new Set(legalMoves());
+            const onPath = new Set();
+            for (let i = 1; i < path.length; i++) onPath.add(edgeKey(path[i - 1], path[i]));
+            if (closed) onPath.add(edgeKey(last, path[0]));
+            const showParts = explain && info.parts && !info.cycle;
+            const kids = [];
+            for (const [a, b] of G.e) {
+              const used = onPath.has(edgeKey(a, b));
+              const next = !closed && path.length > 0 && ((a === last && legal.has(b)) || (b === last && legal.has(a)));
+              kids.push(s('line', { x1: G.v[a][0], y1: G.v[a][1], x2: G.v[b][0], y2: G.v[b][1], stroke: used ? 'var(--accent)' : next ? 'var(--warn)' : 'var(--rule)', 'stroke-width': used ? 5 : next ? 3.5 : 2.2, 'stroke-dasharray': next ? '7 4' : null, 'stroke-linecap': 'round' }));
+            }
+            G.v.forEach(([x, y], v) => {
+              const k = path.indexOf(v), isLast = v === last && !closed, can = legal.has(v);
+              const part = showParts ? info.parts[v] : null;
+              kids.push(s('g', { class: 'gv', tabindex: 0, role: 'button', 'aria-label': `Vertex ${L(v)}${k >= 0 ? `, visited ${k + 1}` : ''}`, onclick: () => clickVertex(v), onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickVertex(v); } } },
+                isLast ? s('circle', { cx: x, cy: y, r: 28, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+                s('circle', { cx: x, cy: y, r: 20, fill: 'var(--paper)', stroke: 'none' }),
+                s('circle', { class: 'body', cx: x, cy: y, r: 20, fill: k >= 0 ? 'var(--accent)' : can ? 'var(--warn-bg)' : 'var(--sheet)', 'fill-opacity': k >= 0 ? 0.3 : 1, stroke: k >= 0 ? 'var(--accent)' : can ? 'var(--warn)' : 'var(--ink-3)', 'stroke-width': k >= 0 || can ? 3 : 1.5, 'stroke-dasharray': part === 1 ? '4 3' : null }),
+                s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: L(v) }),
+                k >= 0 ? s('text', { x: x + 23, y: y - 14, 'font-size': 11.5, 'font-weight': 700, fill: 'var(--accent)', text: `#${k + 1}` }) : null,
+                part !== null ? s('text', { x: x + 23, y: y + 24, 'font-size': 10.5, 'font-weight': 600, fill: 'var(--ink-2)', text: part ? 'side 2' : 'side 1' }) : null));
+            });
+            // keyboard users keep their place: the vertex that had focus gets it back after the redraw
+            const focusedV = document.activeElement && document.activeElement.closest ? document.activeElement.closest('.gv') : null;
+            const focusedIdx = focusedV ? [...svg.querySelectorAll('.gv')].indexOf(focusedV) : -1;
+            rc(svg, kids);
+            if (focusedIdx >= 0) { const again = svg.querySelectorAll('.gv')[focusedIdx]; if (again) again.focus({ preventScroll: true }); }
+            const left = n - path.length;
+            const stuck = path.length > 0 && !closed && !legal.size;
+            // the toolbar is rebuilt too, so keyboard focus is kept on the same control (Undo falls back to Restart once it is disabled)
+            const act = document.activeElement && side.contains(document.activeElement) ? document.activeElement.dataset.act : null;
+            rc(side,
+              h('div.gr-ctl', h('span', 'Graph'), h('div.seg', Object.keys(GRAPHS).map((k) => h('button', { 'aria-pressed': String(k === name), dataset: { act: 'graph-' + k }, onclick: () => { load(k); draw(); } }, k)))),
+              h('div.row', { style: { gap: '0.3rem' } },
+                h('button.btn.sm', { dataset: { act: 'undo' }, onclick: () => { if (closed) closed = false; else path.pop(); msg = null; draw(); }, disabled: !path.length }, 'Undo'),
+                h('button.btn.sm', { dataset: { act: 'restart' }, onclick: () => { path = []; closed = false; msg = null; draw(); } }, 'Restart'),
+                info.cycle ? h('button.btn.sm', { dataset: { act: 'show' }, onclick: () => { path = info.cycle.slice(); closed = true; msg = ['info', `One Hamiltonian cycle: ${path.map(L).join(' → ')} → ${L(path[0])}. Others may exist.`]; draw(); } }, 'Show a cycle') : null,
+                h('button.btn.sm', { dataset: { act: 'explain' }, 'aria-pressed': String(explain), class: explain ? 'on' : '', onclick: () => { explain = !explain; draw(); } }, explain ? 'Hide explanation' : 'Explain')),
+              h('div.gr-stats',
+                h('div', h('b', String(n)), h('span', '|V| vertices')),
+                h('div', h('b', String(G.e.length)), h('span', '|E| edges')),
+                h('div', h('b', String(info.minDeg)), h('span', 'smallest degree'))),
+              h('div.small', { html: `<b>Dirac check:</b> smallest degree ${info.minDeg} ${info.dirac ? '≥' : '<'} n/2 = ${n / 2}, so a Hamiltonian cycle is <b>${info.dirac ? 'guaranteed' : 'not guaranteed'}</b>${info.dirac ? '' : ' (one may still exist)'}.` }),
+              h('div', h('div.tiny.mono.muted', `PATH SO FAR: ${path.length} OF ${n} VERTICES${closed ? ' · CYCLE CLOSED' : ''}`), h('div.gr-order', path.length ? path.map((v, i) => h('span', h('b', String(i + 1)), L(v))) : h('span.small.muted', { style: { background: 'none' } }, 'click a vertex to start'))),
+              msg ? h('div.feedback', { class: msg[0] }, msg[1])
+                : stuck ? h('div.feedback.bad', `Stuck at ${L(last)}: every neighbor is already on the path and ${left} ${left === 1 ? 'vertex remains' : 'vertices remain'}. Undo a few moves, or press Explain.`)
+                  : path.length && !closed ? h('div.feedback.info', `At ${L(last)}. Legal next moves: ${[...legal].map(L).join(', ')}.`) : null,
+              explain ? h('div.card.small', { style: { padding: '0.5rem 0.7rem' } }, explanation()) : null,
+              h('p.tiny.muted', 'Compare with the Euler check: "all degrees even" is a complete, instant test. No such test is known for Hamiltonian cycles, which is why the traveling salesperson problem is hard.'));
+            if (act) {
+              const again = side.querySelector(`[data-act="${act}"]`);
+              const target = again && !again.disabled ? again : side.querySelector('[data-act="restart"]');
+              if (target) target.focus({ preventScroll: true });
+            }
+          }
+          load('Cube');
+          draw();
+        },
+      },
+      /* ---------------------------------------------------------------- 11 */
       {
         title: "Lab: Dijkstra's shortest paths, step by step",
         kind: 'lab',
@@ -771,7 +944,7 @@
             last = { u, rel };
             return true;
           }
-          const svg = s('svg', { class: 'gr-svg', viewBox: '0 0 600 370', role: 'img', 'aria-label': 'Weighted graph for Dijkstra\'s algorithm' });
+          const svg = s('svg', { class: 'gr-svg', viewBox: '0 0 600 370', role: 'group', 'aria-label': 'Weighted graph for Dijkstra\'s algorithm; every vertex is a button that shows its route' });
           const side = h('div.gr-panel');
           body.append(h('div.gr-lab.fill', { style: { gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)' } }, h('div.figure', { style: { minHeight: 0, alignItems: 'start' } }, svg), side));
           function draw() {
@@ -826,7 +999,7 @@
           draw();
         },
       },
-      /* ---------------------------------------------------------------- 11 */
+      /* ---------------------------------------------------------------- 12 */
       {
         title: "Code: Dijkstra's algorithm with a heap",
         kind: 'code',
@@ -860,39 +1033,122 @@
         expected: "{'A': 0, 'B': 3, 'C': 2, 'D': 8}\n",
         tryIt: 'Change the C–B weight to 5 in both places and predict the new distance to B before you run it. Then add a vertex <code>"E": {}</code> that no road reaches and see how the output reports it.',
       },
-      /* ---------------------------------------------------------------- 12 */
+      /* ---------------------------------------------------------------- 13 */
       {
         title: 'Isomorphism and planar graphs',
         kind: 'concept',
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">Graphs \(G_1\) and \(G_2\) are <span class="term">isomorphic</span> if there is a one-to-one, onto function \(f\) from the vertices of \(G_1\) to the vertices of \(G_2\) such that \(u\) and \(v\) are adjacent exactly when \(f(u)\) and \(f(v)\) are. They are the same graph, drawn and labelled differently.</div>
+              <div class="def">Graphs \(G_1\) and \(G_2\) are <span class="term">isomorphic</span> if there is a one-to-one, onto function \(f\) from the vertices of \(G_1\) to the vertices of \(G_2\) such that \(u\) and \(v\) are adjacent exactly when \(f(u)\) and \(f(v)\) are. They are the same graph, drawn and labeled differently.</div>
               <div class="gr-fig">
                 <div class="center">${FIG_C5}<div class="gr-cap">pentagon</div></div>
                 <div class="center" style="font-size:1.4rem;color:var(--ink-3)">≅</div>
                 <div class="center">${FIG_STAR}<div class="gr-cap">five-point star</div></div>
               </div>
               <p class="small center">\(f\): 1 → a, 2 → c, 3 → e, 4 → b, 5 → d maps every edge to an edge.</p>
-              <div class="tip">To <b>disprove</b> isomorphism, find an <i>invariant</i> that differs: the number of vertices or edges, the list of degrees, the number of components, the number of triangles. To <b>prove</b> it, you must exhibit the function \(f\). Matching invariants alone prove nothing.</div>
+              <div class="tip">To <b>disprove</b> isomorphism, find a <span class="term">graph invariant</span> that differs: vertex or edge count, <span class="term">degree sequence</span>, number of components or triangles. To <b>prove</b> it, exhibit \(f\). Matching invariants alone prove nothing; the next lab asks for both.</div>
+              <div class="ai">Whether two molecules share a bond structure is an isomorphism question in AI-driven drug discovery; circuit-board layout is a planarity question, since wires on one layer must not cross.</div>
             </div>
             <div class="stack">
-              <div class="def">A graph is <span class="term" data-term="planar graph">planar</span> if it can be drawn in the plane with no edges crossing. Such a drawing splits the plane into regions called <b>faces</b>, including the unbounded outer face.</div>
+              <div class="def">A graph is <span class="term" data-term="planar graph">planar</span> if it can be drawn with no edges crossing. The drawing cuts the plane into <span class="term" data-term="face">faces</span>, including the unbounded outer face.</div>
               <div class="gr-fig">
                 <div class="center">${FIG_K4X}<div class="gr-cap">K4 with a crossing</div></div>
                 <div class="center" style="font-size:1.2rem;color:var(--ink-3)">→</div>
                 <div class="center">${FIG_K4P}<div class="gr-cap">redrawn: no crossing</div></div>
               </div>
-              <div class="thm"><b>Euler's formula.</b> A connected planar graph drawn without crossings has \(V - E + F = 2\). For \(K_4\): \(4 - 6 + 4 = 2\); for a cube: \(8 - 12 + 6 = 2\). It follows that a simple planar graph with \(V \ge 3\) has \(E \le 3V - 6\), so \(K_5\), with \(10 \gt 9\) edges, is not planar. Neither is \(K_{3,3}\).</div>
-              <div class="ai">Circuit-board designers need wires that do not cross on one layer: a planarity question. Deciding whether two molecules have the same structure is an isomorphism question, central to AI-driven drug discovery.</div>
+              <div class="thm"><b>Euler's formula.</b> A connected planar graph drawn without crossings has \(V - E + F = 2\) (for \(K_4\): \(4 - 6 + 4 = 2\)). Each face has at least 3 boundary edges and each edge borders at most 2 faces, so \(3F \le 2E\); with Euler's formula this gives \(E \le 3V - 6\) when \(V \ge 3\). \(K_5\) has \(10 \gt 9\) edges: not planar.</div>
+              <div class="thm" data-label="Why K3,3 is not planar">The general bound allows \(K_{3,3}\) (\(9 \le 12\)). But \(K_{3,3}\) is bipartite, so it has no triangles, and every face would need at least 4 boundary edges: \(4F \le 2E\), so \(E \le 2V - 4 = 8\). Nine edges are one too many. <span class="term">Kuratowski's theorem</span> says these are the only two obstacles: a graph is planar if and only if no subgraph is a subdivision of \(K_5\) or \(K_{3,3}\) (edges replaced by paths).</div>
             </div>
           </div>`,
       },
-      /* ---------------------------------------------------------------- 13 */
+      /* ---------------------------------------------------------------- 14 */
+      {
+        id: 'iso-lab',
+        title: 'Lab: isomorphic or not?',
+        kind: 'lab',
+        html: String.raw`<p class="muted small">Two drawings, one question: is \(H\) just \(G\) with its vertices renamed and moved around? Reveal the <span class="term" data-term="graph invariant">invariants</span> one at a time. A single mismatch settles the question with <b>no</b>. When everything matches, only an actual vertex mapping settles it with <b>yes</b>, and the lab can show one.</p>`,
+        render(body, ctx) {
+          const { h, s, rc } = ctx;
+          const xy = (k, cx, cy, rad) => ring(k, cx, cy, rad, Array(k).fill('')).map(([, x, y]) => [x, y]);
+          const hex = xy(6, 130, 118, 88), pent = xy(5, 130, 122, 88);
+          const C6 = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0]];
+          const rows33 = [[45, 45], [130, 45], [215, 45], [45, 190], [130, 190], [215, 190]];
+          const K33 = [[0, 3], [0, 4], [0, 5], [1, 3], [1, 4], [1, 5], [2, 3], [2, 4], [2, 5]];
+          const house = { v: [[55, 195], [205, 195], [205, 100], [55, 100], [130, 28]], e: [[0, 1], [1, 2], [2, 3], [3, 0], [2, 4], [3, 4]] };
+          const PAIRS = [
+            { G: { v: hex, e: C6 }, H: { v: hex, e: [[0, 2], [2, 4], [4, 1], [1, 3], [3, 5], [5, 0]] } },
+            { G: { v: hex, e: C6 }, H: { v: [[70, 45], [20, 170], [120, 170], [190, 45], [140, 170], [240, 170]], e: [[0, 1], [1, 2], [2, 0], [3, 4], [4, 5], [5, 3]] } },
+            { G: { v: rows33, e: K33 }, H: { v: hex, e: [...C6, [0, 3], [1, 4], [2, 5]] } },
+            { G: { v: rows33, e: K33 }, H: { v: [[130, 28], [25, 205], [235, 205], [130, 100], [88, 168], [172, 168]], e: [[0, 1], [1, 2], [2, 0], [3, 4], [4, 5], [5, 3], [0, 3], [1, 4], [2, 5]] } },
+            { G: house, H: { v: pent, e: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [0, 2]] } },
+            { G: house, H: { v: [[130, 118], [35, 45], [35, 190], [225, 45], [225, 190]], e: [[0, 1], [0, 2], [1, 2], [0, 3], [0, 4], [3, 4]] } },
+            { G: { v: pent, e: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0]] }, H: house },
+          ];
+          const NAMES = ['vertices', 'edges', 'degree sequence', 'triangles', 'components'];
+          const facts = (P) => {
+            const n = P.G.v.length, m = P.H.v.length;
+            const seq = (k, E) => degrees(k, E).sort((a, b) => b - a).join(', ');
+            const comps = (k, E) => componentsOf(Array.from({ length: k }, (_, i) => i), nbrsOf(E)).length;
+            const rows = [[n, m], [P.G.e.length, P.H.e.length], [seq(n, P.G.e), seq(m, P.H.e)], [triangles(n, P.G.e), triangles(m, P.H.e)], [comps(n, P.G.e), comps(m, P.H.e)]];
+            return { rows, f: n === m ? isomorphism(n, P.G.e, P.H.e) : null, firstDiff: rows.findIndex(([a, b]) => a !== b) };
+          };
+          let pi = 0, revealed = 0, decided = null, showMap = false, F = facts(PAIRS[0]);
+          const gl = (i) => String(i + 1), hl = (i) => 'abcdef'[i];
+          const svg = s('svg', { viewBox: '0 0 560 240', role: 'img', 'aria-label': 'Two graphs, G on the left and H on the right' });
+          const side = h('div.gr-panel');
+          body.append(h('div.gr-lab.fill', { style: { gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)' } }, h('div.figure', { style: { minHeight: 0, alignItems: 'start' } }, svg), side));
+          /** one framed graph; badge(i) may return a label from G to pin on vertex i of H */
+          function panel(graph, dx, title, lab, badge) {
+            const kids = [s('rect', { x: dx, y: 4, width: 260, height: 232, rx: 12, fill: 'var(--sheet)', stroke: 'var(--rule)', 'stroke-width': 1.5 }), s('text', { x: dx + 12, y: 24, 'font-size': 15, 'font-weight': 700, 'font-style': 'italic', fill: 'var(--ink-2)', text: title })];
+            for (const [a, b] of graph.e) kids.push(s('line', { x1: dx + graph.v[a][0], y1: 4 + graph.v[a][1], x2: dx + graph.v[b][0], y2: 4 + graph.v[b][1], stroke: 'var(--ink-2)', 'stroke-width': 2.4, 'stroke-linecap': 'round' }));
+            graph.v.forEach(([x, y], i) => {
+              kids.push(s('circle', { cx: dx + x, cy: 4 + y, r: 16, fill: 'var(--accent-2)', stroke: 'var(--accent)', 'stroke-width': 1.8 }), s('text', { x: dx + x, y: 4 + y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: lab(i) }));
+              const g = badge ? badge(i) : null;
+              if (g != null) kids.push(s('circle', { cx: dx + x + 14, cy: 4 + y - 13, r: 9, fill: 'var(--mark)', stroke: 'var(--ink)', 'stroke-width': 1 }), s('text', { x: dx + x + 14, y: 4 + y - 9.5, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--mark-ink)', text: g }));
+            });
+            return kids;
+          }
+          function draw() {
+            const P = PAIRS[pi];
+            const from = showMap && F.f ? F.f.reduce((acc, j, i) => { acc[j] = gl(i); return acc; }, {}) : null;
+            rc(svg, panel(P.G, 10, 'G', gl), panel(P.H, 290, 'H', hl, from ? (j) => from[j] : null));
+            const verdict = F.f ? 'Isomorphic' : 'Not isomorphic';
+            const d = F.firstDiff;
+            const mapText = F.f ? `${F.f.map((j, i) => `${gl(i)} → ${hl(j)}`).join(', ')}. Every edge of G lands on an edge of H: ${P.G.e.map(([a, b]) => `${gl(a)}${gl(b)} → ${hl(F.f[a])}${hl(F.f[b])}`).join(', ')}.` : '';
+            let fb = null;
+            if (decided) {
+              const ok = decided === verdict;
+              if (ok && F.f) fb = ['good', `Correct. A mapping proves it: ${mapText}`];
+              else if (ok) fb = ['good', `Correct. The decisive invariant is the number of ${NAMES[d]}: G has ${F.rows[d][0]}, H has ${F.rows[d][1]}. Isomorphic graphs agree on every invariant, so one mismatch is enough.`.replace('number of degree sequence', 'degree sequence')];
+              else if (F.f) fb = ['bad', `Not quite. Every invariant matches, and this mapping preserves every edge: ${mapText}`];
+              else fb = ['bad', `Not quite. Compare the ${NAMES[d]}: G has ${F.rows[d][0]} and H has ${F.rows[d][1]}. Isomorphic graphs can never differ in an invariant.`];
+            }
+            rc(side,
+              h('div.gr-ctl', h('span', 'Pair'), h('div.seg', PAIRS.map((_, i) => h('button', { 'aria-pressed': String(i === pi), onclick: () => { pi = i; F = facts(PAIRS[i]); revealed = 0; decided = null; showMap = false; draw(); } }, String(i + 1))))),
+              h('table.tt.gr-table', { style: { width: '100%' } },
+                h('thead', h('tr', h('th.l', 'invariant'), h('th', 'G'), h('th', 'H'), h('th', 'same?'))),
+                h('tbody', NAMES.map((nm, i) => { const shown = i < revealed; const [a, b] = F.rows[i]; return h('tr', { class: shown && a !== b ? 'cur' : '' }, h('td.l', nm), h('td.mono', shown ? String(a) : '?'), h('td.mono', shown ? String(b) : '?'), h('td', shown ? (a === b ? 'match' : 'differ') : '')); }))),
+              h('div.row', { style: { gap: '0.3rem' } },
+                h('button.btn.sm.primary', { onclick: () => { revealed = Math.min(NAMES.length, revealed + 1); draw(); }, disabled: revealed >= NAMES.length }, revealed ? 'Reveal next invariant' : 'Reveal the first invariant'),
+                h('button.btn.sm', { onclick: () => { revealed = NAMES.length; draw(); }, disabled: revealed >= NAMES.length }, 'Reveal all')),
+              h('div.row', { style: { gap: '0.3rem' } },
+                h('span.small', 'Your call:'),
+                ['Isomorphic', 'Not isomorphic'].map((c) => h('button.btn.sm', { 'aria-pressed': String(decided === c), class: decided === c ? 'on' : '', onclick: () => { decided = c; showMap = !!F.f; draw(); } }, c)),
+                F.f && decided ? h('button.btn.sm', { 'aria-pressed': String(showMap), class: showMap ? 'on' : '', onclick: () => { showMap = !showMap; draw(); } }, showMap ? 'Hide the mapping' : 'Show the mapping') : null),
+              fb ? h('div.feedback', { class: fb[0] }, fb[1])
+                : revealed >= NAMES.length ? h('div.feedback.info', d >= 0 ? 'One invariant differs. What does that tell you?' : 'All five invariants match. That is consistent with isomorphism but proves nothing by itself: decide, then check the mapping.')
+                  : h('p.small.muted', 'Reveal invariants until one differs, or until you are ready to decide. Where a vertex sits on the page means nothing; only which pairs are joined.'),
+              showMap && F.f ? h('p.tiny.muted', 'The highlighted badges on H name the vertex of G that each vertex came from.') : null);
+          }
+          draw();
+        },
+      },
+      /* ---------------------------------------------------------------- 15 */
       {
         title: 'Design practice: graphs in real software',
         kind: 'design',
-        html: String.raw`<p class="muted small">Graph code goes wrong in predictable ways: unclear modelling, the wrong representation, missing visited checks. Click each principle (or use <kbd>↓</kbd>) to compare code to avoid with code to write.</p>`,
+        html: String.raw`<p class="muted small">Graph code goes wrong in predictable ways: unclear modeling, the wrong representation, missing visited checks. Click each principle (or use <kbd>↓</kbd>) to compare code to avoid with code to write.</p>`,
         principles: [
           {
             name: 'Model the domain before you write code',
@@ -942,7 +1198,7 @@
           },
         ],
       },
-      /* ---------------------------------------------------------------- 14 */
+      /* ---------------------------------------------------------------- 16 */
       {
         title: 'Practice: graphs',
         kind: 'practice',
@@ -1058,23 +1314,126 @@
               return { prompt: `This is the adjacency matrix \\(A\\) of a graph. How many walks of length 2 go from ${lab[i]} to ${lab[j]}? (That is the entry \\((A^2)_{${lab[i]}${lab[j]}}\\).)${table}`, answer: val, hint: 'a walk of length 2 goes from the first vertex to some middle vertex, then on to the second.', solution: `Multiply row ${lab[i]} by column ${lab[j]}: ${A[i].map((x, k) => `${x}·${A[k][j]}`).join(' + ')} = <b>${val}</b>. ${val ? `The middle vertex can be ${via.join(' or ')}: ${via.map((m) => `${lab[i]} → ${m} → ${lab[j]}`).join(', ')}.` : 'No vertex is adjacent to both, so there is no such walk.'}` };
             },
           },
+          {
+            label: 'Isomorphism',
+            make(R, M) {
+              const HL = 'abcdefg';
+              const seqOf = (k, E) => degrees(k, E).sort((a, b) => b - a);
+              const relabel = (E, p) => E.map(([a, b]) => [p[a], p[b]]);
+              const nonEdges = (k, E) => allPairs(k).filter(([a, b]) => !E.some(([x, y]) => (x === a && y === b) || (x === b && y === a)));
+              const randomGraph = (k) => { let E; do { E = allPairs(k).filter(() => R.chance(0.45)); } while (E.length < k - 1 || E.length > M.C(k, 2) - 2); return E; };
+              /* keeps the number of edges but changes the degree sequence by moving one edge; null if 60 tries fail */
+              const moveEdge = (k, E) => {
+                for (let t = 0; t < 60; t++) {
+                  const drop = R.int(0, E.length - 1), add = R.pick(nonEdges(k, E));
+                  const E2 = E.filter((_, i) => i !== drop).concat([add]);
+                  if (seqOf(k, E2).join() !== seqOf(k, E).join()) return E2;
+                }
+                return null;
+              };
+              if (R.chance(0.55)) {
+                // two drawings: a curated same-degree-sequence pair, a relabeled copy, or a moved edge
+                const CURATED = [
+                  [[[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0]], [[0, 1], [1, 2], [2, 0], [3, 4], [4, 5], [5, 3]]],
+                  [[[0, 3], [0, 4], [0, 5], [1, 3], [1, 4], [1, 5], [2, 3], [2, 4], [2, 5]], [[0, 1], [1, 2], [2, 0], [3, 4], [4, 5], [5, 3], [0, 3], [1, 4], [2, 5]]],
+                ];
+                const mode = R.int(0, 2);
+                const n = mode === 2 ? 6 : R.int(5, 6);
+                let EG, EH;
+                if (mode === 2) { const pair = R.shuffle(R.pick(CURATED)); EG = relabel(pair[0], R.shuffle(M.range(0, 5))); EH = relabel(pair[1], R.shuffle(M.range(0, 5))); }
+                else { EG = randomGraph(n); const perm = R.shuffle(M.range(0, n - 1)); EH = relabel(mode === 0 ? EG : moveEdge(n, EG) || EG.slice(1), perm); }
+                const f = isomorphism(n, EG, EH);
+                const comps = (E) => componentsOf(M.range(0, n - 1), nbrsOf(E)).length;
+                const rows = [['edges', EG.length, EH.length], ['degree sequence', seqOf(n, EG).join(', '), seqOf(n, EH).join(', ')], ['triangles', triangles(n, EG), triangles(n, EH)], ['components', comps(EG), comps(EH)]];
+                const diff = rows.find(([, a, b]) => a !== b);
+                const posG = ring(n, 100, 82, 62, M.range(1, n).map(String));
+                const posH = (n === 5 ? [[40, 28], [160, 28], [100, 80], [40, 136], [160, 136]] : [[35, 32], [100, 32], [165, 32], [35, 128], [100, 128], [165, 128]]).map(([x, y], i) => [HL[i], x, y]);
+                const figs = `<div class="row" style="justify-content:center;gap:1.5rem;margin:0.3rem 0">${fig(200, 160, posG, EG, { aria: 'Graph G', style: 'max-height:8.5rem;display:block' })}${fig(200, 160, posH, EH, { aria: 'Graph H', style: 'max-height:8.5rem;display:block' })}</div>`;
+                return {
+                  prompt: String.raw`Are these two graphs isomorphic? \(G\) is on the left (vertices 1 to ${n}) and \(H\) on the right (vertices a to ${HL[n - 1]}).${figs}`,
+                  options: ['Yes', 'No'], answer: f ? 'Yes' : 'No',
+                  hint: 'compare invariants first: edges, degree sequence, triangles, components. Only a mapping proves yes.',
+                  solution: f
+                    ? `<b>Yes.</b> Both have ${n} vertices, ${EG.length} edges and degree sequence ${rows[1][1]}, which only suggests it. The mapping ${f.map((j, i) => `${i + 1} → ${HL[j]}`).join(', ')} proves it, because it sends every edge of G to an edge of H: ${EG.map(([a, b]) => `${a + 1}${b + 1} → ${HL[f[a]]}${HL[f[b]]}`).join(', ')}.`
+                    : `<b>No.</b> ${diff ? `Compare the ${diff[0]}: G has ${diff[1]} and H has ${diff[2]}.` : 'An exhaustive check of every vertex relabeling finds none that preserves adjacency.'} Isomorphic graphs agree on every invariant, so one mismatch is enough.`,
+                };
+              }
+              const n = R.int(5, 7);
+              const EG = randomGraph(n), sg = seqOf(n, EG);
+              const opts = ['No: they do not even have the same number of edges', 'No: the edge counts agree, but the degree sequences differ', 'Possibly: these invariants match, so only a vertex mapping can decide'];
+              const mode = R.int(0, 2);
+              let EH, answer;
+              if (mode === 0) { EH = relabel(EG, R.shuffle(M.range(0, n - 1))); answer = opts[2]; }
+              else if (mode === 1) { EH = R.chance(0.5) && EG.length > n ? EG.slice(1) : [...EG, R.pick(nonEdges(n, EG))]; answer = opts[0]; }
+              else { EH = moveEdge(n, EG); if (EH) answer = opts[1]; else { EH = EG.slice(1); answer = opts[0]; } }
+              const sh = seqOf(n, EH);
+              const sumG = sg.reduce((x, y) => x + y, 0), sumH = sh.reduce((x, y) => x + y, 0);
+              return {
+                prompt: String.raw`Graph \(G\) has ${n} vertices with degree sequence ${sg.join(', ')}. Graph \(H\) has ${n} vertices with degree sequence ${sh.join(', ')}. Can \(G\) and \(H\) be isomorphic?`,
+                options: opts, answer,
+                hint: 'the handshake theorem turns a degree sequence into an edge count.',
+                solution: `Handshake theorem first: the degrees of G add to ${sumG}, so G has ${sumG / 2} edges; the degrees of H add to ${sumH}, so H has ${sumH / 2}. ` + (answer === opts[0]
+                  ? 'Different edge counts, so no isomorphism is possible.'
+                  : answer === opts[1]
+                    ? `Same edge count. An isomorphism sends each vertex to a vertex of the same degree, so the sorted degree lists would have to agree. They do not (${sg.join(', ')} against ${sh.join(', ')}), so the graphs are not isomorphic.`
+                    : 'Same edge count and the same degree sequence. These invariants are consistent with isomorphism but prove nothing: a hexagon and two separate triangles both have degree sequence 2, 2, 2, 2, 2, 2 and are not isomorphic. To prove isomorphism you must exhibit the vertex mapping.'),
+              };
+            },
+          },
+          {
+            label: 'Planar & Hamiltonian',
+            make(R, M) {
+              const kind = R.int(0, 2);
+              if (kind === 0) {
+                const v = R.int(5, 12), e = R.int(v, 3 * v - 6), f = e - v + 2;
+                return {
+                  prompt: String.raw`A connected planar graph has \(${v}\) vertices and \(${e}\) edges. How many faces does a crossing-free drawing of it have, counting the outer face?`,
+                  answer: f,
+                  hint: String.raw`Euler's formula: \(V - E + F = 2\).`,
+                  solution: String.raw`Euler's formula \(V - E + F = 2\) gives \(${v} - ${e} + F = 2\), so \(F = 2 - ${v} + ${e} = ${f}\). The unbounded outer region counts as one of the faces.`,
+                };
+              }
+              if (kind === 1) {
+                const tf = R.chance(0.4);
+                const v = R.int(5, 9), e = R.int(v, tf ? Math.floor((v * v) / 4) : M.C(v, 2));
+                const bound = tf ? 2 * v - 4 : 3 * v - 6;
+                const opts = ['No: it has too many edges to be planar', 'Maybe: the edge bound does not rule it out'];
+                const answer = e > bound ? opts[0] : opts[1];
+                return {
+                  prompt: String.raw`A simple${tf ? ', triangle-free' : ''} graph has \(${v}\) vertices and \(${e}\) edges. Can it be planar?`,
+                  options: opts, answer,
+                  hint: tf ? String.raw`a planar graph with no triangles has \(E \le 2V - 4\).` : String.raw`a simple planar graph with \(V \ge 3\) has \(E \le 3V - 6\).`,
+                  solution: String.raw`In a crossing-free drawing every face has at least ${tf ? 4 : 3} boundary edges${tf ? ' (no triangles)' : ''} and every edge borders at most two faces, so \(${tf ? 4 : 3}F \le 2E\). Combined with Euler's formula that gives \(E \le ${tf ? '2V - 4' : '3V - 6'} = ${bound}\). Here \(E = ${e} ${e > bound ? '\\gt' : '\\le'} ${bound}\), so ${e > bound ? 'the graph cannot be planar.' : `the bound does not rule planarity out. It does not prove it either: ${tf ? 'subdivide one edge of \\(K_{3,3}\\) and you get a triangle-free graph with \\(V = 7\\) and \\(E = 10 = 2 \\cdot 7 - 4\\) that is still not planar' : '\\(K_{3,3}\\) has \\(9 \\le 3 \\cdot 6 - 6 = 12\\) edges and is still not planar'}.`}`,
+                };
+              }
+              const n = R.int(5, 12), d = R.int(2, n - 1), ok = 2 * d >= n;
+              return {
+                prompt: String.raw`A simple graph has \(${n}\) vertices, and every vertex has degree at least \(${d}\). Does Dirac's theorem guarantee a Hamiltonian cycle?`,
+                options: ['Yes', 'No'], answer: ok ? 'Yes' : 'No',
+                hint: String.raw`Dirac's condition: every degree at least \(n/2\).`,
+                solution: String.raw`Dirac's theorem: if every vertex of a simple graph with \(n \ge 3\) vertices has degree at least \(n/2\), the graph has a Hamiltonian cycle. Here \(n/2 = ${n / 2}\) and every degree is at least \(${d}\), which ${ok ? 'meets' : 'does not meet'} the condition. ${ok ? 'So a Hamiltonian cycle is <b>guaranteed</b>.' : 'So the theorem gives <b>no guarantee</b>. A cycle may still exist (the cube graph has degree 3 with 8 vertices and still has one): the condition is sufficient, not necessary.'}`,
+              };
+            },
+          },
         ],
       },
-      /* ---------------------------------------------------------------- 15 */
+      /* ---------------------------------------------------------------- 17 */
       {
         title: 'Check yourself: graphs',
         kind: 'quiz',
         questions: [
-          { q: 'A graph has five vertices with degrees 3, 3, 2, 2 and 2. How many edges does it have?', choices: ['5', '6', '12', 'It cannot exist'], answer: 1, explain: String.raw`By the handshake theorem the degrees add to \(2|E|\): \(3 + 3 + 2 + 2 + 2 = 12\), so \(|E| = 6\).` },
+          { q: 'A graph has five vertices with degrees 3, 3, 2, 2 and 2. How many edges does it have?', choices: ['6', '5', '12', 'It cannot exist'], answer: 0, explain: String.raw`By the handshake theorem the degrees add to \(2|E|\): \(3 + 3 + 2 + 2 + 2 = 12\), so \(|E| = 6\).` },
           { q: 'Is there a graph with five vertices that all have degree 3?', choices: ['Yes, for example the complete graph \\(K_5\\)', 'Yes, but only if loops are allowed', 'No: the degrees would add up to 15, an odd number', 'No: five vertices can have at most 4 edges'], answer: 2, explain: String.raw`The degree sum is always \(2|E|\), which is even. Five vertices of degree 3 add up to 15. (In \(K_5\) every vertex has degree 4, not 3.)` },
-          { q: String.raw`How many edges does \(K_6\) have?`, choices: ['6', '12', '15', '30'], answer: 2, explain: String.raw`\(\binom{6}{2} = \frac{6 \cdot 5}{2} = 15\). Each of the 6 vertices has degree 5, and \(6 \cdot 5 = 30 = 2 \cdot 15\).` },
+          { q: String.raw`How many edges does \(K_6\) have?`, choices: ['6', '12', '30', '15'], answer: 3, explain: String.raw`\(\binom{6}{2} = \frac{6 \cdot 5}{2} = 15\). Each of the 6 vertices has degree 5, and \(6 \cdot 5 = 30 = 2 \cdot 15\).` },
           { q: 'A connected graph has exactly two vertices of odd degree, u and v. What does Euler\'s theorem tell you?', choices: ['It has an Euler cycle', 'It has an Euler path from u to v, but no Euler cycle', 'It has neither an Euler path nor an Euler cycle', 'It has a Hamiltonian cycle'], answer: 1, explain: 'An Euler cycle needs every degree even. With exactly two odd vertices, an Euler path exists and must start at one of them and end at the other. Euler\'s theorem says nothing about Hamiltonian cycles.' },
-          { q: 'Why can no walk cross each of the seven bridges of Königsberg exactly once?', choices: ['There are too many bridges', 'The island is not connected to the east land', 'All four land masses touch an odd number of bridges', 'A walk cannot cross water twice'], answer: 2, explain: 'Each pass through a land mass uses two bridges, so only the start and the finish may touch an odd number. In Königsberg all four land masses touch an odd number (5, 3, 3, 3).' },
-          { q: 'Why does Dijkstra\'s algorithm fail when some edge weights are negative?', choices: ['Heaps cannot store negative numbers', 'A vertex already finalized might later be reachable more cheaply through a negative edge', 'Negative weights make the graph disconnected', 'It runs forever'], answer: 1, explain: 'Dijkstra never revisits a finalized vertex. That is safe only if adding more edges can never shorten a route. A negative edge discovered later can, so the finalized distance may be wrong. Bellman–Ford handles negative weights.' },
+          { q: 'Why can no walk cross each of the seven bridges of Königsberg exactly once?', choices: ['There are too many bridges', 'The island is not connected to the east land', 'A walk cannot cross water twice', 'All four land masses touch an odd number of bridges'], answer: 3, explain: 'Each pass through a land mass uses two bridges, so only the start and the finish may touch an odd number. In Königsberg all four land masses touch an odd number (5, 3, 3, 3).' },
+          { q: 'What is the difference between an Euler cycle and a Hamiltonian cycle?', choices: ['An Euler cycle visits every vertex exactly once; a Hamiltonian cycle uses every edge exactly once', 'An Euler cycle uses every edge exactly once; a Hamiltonian cycle visits every vertex exactly once', 'They are two names for the same thing', 'An Euler cycle exists only in weighted graphs'], answer: 1, explain: String.raw`Euler cycles are about edges and have an instant test (every degree even). Hamiltonian cycles are about vertices and have no known fast test. The two are independent: \(K_4\) has a Hamiltonian cycle but no Euler cycle, because every degree is 3.` },
+          { q: 'Why does Dijkstra\'s algorithm fail when some edge weights are negative?', choices: ['A vertex already finalized might later be reachable more cheaply through a negative edge', 'Heaps cannot store negative numbers', 'Negative weights make the graph disconnected', 'It runs forever'], answer: 0, explain: 'Dijkstra never revisits a finalized vertex. That is safe only if adding more edges can never shorten a route. A negative edge discovered later can, so the finalized distance may be wrong. Bellman–Ford handles negative weights.' },
           { q: 'A social network has 100 million users, each with about 200 friends. Which representation fits?', choices: ['An adjacency matrix, for fast lookups', 'An adjacency list', 'A list of all \\(\\binom{n}{2}\\) possible pairs', 'A single string'], answer: 1, explain: String.raw`A matrix would need \(10^{16}\) cells, almost all zero. The list stores only the real friendships, about \(2 \times 10^{10}\) entries. Sparse graphs call for adjacency lists.` },
-          { q: 'In an unweighted graph, what does breadth-first search from a vertex s find?', choices: ['A Hamiltonian cycle through s', 'The path from s with the fewest edges to every reachable vertex', 'The heaviest path from s', 'Whether the graph is planar'], answer: 1, explain: 'BFS processes vertices in order of distance from s, so the first time it reaches a vertex it does so along a path with the fewest possible edges.' },
-          { q: String.raw`What does the entry in row \(i\), column \(j\) of \(A^2\) count, where \(A\) is the adjacency matrix?`, choices: ['The number of edges at vertex \\(i\\)', 'The number of walks of length 2 from \\(v_i\\) to \\(v_j\\)', 'The length of the shortest path from \\(v_i\\) to \\(v_j\\)', 'Whether \\(v_i\\) and \\(v_j\\) are adjacent'], answer: 1, explain: String.raw`\((A^2)_{ij} = \sum_k A_{ik} A_{kj}\) counts the middle vertices \(k\) adjacent to both \(v_i\) and \(v_j\), that is, the walks \(v_i \to v_k \to v_j\). On the diagonal it gives the degree.` },
-          { q: 'A connected planar graph has 10 vertices and 15 edges. How many faces does a crossing-free drawing of it have?', choices: ['5', '7', '23', '27'], answer: 1, explain: String.raw`Euler's formula \(V - E + F = 2\) gives \(10 - 15 + F = 2\), so \(F = 7\), counting the outer face.` },
+          { q: 'In an unweighted graph, what does breadth-first search from a vertex s find?', choices: ['A Hamiltonian cycle through s', 'The heaviest path from s', 'The path from s with the fewest edges to every reachable vertex', 'Whether the graph is planar'], answer: 2, explain: 'BFS processes vertices in order of distance from s, so the first time it reaches a vertex it does so along a path with the fewest possible edges.' },
+          { q: String.raw`What does the entry in row \(i\), column \(j\) of \(A^2\) count, where \(A\) is the adjacency matrix?`, choices: ['The number of edges at vertex \\(i\\)', 'The length of the shortest path from \\(v_i\\) to \\(v_j\\)', 'Whether \\(v_i\\) and \\(v_j\\) are adjacent', 'The number of walks of length 2 from \\(v_i\\) to \\(v_j\\)'], answer: 3, explain: String.raw`\((A^2)_{ij} = \sum_k A_{ik} A_{kj}\) counts the middle vertices \(k\) adjacent to both \(v_i\) and \(v_j\), that is, the walks \(v_i \to v_k \to v_j\). On the diagonal it gives the degree.` },
+          { q: 'A connected planar graph has 10 vertices and 15 edges. How many faces does a crossing-free drawing of it have?', choices: ['7', '5', '23', '27'], answer: 0, explain: String.raw`Euler's formula \(V - E + F = 2\) gives \(10 - 15 + F = 2\), so \(F = 7\), counting the outer face.` },
+          { q: String.raw`Why is \(K_{3,3}\) not planar?`, choices: ['It has more than \\(3V - 6 = 12\\) edges', 'Every vertex has odd degree', 'It is bipartite, so it has no triangles, and a planar graph without triangles needs \\(E \\le 2V - 4 = 8\\); it has 9 edges', 'It is not connected'], answer: 2, explain: String.raw`The general bound gives \(9 \le 12\) and does not decide. Without triangles every face has at least 4 boundary edges, so \(4F \le 2E\) and \(E \le 2V - 4 = 8\), one short of the 9 edges of \(K_{3,3}\). Kuratowski's theorem names \(K_5\) and \(K_{3,3}\) as the two basic obstacles to planarity. Odd degrees matter for Euler cycles, not for planarity.` },
         ],
       },
     ],

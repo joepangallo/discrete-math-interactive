@@ -1,8 +1,17 @@
-# Source syllabus stays local (school and course identifiers)
-2026-Fall-*.pdf
+# Course inputs with school or course identifiers stay local; only the companion PDF is published
+*.pdf
+!discrete-math-companion.pdf
+private/
+
 # Local tooling and test output
 .DS_Store
 node_modules/
 __pycache__/
 *.pyc
+.venv/
+venv/
+*.log
+.idea/
+.vscode/
 shots/
+*.fragment.html
