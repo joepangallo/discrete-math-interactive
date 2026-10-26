@@ -128,6 +128,49 @@
     return col;
   }
 
+  /* ---------- worked-example data: BFS layers and Dijkstra snapshots, precomputed ---------- */
+  const EX_BFS_VERTS = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const EX_BFS_POS = { A: [60, 105], B: [175, 40], C: [175, 170], D: [295, 105], E: [415, 170], F: [415, 40] };
+  const EX_BFS_EDGES = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']];
+  const EX_BFS_ANSWER = { order: ['A', 'B', 'C', 'D', 'E', 'F'], dist: { A: 0, B: 1, C: 1, D: 2, E: 2, F: 3 } };
+  const EX_BFS_SNAP = (() => {
+    const adj = Object.fromEntries(EX_BFS_VERTS.map((v) => [v, []]));
+    EX_BFS_EDGES.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
+    EX_BFS_VERTS.forEach((v) => adj[v].sort());
+    const dist = { A: 0 }, parent = {}, order = [], q = ['A'];
+    const snaps = [{ queue: ['A'], order: [], discovered: ['A'], parent: {}, current: null }];
+    while (q.length) {
+      const u = q.shift(); order.push(u);
+      for (const w of adj[u]) if (!(w in dist)) { dist[w] = dist[u] + 1; parent[w] = u; q.push(w); }
+      snaps.push({ queue: [...q], order: [...order], discovered: Object.keys(dist), parent: { ...parent }, current: u });
+    }
+    return snaps;
+  })();
+  const EX_DIJ_VERTS = ['A', 'B', 'C', 'D', 'E'];
+  const EX_DIJ_POS = { A: [55, 115], B: [185, 40], C: [185, 190], D: [325, 115], E: [465, 190] };
+  const EX_DIJ_EDGES = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
+  const EX_DIJ_ANSWER = { A: 0, B: 3, C: 2, D: 8, E: 10 };
+  const EX_DIJ_SNAP = (() => {
+    const adj = Object.fromEntries(EX_DIJ_VERTS.map((v) => [v, []]));
+    EX_DIJ_EDGES.forEach(([a, b, w]) => { adj[a].push([b, w]); adj[b].push([a, w]); });
+    EX_DIJ_VERTS.forEach((v) => adj[v].sort((x, y) => x[0].localeCompare(y[0])));
+    const dist = Object.fromEntries(EX_DIJ_VERTS.map((v) => [v, v === 'A' ? 0 : Infinity]));
+    const prev = {}, settled = [];
+    const snaps = [{ dist: { ...dist }, prev: {}, settled: [], improved: [], current: null }];
+    for (;;) {
+      const cand = EX_DIJ_VERTS.filter((v) => !settled.includes(v) && dist[v] < Infinity).sort((a, b) => dist[a] - dist[b] || a.localeCompare(b));
+      if (!cand.length) break;
+      const u = cand[0]; settled.push(u);
+      const improved = [];
+      for (const [w, wt] of adj[u]) {
+        if (settled.includes(w)) continue;
+        if (dist[u] + wt < dist[w]) { improved.push([w, dist[w], dist[u] + wt]); dist[w] = dist[u] + wt; prev[w] = u; }
+      }
+      snaps.push({ dist: { ...dist }, prev: { ...prev }, settled: [...settled], improved, current: u });
+    }
+    return snaps;
+  })();
+
   DM.module({
     id: 'graphs',
     num: 9,
@@ -1197,6 +1240,142 @@
             good: 'import networkx as nx\nG = nx.Graph()\nG.add_weighted_edges_from([("A", "B", 4), ("A", "C", 2)])\nprint(nx.shortest_path(G, "A", "B", weight="weight"))',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: breadth-first search order and layers',
+        kind: 'example',
+        id: 'ex-bfs-order',
+        problem: '<p>Run breadth-first search from vertex A in the graph with vertices A, B, C, D, E, F and edges A-B, A-C, B-D, C-D, C-E, D-F and E-F, visiting neighbors in alphabetical order. Give the visit order and the distance (layer) of each vertex from A.</p>',
+        steps: [
+          { visited: 0, caption: 'Start with the graph and the queue holding only A, marked as the source at layer 0. Nothing is visited yet, because BFS visits a vertex only when it reaches the front of the queue.' },
+          { visited: 1, caption: 'Visit A and move its undiscovered neighbors B and C to the back of the queue at layer 1. A is finished first because the queue is first in, first out, so nearer vertices are always processed before farther ones.' },
+          { visited: 2, caption: 'Visit B, the front of the queue, and enqueue its only undiscovered neighbor D at layer 2; A and C are already known. D gets layer 2 because BFS first reaches it along a shortest path, A-B-D, while layer-1 C is still waiting.' },
+          { visited: 3, caption: 'Visit C and enqueue E at layer 2, while D is already waiting in the queue and so is not added a second time. C is processed before D because every layer-1 vertex leaves the queue before any layer-2 vertex.' },
+          { visited: 4, caption: 'Visit D and enqueue F at layer 3, its first discovery, reached along the path A-B-D. F cannot sit closer than layer 3, because both of its neighbors are at layer 2 and BFS discovers vertices in order of distance.' },
+          { visited: 5, caption: 'Visit E and enqueue nothing new: both of its neighbors, C and F, have already been discovered. The queue still holds F, so the search continues until the last layer-2 vertex is done and F reaches the front.' },
+          { visited: 6, caption: 'Visit F, the last vertex in the queue, and the queue empties, which ends the search. F sits at layer 3 because it was discovered from a layer-2 vertex, and the queue order guarantees no shorter route to it exists.' },
+          { visited: 6, answer: true, caption: 'Answer: the visit order is A, B, C, D, E, F, with distances A 0, B 1, C 1, D 2, E 2 and F 3. Check: every edge joins layers differing by at most 1 — A-B is 0 to 1 and D-F is 2 to 3 — and F at layer 3 also matches the path A-C-E-F of length 3.' },
+        ],
+        answer: EX_BFS_ANSWER,
+        verify(M) {
+          const edges = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']];
+          const verts = ['A', 'B', 'C', 'D', 'E', 'F'];
+          const adj = Object.fromEntries(verts.map((v) => [v, []]));
+          edges.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
+          verts.forEach((v) => adj[v].sort());
+          const dist = { A: 0 }, order = [], q = ['A'];
+          while (q.length) { const u = q.shift(); order.push(u); for (const w of adj[u]) if (!(w in dist)) { dist[w] = dist[u] + 1; q.push(w); } }
+          const sameOrder = JSON.stringify(order) === JSON.stringify(EX_BFS_ANSWER.order);
+          const sameDist = verts.every((v) => dist[v] === EX_BFS_ANSWER.dist[v]);
+          const layersOk = edges.every(([a, b]) => Math.abs(EX_BFS_ANSWER.dist[a] - EX_BFS_ANSWER.dist[b]) <= 1);
+          return sameOrder && sameDist && layersOk;
+        },
+        draw(stage, ctx, step) {
+          const { h, s, rc } = ctx;
+          const snap = EX_BFS_SNAP[step.visited];
+          const visited = new Set(snap.order);
+          const discovered = new Set(snap.discovered);
+          const kids = [];
+          for (const [a, b] of EX_BFS_EDGES) {
+            const tree = snap.parent[b] === a || snap.parent[a] === b;
+            kids.push(s('line', { x1: EX_BFS_POS[a][0], y1: EX_BFS_POS[a][1], x2: EX_BFS_POS[b][0], y2: EX_BFS_POS[b][1], stroke: tree ? 'var(--accent)' : 'var(--rule)', 'stroke-width': tree ? 4.5 : 2.2, 'stroke-linecap': 'round' }));
+          }
+          for (const v of EX_BFS_VERTS) {
+            const [x, y] = EX_BFS_POS[v];
+            const isV = visited.has(v), isQ = discovered.has(v) && !isV, cur = snap.current === v && !step.answer;
+            kids.push(s('g', {},
+              cur || (step.visited === 0 && v === 'A') ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+              s('circle', { cx: x, cy: y, r: 20, fill: isV ? 'var(--accent)' : isQ ? 'var(--warn-bg)' : 'var(--sheet)', 'fill-opacity': isV ? 0.3 : 1, stroke: isV ? 'var(--accent)' : isQ ? 'var(--warn)' : 'var(--ink-3)', 'stroke-width': isV || isQ ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: v }),
+              isV ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: 'var(--ink-2)', text: `layer ${EX_BFS_ANSWER.dist[v]}` }) : null,
+              cur ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--ink)', text: '▼ current' }) : null,
+              step.visited === 0 && v === 'A' ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--accent)', text: '▼ source' }) : null));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 235', role: 'img', 'aria-label': 'Graph for breadth-first search from A, with visited vertices filled and the queue shown below', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const queue = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'QUEUE'),
+            h('div.gr-box', h('span.end', 'front →'), snap.queue.length ? snap.queue.map((v) => h('span.cell', v)) : h('span.small.muted', 'empty'), h('span.end', '← back')));
+          const orderStrip = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'VISIT ORDER'),
+            h('div.gr-order', snap.order.length ? snap.order.map((v, i) => h('span', h('b', String(i + 1)), v)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing visited yet')));
+          const table = step.answer ? h('table.tt',
+            h('thead', h('tr', h('th', 'vertex'), EX_BFS_VERTS.map((v) => h('th', v)))),
+            h('tbody', h('tr', h('td', 'distance'), EX_BFS_VERTS.map((v) => h('td', String(EX_BFS_ANSWER.dist[v])))))) : null;
+          const banner = step.answer ? h('div.ex-answer', 'Answer: visit order A → B → C → D → E → F · distances A 0, B 1, C 1, D 2, E 2, F 3 · check: every edge joins layers at most 1 apart (A-B: 0-1, D-F: 2-3), and F = 3 matches the path A-C-E-F ✓') : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, queue, orderStrip, table, banner));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: Dijkstra shortest distances from A',
+        kind: 'example',
+        id: 'ex-dijkstra',
+        problem: '<p>Find the shortest distances from A in the weighted graph with edges A-B 4, A-C 2, C-B 1, B-D 5, C-D 8, C-E 10 and D-E 2. Show the tentative distance of every vertex after each vertex is settled, and give the shortest path to E.</p>',
+        steps: [
+          { settled: 0, caption: 'Setup: A starts at distance 0 and every other vertex is infinity, meaning no route to it is known yet. Dijkstra settles the closest unsettled vertex next, because with all weights positive no alternative route could reach that vertex more cheaply.' },
+          { settled: 1, caption: 'Settle A at 0, the smallest tentative label, and relax its edges: B gets 4 and C gets 2. These labels are only tentative, not final, because a shorter route to either vertex could still show up through the other one.' },
+          { settled: 2, caption: 'Settle C at 2, the smallest tentative label, and relax its edges: B improves from 4 to 3 via C, while D appears at 10 and E at 12. The improvement to B is exactly why a label is never finalized until its vertex is the minimum unsettled one.' },
+          { settled: 3, caption: 'Settle B at 3 and relax its edge to D: D improves from 10 to 8 via B, beating the route through C. B has no edge to E in this graph, so E keeps its tentative label of 12 for now.' },
+          { settled: 4, caption: 'Settle D at 8 and relax its edge to E: E improves from 12 to 10 via D. Every other neighbor of D is already settled, so this is the last improvement the algorithm will make.' },
+          { settled: 5, caption: 'Settle E at 10, the only vertex left, and there is nothing left to relax because all of its neighbors are settled. The settled order A, C, B, D, E increases in distance, which is exactly the pattern Dijkstra guarantees.' },
+          { settled: 5, answer: true, caption: 'Answer: the shortest distances from A are A 0, B 3, C 2, D 8 and E 10. Check: the path A-C-B-D-E sums to 2 + 1 + 5 + 2 = 10, matching the distance of E, and D via C would cost 2 + 8 = 10, more than 8, so the route through B really is better.' },
+        ],
+        answer: EX_DIJ_ANSWER,
+        verify(M) {
+          const edges = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
+          const verts = ['A', 'B', 'C', 'D', 'E'];
+          const dist = Object.fromEntries(verts.map((v) => [v, v === 'A' ? 0 : Infinity]));
+          for (let i = 0; i < verts.length - 1; i++) {
+            for (const [a, b, w] of edges) {
+              if (dist[a] + w < dist[b]) dist[b] = dist[a] + w;
+              if (dist[b] + w < dist[a]) dist[a] = dist[b] + w;
+            }
+          }
+          const wOf = (a, b) => edges.find(([x, y]) => (x === a && y === b) || (x === b && y === a))[2];
+          const pathSum = wOf('A', 'C') + wOf('C', 'B') + wOf('B', 'D') + wOf('D', 'E');
+          return verts.every((v) => dist[v] === EX_DIJ_ANSWER[v]) && pathSum === 10 && pathSum === EX_DIJ_ANSWER.E;
+        },
+        draw(stage, ctx, step) {
+          const { h, s, rc } = ctx;
+          const snap = EX_DIJ_SNAP[step.settled];
+          const settled = new Set(snap.settled);
+          const improved = new Map(snap.improved.map(([v, o, n]) => [v, [o, n]]));
+          const fmtD = (d) => (d === Infinity ? '∞' : String(d));
+          const kids = [];
+          for (const [a, b, w] of EX_DIJ_EDGES) {
+            const tree = snap.prev[b] === a || snap.prev[a] === b;
+            const mx = (EX_DIJ_POS[a][0] + EX_DIJ_POS[b][0]) / 2, my = (EX_DIJ_POS[a][1] + EX_DIJ_POS[b][1]) / 2;
+            kids.push(s('line', { x1: EX_DIJ_POS[a][0], y1: EX_DIJ_POS[a][1], x2: EX_DIJ_POS[b][0], y2: EX_DIJ_POS[b][1], stroke: tree ? 'var(--accent)' : 'var(--ink-3)', 'stroke-width': tree ? 4 : 1.8, 'stroke-linecap': 'round' }));
+            kids.push(s('circle', { cx: mx, cy: my, r: 10.5, fill: 'var(--sheet)', stroke: 'var(--rule)', 'stroke-width': 1.2 }));
+            kids.push(s('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 700, fill: 'var(--ink)', text: String(w) }));
+          }
+          for (const v of EX_DIJ_VERTS) {
+            const [x, y] = EX_DIJ_POS[v];
+            const isF = settled.has(v), front = !isF && snap.dist[v] < Infinity, cur = snap.current === v && !step.answer, imp = improved.has(v);
+            kids.push(s('g', {},
+              cur ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+              s('circle', { cx: x, cy: y, r: 20, fill: isF ? 'var(--accent)' : front ? 'var(--warn-bg)' : 'var(--sheet)', stroke: isF ? 'var(--accent)' : front ? 'var(--warn)' : 'var(--ink-3)', 'stroke-width': isF || front ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: isF ? 'var(--accent-ink)' : 'var(--ink)', text: v }),
+              isF ? s('text', { x: x + 25, y: y - 15, 'font-size': 13, 'font-weight': 700, fill: 'var(--true)', text: '✓' }) : null,
+              cur ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--ink)', text: '▼ settled now' }) : null,
+              s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 700, class: imp ? 'ex-improved' : null, fill: imp ? 'var(--warn)' : isF ? 'var(--accent)' : 'var(--ink-2)', text: imp ? `${fmtD(snap.dist[v])} ↓` : fmtD(snap.dist[v]) })));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 250', role: 'img', 'aria-label': 'Weighted graph for Dijkstra from A, with the current distance under each vertex', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const note = snap.improved.length
+            ? h('p.small', { html: `Improved on this step: ${snap.improved.map(([v, o, n]) => `<b>${v}</b> ${fmtD(o)} → ${n}`).join(', ')}` })
+            : step.settled > 0 && !step.answer ? h('p.small.muted', 'No label improved on this step.') : null;
+          const orderStrip = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'SETTLED ORDER'),
+            h('div.gr-order', snap.settled.length ? snap.settled.map((v, i) => h('span', h('b', String(i + 1)), `${v}:${snap.dist[v]}`)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing settled yet')));
+          const table = step.answer ? h('table.tt',
+            h('thead', h('tr', h('th', 'vertex'), EX_DIJ_VERTS.map((v) => h('th', v)))),
+            h('tbody', h('tr', h('td', 'distance'), EX_DIJ_VERTS.map((v) => h('td', String(EX_DIJ_ANSWER[v])))))) : null;
+          const banner = step.answer ? h('div.ex-answer', 'Answer: distances from A — A 0, B 3, C 2, D 8, E 10 · shortest path to E: A-C-B-D-E = 2 + 1 + 5 + 2 = 10 · check: D via C would be 2 + 8 = 10 > 8, so the route through B is better ✓') : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, note, orderStrip, table, banner));
+        },
       },
       /* ---------------------------------------------------------------- 16 */
       {

@@ -584,7 +584,7 @@ onmessage = (e) => {
   });
 
   /* ---------------- slide kinds ---------------- */
-  const KIND_LABEL = { concept: 'Concept', lab: 'Interactive lab', code: 'Code walkthrough', design: 'Design practice', practice: 'Practice', quiz: 'Check yourself' };
+  const KIND_LABEL = { concept: 'Concept', lab: 'Interactive lab', code: 'Code walkthrough', design: 'Design practice', practice: 'Practice', quiz: 'Check yourself', example: 'Worked example' };
 
   DM.kinds.concept = (body, sl, ctx) => {
     if (sl.html) body.append(...rich('div', sl.html).childNodes);
@@ -1089,6 +1089,39 @@ onmessage = (e) => {
     show(0);
   };
 
+  /* Worked example: a stated problem, then a narrated step-by-step solution on the shared
+     player, ending in a checked answer and a jump to this module's practice problems.
+     The slide carries pure data (problem, steps, answer, verify) plus draw(stage, ctx, step, k),
+     which renders one step's snapshot. In print the player becomes a storyboard — the final
+     frame plus every caption in order — so the PDF never shows a question without its answer. */
+  DM.kinds.example = (body, sl, ctx) => {
+    if (sl.html) body.append(...rich('div', sl.html).childNodes);
+    const prob = h('div.ex-problem', h('span.ex-problem-tag', 'Problem'));
+    if (sl.problem) prob.append(...rich('div', sl.problem).childNodes);
+    body.append(prob);
+    const last = sl.steps.length - 1;
+    if (ctx.print) {
+      const stage = h('div.ex-stage.ex-final');
+      try { sl.draw(stage, ctx, sl.steps[last], last); } catch (e) { console.error('[DM] example print frame failed:', e); }
+      body.append(stage, h('ol.ex-board', sl.steps.map((st) => { const li = rich('li', st.caption || ''); if (st.answer) li.className = 'ex-answer-line'; return li; })));
+      return;
+    }
+    const player = ctx.player({ steps: sl.steps, draw: (stage, step, k) => sl.draw(stage, ctx, step, k) });
+    body.append(player.el);
+    const pr = ctx.module.slides.find((x) => x.kind === 'practice');
+    if (pr) body.append(h('div.row.ex-try',
+      h('button.btn.primary', { onclick: () => ctx.go(`${ctx.module.id}-${pr._key}`) }, 'Now you try: practice problems →'),
+      h('span.small.muted', 'Same method, fresh numbers, checked as you go.')));
+    ctx.keys = (e) => {
+      if (e.key === 'ArrowDown') { player.next(); return true; }
+      if (e.key === 'ArrowUp') { player.prev(); return true; }
+      return false;
+    };
+    ctx.onHide(player.stop);
+    DM._exampleHooks.push({ slide: sl, player });
+  };
+  DM._exampleHooks = [];
+
   /* ---------------- module registry ---------------- */
   DM.module = (m) => {
     if (!m || !m.id || !Array.isArray(m.slides)) { console.error('[DM] bad module', m); return; }
@@ -1187,6 +1220,74 @@ onmessage = (e) => {
         hide.push(() => t.stop());
         sync();
         return t;
+      },
+      /** player({ steps, draw }) builds the shared worked-example player. steps[k] is a complete
+          snapshot ({ caption, answer?, ...data }); draw(stage, step, k) renders step k from its
+          snapshot alone, so jumping, scrubbing or stepping back always shows the same picture.
+          Controls: Back / Play / Step / Restart, a scrubber, 0.5x / 1x / 2x speed and a step
+          counter. Play stops at the last step and when the slide is hidden (via `hide`), and
+          nothing ever autoplays on load, so prefers-reduced-motion needs no special path beyond
+          the global CSS that stills transitions. The caption is announced politely for manual
+          steps and muted during autoplay, like the code-trace player. */
+      player(opts) {
+        const steps = opts.steps;
+        const n = steps.length;
+        let i = 0;
+        let speed = 1;
+        let timer = null;
+        const stage = h('div.ex-stage');
+        const caption = h('div.ex-caption', { 'aria-live': 'polite' });
+        const count = h('span.ex-count');
+        const backB = h('button.btn.sm', { onclick: () => { stop(); go(i - 1); }, 'aria-label': 'Previous step' }, '◀ Back');
+        const playB = h('button.btn.sm.primary', { onclick: () => toggle(), 'aria-label': 'Play the steps', 'aria-pressed': 'false' }, '▶ Play');
+        const fwdB = h('button.btn.sm', { onclick: () => { stop(); go(i + 1); }, 'aria-label': 'Next step' }, 'Step ▶');
+        const restartB = h('button.btn.sm', { onclick: () => { stop(); go(0); }, 'aria-label': 'Back to the first step' }, '↺ Restart');
+        const scrub = h('input', { type: 'range', min: 0, max: n - 1, value: 0, step: 1, 'aria-label': 'Jump to a step', oninput: (e) => { stop(); go(+e.target.value); } });
+        const speedSeg = h('div.seg', { 'aria-label': 'Playback speed' },
+          [0.5, 1, 2].map((sp) => h('button', { 'aria-pressed': String(sp === 1), onclick: () => setSpeed(sp) }, `${sp}×`)));
+        const el = h('div.ex-player',
+          stage, caption,
+          h('div.ex-ctl', backB, playB, fwdB, restartB, h('div.ex-scrub', scrub), speedSeg, count),
+          h('p.tiny.muted.ex-keys', 'Keys: ', h('kbd', '↑'), ' / ', h('kbd', '↓'), ' step through the example · ', h('kbd', 'Space'), ' plays or pauses when the player has focus'));
+        el.addEventListener('keydown', (e) => {
+          if (e.key === ' ' && !e.target.closest('button, input, select, textarea, a, [role="tab"]')) { e.preventDefault(); toggle(); }
+        });
+        function syncPlay() {
+          playB.textContent = timer ? '❚❚ Pause' : '▶ Play';
+          playB.setAttribute('aria-label', timer ? 'Pause' : 'Play the steps');
+          playB.setAttribute('aria-pressed', String(!!timer));
+          caption.setAttribute('aria-live', timer ? 'off' : 'polite');
+        }
+        function start() {
+          if (timer || PRINT || i >= n - 1) return;
+          timer = setInterval(() => { if (i >= n - 1) { stop(); return; } go(i + 1); if (i >= n - 1) stop(); }, 1500 / speed);
+          syncPlay();
+        }
+        function stop() { if (timer) clearInterval(timer); timer = null; syncPlay(); }
+        function toggle() { if (timer) stop(); else if (i >= n - 1) { go(0); start(); } else start(); }
+        function setSpeed(sp) {
+          speed = sp;
+          $$('button', speedSeg).forEach((b, j) => b.setAttribute('aria-pressed', String([0.5, 1, 2][j] === sp)));
+          if (timer) { stop(); start(); }
+        }
+        function go(k) {
+          i = Math.max(0, Math.min(n - 1, k));
+          rc(stage);
+          try { opts.draw(stage, steps[i], i); } catch (e) { console.error('[DM] example step failed:', e); stage.append(h('div.warn', `This step could not be drawn: ${e.message}`)); }
+          renderMath(stage);
+          caption.innerHTML = steps[i].caption || '';
+          renderMath(caption);
+          count.textContent = `Step ${i + 1} of ${n}`;
+          scrub.value = String(i);
+          scrub.setAttribute('aria-valuetext', `Step ${i + 1} of ${n}`);
+          backB.disabled = i === 0;
+          fwdB.disabled = i === n - 1;
+          restartB.disabled = i === 0;
+          stage.classList.toggle('ex-done', !!steps[i].answer);
+        }
+        hide.push(stop);
+        go(0);
+        return { el, go, stop, next() { stop(); go(i + 1); }, prev() { stop(); go(i - 1); }, get index() { return i; }, get playing() { return !!timer; } };
       },
     };
   }

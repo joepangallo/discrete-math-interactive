@@ -34,6 +34,20 @@
   while (fibs.length < 60) fibs.push(fibs[fibs.length - 1] + fibs[fibs.length - 2]);
   const pow2s = (x) => ({ 0: '1', 0.5: '√n', 1: 'n', 1.5: 'n√n', 2: 'n²', 3: 'n³', 4: 'n⁴' })[x];
 
+  // ---- worked-example data, computed once in module scope ----
+  // Optimal 3-disk Hanoi moves as [disk, from peg, to peg] with pegs A = 0, B = 1, C = 2.
+  const EX_HANOI_MOVES = [[1, 0, 2], [2, 0, 1], [1, 2, 1], [3, 0, 2], [1, 1, 0], [2, 1, 2], [1, 0, 2]];
+  // The 8 states of that solution: peg contents (bottom disk first) before the first move and after each move.
+  const EX_HANOI_STATES = (() => {
+    const pegs = [[3, 2, 1], [], []];
+    const states = [pegs.map((p) => [...p])];
+    for (const [, from, to] of EX_HANOI_MOVES) { pegs[to].push(pegs[from].pop()); states.push(pegs.map((p) => [...p])); }
+    return states;
+  })();
+  // First terms of a(n) = 2a(n-1) + 1 with a0 = 0, iterated once here: 0, 1, 3, 7, 15.
+  const EX_REC_TERMS = [0];
+  for (let i = 1; i <= 4; i++) EX_REC_TERMS.push(2 * EX_REC_TERMS[i - 1] + 1);
+
   // Compare the entered decimal values exactly before using floating-point roots.
   // An epsilon would erase deliberately small nonzero contributions as well as noise.
   function decimalIntegers(values) {
@@ -970,6 +984,115 @@
             good: 'def hanoi_moves(n):          # straight from the rule\n    return 1 if n == 1 else 2 * hanoi_moves(n - 1) + 1\n\nfor n in range(1, 20):\n    assert hanoi_moves(n) == 2**n - 1, n',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: Tower of Hanoi in 7 moves',
+        kind: 'example',
+        id: 'ex-hanoi-moves',
+        problem: String.raw`<p>The Tower of Hanoi starts with 3 disks on peg A, largest at the bottom, and no disk may ever rest on a smaller one. List and picture every move of the fastest solution that transfers the whole tower to peg C, and count the moves.</p>`,
+        steps: [
+          { mv: 0, caption: 'All three disks start on peg A, largest at the bottom, and the goal is the same tower on peg C. To free the largest disk, the two smaller disks above it must first become one tower on the spare peg B.' },
+          { mv: 1, caption: 'Move 1: disk 1 goes from A to C, because the smallest disk is uncovered first and can land on any peg. Parking it on C begins the subproblem of moving the top two disks onto B.' },
+          { mv: 2, caption: 'Move 2: disk 2 goes from A to B, now that disk 1 has uncovered it and B is still empty. This starts the two-disk tower on B, which is where those disks must wait while disk 3 moves.' },
+          { mv: 3, caption: 'Move 3: disk 1 goes from C to B, landing on the larger disk 2, so the move is legal. The two smaller disks now form one tower on B, exactly what freeing the largest disk required.' },
+          { mv: 4, caption: 'Move 4: disk 3 goes from A to C, and the largest disk can finally move because both smaller disks are stacked on B and C is empty. This single move is the +1 between the two smaller towers in the recurrence.' },
+          { mv: 5, caption: 'Move 5: disk 1 goes from B to A, because it covers disk 2 and must move out of the way first. The two-disk tower now has to be rebuilt on peg C, on top of the largest disk.' },
+          { mv: 6, caption: 'Move 6: disk 2 goes from B to C, landing on the larger disk 3, so the move is legal. Only disk 1 is still out of place, sitting alone on A and ready for the final move.' },
+          { mv: 7, caption: 'Move 7: disk 1 goes from A to C, landing on disk 2 to complete the tower in size order. All seven moves followed one pattern: clear the disk below, move it, then rebuild the smaller tower on top.' },
+          { mv: 7, answer: true, caption: 'Answer: the tower takes 7 moves, checked by the recurrence T(3) = 2·T(2) + 1 = 2·(2·T(1) + 1) + 1 = 7, which is also 2^3 − 1. Every disk ended in size order on peg C, and no disk ever rested on a smaller one during the sequence.' },
+        ],
+        answer: 7,
+        verify(M) {
+          const moves = [];
+          function gen(n, from, to, via) {
+            if (n === 0) return;
+            gen(n - 1, from, via, to);
+            moves.push([n, from, to]);
+            gen(n - 1, via, to, from);
+          }
+          gen(3, 0, 2, 1);
+          const pegs = [[3, 2, 1], [], []];
+          let legal = moves.length === 7;
+          for (const [disk, from, to] of moves) {
+            const top = pegs[to][pegs[to].length - 1];
+            if (pegs[from][pegs[from].length - 1] !== disk || (top !== undefined && top < disk)) legal = false;
+            pegs[to].push(pegs[from].pop());
+          }
+          let T = 0;
+          for (let n = 1; n <= 3; n++) T = 2 * T + 1;
+          return legal && pegs[2].join(',') === '3,2,1' && pegs[0].length === 0 && pegs[1].length === 0 && 2 ** 3 - 1 === 7 && T === 7;
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const NAME = ['A', 'B', 'C'];
+          const PX = [110, 320, 530], BASE = 210, DH = 28;
+          const COLOR = ['--num', '--fnc', '--accent'];
+          const state = EX_HANOI_STATES[step.mv];
+          const lastMove = step.mv > 0 ? EX_HANOI_MOVES[step.mv - 1] : null;
+          const movedDisk = lastMove ? lastMove[0] : 0;
+          const kids = [
+            s('rect', { x: 20, y: BASE, width: 600, height: 10, rx: 4, fill: 'var(--ink-3)' }),
+            ...PX.map((x) => s('rect', { x: x - 3, y: 62, width: 6, height: BASE - 62, rx: 3, fill: 'var(--ink-3)' })),
+            ...PX.map((x, p) => s('text', { x, y: BASE + 30, 'text-anchor': 'middle', 'font-size': 16, 'font-weight': 700, fill: 'var(--ink-2)', text: 'Peg ' + NAME[p] })),
+          ];
+          state.forEach((stack, p) => stack.forEach((disk, i) => {
+            const w = 40 + disk * 38;
+            const y = BASE - (i + 1) * DH;
+            const isMoved = disk === movedDisk;
+            kids.push(s('rect', { x: PX[p] - w / 2, y, width: w, height: DH - 3, rx: 8, fill: `var(${COLOR[disk - 1]})`, stroke: isMoved ? 'var(--ink)' : 'none', 'stroke-width': isMoved ? 3.5 : 0 }));
+            kids.push(s('text', { x: PX[p], y: y + DH / 2 + 1, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': isMoved ? 800 : 700, fill: 'var(--accent-ink)', text: String(disk) }));
+          }));
+          if (lastMove) kids.push(s('text', { x: PX[lastMove[2]], y: 40, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: 'var(--ink)', text: `disk ${movedDisk} just moved here` }));
+          const svg = s('svg', { viewBox: '0 0 640 248', role: 'img', 'aria-label': 'Three pegs A, B and C with three disks', style: 'width:min(40rem,100%);height:auto' }, ...kids);
+          const soFar = step.mv === 0 ? 'Moves so far: none yet' : 'Moves so far: ' + EX_HANOI_MOVES.slice(0, step.mv).map(([d, f, t], i) => `${i + 1}. disk ${d} ${NAME[f]}→${NAME[t]}`).join(' · ');
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.35rem' } },
+            svg,
+            h('p.small', { style: { margin: 0, textAlign: 'center' } }, step.mv === 0 ? 'Start: after move 0 of 7 — the tower sits on peg A and the goal is peg C' : `After move ${step.mv} of 7: disk ${movedDisk} moved ${NAME[lastMove[1]]} → ${NAME[lastMove[2]]}`),
+            h('p.small.mono.muted', { style: { margin: 0, textAlign: 'center' } }, soFar),
+            step.answer ? h('div.ex-answer', 'Answer: 7 moves = 2^3 − 1 · check: T(3) = 2·T(2) + 1 = 7, and the tower stands in size order on peg C') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: iterating a recurrence to a closed form',
+        kind: 'example',
+        id: 'ex-recurrence-iteration',
+        problem: String.raw`<p>A sequence starts with \(a_0 = 0\) and follows \(a_n = 2a_{n-1} + 1\) for \(n \ge 1\). Compute the first terms by iteration, guess a closed form for \(a_n\), and prove the guess by induction.</p>`,
+        steps: [
+          { rows: 0, phase: 0, caption: 'Setup: the starting value is a0 = 0 and every later term follows a(n) = 2·a(n−1) + 1, so iteration means just applying the rule repeatedly. The extra a(n) + 1 column is there because these numbers look like one less than something familiar.' },
+          { rows: 3, phase: 0, caption: 'Two terms appear: a1 = 2·0 + 1 = 1 and a2 = 2·1 + 1 = 3, filling the table down from the starting value. Each term needs only the previous one, which is what makes iteration cheap.' },
+          { rows: 5, phase: 0, caption: 'Two more terms appear: a3 = 2·3 + 1 = 7 and a4 = 2·7 + 1 = 15, completing the first five terms. The a(n) + 1 column now reads 1, 2, 4, 8, 16 — pure powers of 2.' },
+          { rows: 5, phase: 1, caption: 'The pattern suggests the guess a(n) + 1 = 2^n, so a(n) = 2^n − 1 for every n. A pattern in five terms is a conjecture, not a proof, and induction is the right tool because the claim covers all n while the recurrence links each n to the one before.' },
+          { rows: 5, phase: 2, caption: 'Induction checks the guess: the base case a0 = 2^0 − 1 = 0 matches the starting value outright. If a(k) = 2^k − 1 holds for some k, then a(k+1) = 2(2^k − 1) + 1 = 2^(k+1) − 1, so the formula reproduces itself through the recurrence.' },
+          { rows: 5, phase: 2, answer: true, caption: 'Answer: a(n) = 2^n − 1, and the spot check a4 = 2^4 − 1 = 15 matches the iterated table exactly. This is the same count as the Hanoi moves with a shift of index, since the three-disk tower takes T(3) = 7 = a3 moves.' },
+        ],
+        answer: '2^n − 1',
+        verify(M) {
+          const terms = [0];
+          for (let n = 1; n <= 20; n++) terms.push(2 * terms[n - 1] + 1);
+          const matchesClosedForm = terms.every((x, n) => x === 2 ** n - 1);
+          const firstFive = [0, 1, 3, 7, 15].every((x, n) => terms[n] === x);
+          return matchesClosedForm && firstFive;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = EX_REC_TERMS.slice(0, step.rows).map((x, n) => h('tr', { class: n === step.rows - 1 && step.phase === 0 ? 'hit' : '' },
+            h('td', String(n)), h('td', String(x)), h('td', String(x + 1))));
+          const table = h('table.tt', { style: { width: 'min(22rem, 100%)' } },
+            h('thead', h('tr', h('th', { html: '\\(n\\)' }), h('th', { html: '\\(a_n\\)' }), h('th', { html: '\\(a_n + 1\\)' }))),
+            h('tbody', rows.length ? rows : h('tr', h('td.muted', '·'), h('td.muted', '·'), h('td.muted', '·'))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } },
+            h('div.big-math', { html: String.raw`\(a_0 = 0, \qquad a_n = 2a_{n-1} + 1\)`, style: { fontSize: '1.05rem' } }),
+            table,
+            step.rows === 0 ? h('p.small.muted', { style: { margin: 0 } }, 'No terms computed yet — the table fills in as the rule is applied.') : null,
+            step.phase >= 1 ? h('div.big-math', { html: String.raw`Guess: \(a_n + 1 = 2^n\), so \(a_n = 2^n - 1\)`, style: { fontSize: '1.05rem' } }) : null,
+            step.phase >= 2 ? h('div.stack', { style: { gap: '0.15rem', alignItems: 'center', fontSize: '0.92rem' } },
+              h('div', { html: String.raw`Base case: \(a_0 = 2^0 - 1 = 0\) ✓` }),
+              h('div', { html: String.raw`Assume \(a_k = 2^k - 1\) for some \(k \ge 0\).` }),
+              h('div', { html: String.raw`Then \(a_{k+1} = 2a_k + 1 = 2(2^k - 1) + 1 = 2^{k+1} - 1\).` })) : null,
+            step.answer ? h('div.ex-answer', 'Answer: a(n) = 2^n − 1 · check: a4 = 2^4 − 1 = 15 matches the table, and T(3) = 7 = a3') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

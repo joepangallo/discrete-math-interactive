@@ -20,6 +20,22 @@
   // a small static Pascal triangle for the concept slide (rows 0..6)
   const miniTri = Array.from({ length: 7 }, (_, n) => `<div class="ct-trirow"><span class="ct-rl">${n}</span>${Array.from({ length: n + 1 }, (_, k) => `<span>${C(n, k)}</span>`).join('')}</div>`).join('');
 
+  // ---- worked example data: the ordered picks of 3 of {A, B, C, D}, and the committees they collapse to ----
+  const EX_MEMBERS = ['A', 'B', 'C', 'D'];
+  const EX_PERMS = perms(4, 3).map((ix) => ix.map((i) => EX_MEMBERS[i]).join('')); // all 24 ordered triples, in lexicographic order
+  const EX_GROUPS = combos(4, 3).map((ix) => { // the 4 committees, each with its 3! = 6 orders
+    const mem = ix.map((i) => EX_MEMBERS[i]);
+    return { set: `{${mem.join(', ')}}`, name: mem.join(''), orders: perms(3, 3).map((pp) => pp.map((j) => mem[j]).join('')) };
+  });
+  const EX_ABC_ORDERS = EX_GROUPS[0].orders; // ABC, ACB, BAC, BCA, CAB, CBA
+
+  // ---- worked example data: Pascal's triangle down to row 5, built by the addition rule ----
+  const EX_TRI = (() => {
+    const rows = [[1]];
+    for (let n = 1; n <= 5; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
+    return rows;
+  })();
+
   DM.module({
     id: 'counting',
     num: 7,
@@ -732,6 +748,102 @@
             good: 'print(f"{94 ** 8:.1e}")     # 6.1e+15: 8 random symbols\nprint(f"{7776 ** 5:.1e}")   # 2.8e+19: 5 random words\n# pick with secrets.choice, never with random',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: ordered picks collapse into committees',
+        kind: 'example',
+        id: 'ex-choose-collapse',
+        problem: String.raw`<p>A club has 4 members: A, B, C and D. How many different 3-person committees can the club form from these 4 members, that is, what is \(C(4, 3)\)?</p>`,
+        steps: [
+          { phase: 0, head: 'PICK 1 OF 3 · ORDERED PICKS, ON PURPOSE', note: 'First pick: 4 options — A, B, C or D.', caption: 'We count ordered picks on purpose first, even though a committee has no order. The first pick has 4 options, one for each member A, B, C and D, and the tree starts with those 4 branches.' },
+          { phase: 1, head: 'PICK 2 OF 3 · EACH BRANCH SPLITS INTO 3', note: 'After two picks: 4 × 3 = 12 partial picks.', caption: 'Each first pick splits into the 3 members still left, because nobody can be picked twice. The product rule multiplies the stages, so there are now 4 × 3 = 12 partial picks.' },
+          { phase: 2, head: 'PICK 3 OF 3 · ALL 24 LEAVES', note: 'Ordered triples: 4 × 3 × 2 = 24 = P(4, 3).', caption: 'Each partial pick splits once more into the 2 members still left, and the tree stops at full triples. The product rule gives 4 × 3 × 2 = 24 ordered picks, which is exactly P(4, 3).' },
+          { phase: 3, head: 'ONE COMMITTEE, SIX LEAVES', note: 'Highlighted: the 6 orders of {A, B, C}.', caption: 'Look at the highlighted leaves: ABC, ACB, BAC, BCA, CAB and CBA are six different leaves but one and the same committee. Every committee is counted exactly 3! = 6 times this way, once for each order of its 3 members.' },
+          { phase: 4, head: 'DIVIDE BY THE OVERCOUNT', note: '24 ordered picks ÷ 6 orders per committee = 4 committees.', caption: 'Since every committee was counted the same number of times, dividing undoes the overcount fairly. There are 24 / 6 = 4 committees, and the leaves now sit in 4 groups, one group per committee.' },
+          { phase: 5, head: 'THE 4 COMMITTEES', note: 'Each committee listed once, with no order inside a committee.', caption: 'Answer: C(4, 3) = 4, and the committees are ABC, ABD, ACD and BCD. Check with the formula: 4! / (3! · 1!) = 24 / 6 = 4, which matches the explicit list of exactly 4 committees.', answer: true },
+        ],
+        answer: 4,
+        verify(M) {
+          let count = 0; const seen = [];
+          const mem = ['A', 'B', 'C', 'D'];
+          for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) for (let k = j + 1; k < 4; k++) { count++; seen.push(mem[i] + mem[j] + mem[k]); }
+          return M.C(4, 3) === 4 && count === 4 && seen.join(' ') === 'ABC ABD ACD BCD' && (4 * 3 * 2) / M.fact(3) === 4 && EX_PERMS.length === 24 && EX_GROUPS.length === 4;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const chip = (txt, mode) => h('span.mono', { style: { display: 'inline-block', fontSize: mode === 'big' ? '1rem' : mode === 'tiny' ? '0.72rem' : '0.82rem', fontWeight: mode === 'hot' || mode === 'big' ? 700 : 400, border: mode === 'hot' ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: mode === 'tiny' ? '0.02rem 0.28rem' : '0.08rem 0.42rem', background: mode === 'hot' ? 'var(--mark)' : 'var(--sheet)', opacity: mode === 'dim' ? 0.5 : 1 } }, txt);
+          const noteLine = h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, step.note);
+          const head = h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, step.head);
+          let body = null;
+          if (step.phase === 0) {
+            body = h('div.stack', { style: { alignItems: 'center', gap: '0.5rem' } },
+              h('div.big-math', 'Club {A, B, C, D}'),
+              h('div.small.muted', 'Pick a first member for the tree (the order will be removed later):'),
+              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_MEMBERS.map((m) => chip(m, 'big'))),
+              h('div.small', '4 branches leave the root, one per member.'));
+          } else if (step.phase === 1) {
+            body = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' } },
+              EX_MEMBERS.map((first) => h('div', { style: { border: '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--sheet)', textAlign: 'center' } },
+                h('div.tiny.mono.muted', `first pick ${first}, then`),
+                h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', marginTop: '0.25rem' } }, EX_MEMBERS.filter((x) => x !== first).map((second) => chip(first + second, ''))))));
+          } else if (step.phase === 2 || step.phase === 3) {
+            const hot = new Set(EX_ABC_ORDERS);
+            body = h('div.stack', { style: { gap: '0.3rem', alignItems: 'center' } },
+              EX_MEMBERS.map((first) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } },
+                h('span.tiny.mono.muted', { style: { width: '1.2rem', textAlign: 'right' } }, first),
+                EX_PERMS.filter((p) => p[0] === first).map((p) => chip(p, step.phase === 3 ? (hot.has(p) ? 'hot' : 'dim') : '')))),
+              step.phase === 3 ? h('div.small', { style: { textAlign: 'center' } }, 'ABC, ACB, BAC, BCA, CAB, CBA — six leaves, one committee: {A, B, C}.') : h('div.small', '24 leaves, and every leaf is one ordered triple.'));
+          } else if (step.phase === 4) {
+            body = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' } },
+              EX_GROUPS.map((g) => h('div', { style: { border: '2px solid var(--accent)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--accent-2)', textAlign: 'center', maxWidth: '14rem' } },
+                h('div.mono', { style: { fontWeight: 700 } }, g.set),
+                h('div.row', { style: { gap: '0.25rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.25rem' } }, g.orders.map((o) => chip(o, 'tiny'))))));
+          } else {
+            body = h('div.stack', { style: { alignItems: 'center', gap: '0.5rem' } },
+              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_GROUPS.map((g) => chip(g.set, 'big'))),
+              h('div.small', { style: { textAlign: 'center' } }, 'Formula: C(4, 3) = 4! / (3! · 1!) = 24 / 6 = 4.'),
+              h('div.ex-answer', 'Answer: C(4, 3) = 4 committees — ABC, ABD, ACD, BCD. Check: 4! / (3! · 1!) = 4 and the explicit list has exactly 4 entries.'));
+          }
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } }, head, body, noteLine));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: building Pascal\u2019s triangle to find C(5, 2)',
+        kind: 'example',
+        id: 'ex-pascal-build',
+        problem: String.raw`<p>Build Pascal's triangle down to row 5, one row at a time. Then use the finished triangle to find \(C(5, 2)\), the number of ways to choose 2 books from a set of 5 books.</p>`,
+        steps: [
+          { rows: 2, focus: [], parents: [], note: 'Rows 0 and 1 in place: 1 / 1 1. Edges are always 1.', caption: 'Rows 0 and 1 are already in place: a single 1, then 1 and 1. Every later entry is the sum of the two entries above it, and the edges stay 1 because there is exactly one way to choose all of a set or none of it.' },
+          { rows: 3, focus: [[2, 1]], parents: [[1, 0], [1, 1]], note: 'Row 2: the middle entry is 2 = 1 + 1, from its two parents in row 1.', caption: 'Row 2 appears as 1, 2, 1, and its middle entry is the first one that must be computed. It comes from its two parents in row 1: 2 = 1 + 1, while the two edge entries are copied down as 1.' },
+          { rows: 4, focus: [[3, 1]], parents: [[2, 0], [2, 1]], note: 'Row 3: the marked entry is 3 = 1 + 2, from the parents 1 and 2 in row 2.', caption: 'Row 3 appears as 1, 3, 3, 1, built by adding neighboring pairs from row 2. The marked entry shows the pattern clearly: 3 = 1 + 2, the sum of the entry above-left and the entry above-right.' },
+          { rows: 5, focus: [[4, 2]], parents: [[3, 1], [3, 2]], note: 'Row 4: the middle entry is 6 = 3 + 3, and it is C(4, 2).', caption: 'Row 4 appears as 1, 4, 6, 4, 1, and its middle entry is worth remembering. It is 6 = 3 + 3 from the two 3s above it, and it is C(4, 2), the count for choosing 2 of 4.' },
+          { rows: 6, focus: [[5, 2]], parents: [[4, 1], [4, 2]], note: 'Row 5: C(5, 2) is the third entry, 10 = 4 + 6 from its parents in row 4.', caption: 'Row 5 appears as 1, 5, 10, 10, 5, 1, completing the triangle we need. The marked third entry is C(5, 2), and it comes from its parents 4 and 6 in row 4: 10 = 4 + 6.' },
+          { rows: 6, focus: [[5, 2], [5, 3]], parents: [[4, 1], [4, 2]], note: 'Row 5 sums to 1 + 5 + 10 + 10 + 5 + 1 = 32 = 2^5, one subset count per entry.', caption: 'Answer: C(5, 2) = 10, so there are 10 ways to choose 2 books from 5. Check with factorials: 5! / (2! · 3!) = 120 / 12 = 10, and symmetry gives the same 10 at C(5, 3), the mirrored entry in row 5.', answer: true },
+        ],
+        answer: 10,
+        verify(M) {
+          const rows = [[1]];
+          for (let n = 1; n <= 5; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
+          return M.C(5, 2) === 10 && 120 / (2 * 6) === 10 && M.fact(5) / (M.fact(2) * M.fact(3)) === 10 && rows[5].join(',') === '1,5,10,10,5,1' && rows[5].reduce((a, b) => a + b, 0) === 32 && M.C(5, 3) === 10 && EX_TRI[5].join(',') === '1,5,10,10,5,1';
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const has = (list, n, k) => list.some(([a, b]) => a === n && b === k);
+          const tri = EX_TRI.slice(0, step.rows).map((row, n) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' } },
+            h('span.tiny.mono.muted', { style: { width: '3rem', textAlign: 'right' } }, `row ${n}`),
+            row.map((v, k) => {
+              const foc = has(step.focus, n, k), par = has(step.parents, n, k), isNew = n === step.rows - 1 && !step.answer;
+              return h('span.mono', { style: { display: 'inline-block', minWidth: '2.1rem', textAlign: 'center', fontSize: '0.95rem', fontWeight: foc || par || isNew ? 700 : 400, border: foc ? '2px solid var(--ink)' : par ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: '0.1rem 0.2rem', background: foc ? 'var(--mark)' : par ? 'var(--accent-2)' : 'var(--sheet)', boxShadow: par ? '0 0 0 2px var(--accent)' : 'none' } }, String(v));
+            }),
+            h('span.tiny.mono.muted', { style: { width: '3rem' } }, n === step.rows - 1 && step.rows > 2 ? 'new' : '')));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, 'PASCAL\u2019S TRIANGLE · EACH ENTRY = SUM OF THE TWO ABOVE IT'),
+            h('div.stack', { style: { gap: '0.25rem', alignItems: 'center' } }, tri),
+            h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, step.note),
+            step.answer ? h('div.ex-answer', 'Answer: C(5, 2) = 10 ways to choose 2 books from 5. Check: 5! / (2! · 3!) = 120 / 12 = 10, and C(5, 3) = 10 is the same 10 mirrored in row 5.') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

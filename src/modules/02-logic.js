@@ -120,6 +120,35 @@
     return parse('(p → q) ∧ ¬r');
   }
 
+  // ---- worked example: the truth table for [(p -> q) and (q -> r)] -> (p -> r), built column by column ----
+  const EX_TT_VARS = ['p', 'q', 'r'];
+  const EX_TT_ENVS = assignments(EX_TT_VARS);
+  const EX_TT_COLS = [
+    { tex: String.raw`p \to q`, f: (e) => !e.p || e.q },
+    { tex: String.raw`q \to r`, f: (e) => !e.q || e.r },
+    { tex: String.raw`(p \to q) \land (q \to r)`, f: (e) => (!e.p || e.q) && (!e.q || e.r) },
+    { tex: String.raw`\big[(p \to q) \land (q \to r)\big] \to (p \to r)`, f: (e) => { const pq = !e.p || e.q, qr = !e.q || e.r, pr = !e.p || e.r; return !(pq && qr) || pr; } },
+  ];
+  // rows where the hypothesis of the whole formula holds: the only rows that could make it false
+  const EX_TT_DANGER = EX_TT_ENVS.map((e, i) => (EX_TT_COLS[2].f(e) ? i : -1)).filter((i) => i >= 0);
+
+  // ---- worked example: rewriting the negated conditional ¬(p -> q) as p ∧ ¬q, one named law per line ----
+  const EX_NC_VARS = ['p', 'q'];
+  const EX_NC_ALL = assignments(EX_NC_VARS);
+  // the revealing row (p = T, q = F) comes first, then the remaining rows in textbook order,
+  // so both formula columns read T, F, F, F from top to bottom
+  const EX_NC_ENVS = [EX_NC_ALL[1], EX_NC_ALL[0], EX_NC_ALL[2], EX_NC_ALL[3]];
+  const EX_NC_COLS = [
+    { tex: String.raw`\neg(p \to q)`, f: (e) => !(!e.p || e.q) },
+    { tex: String.raw`p \land \neg q`, f: (e) => e.p && !e.q },
+  ];
+  const EX_NC_LINES = [
+    { tex: String.raw`\neg(p \to q)`, law: 'starting formula' },
+    { tex: String.raw`\neg(\neg p \lor q)`, law: String.raw`implication law: \(p \to q \equiv \neg p \lor q\)` },
+    { tex: String.raw`\neg\neg p \land \neg q`, law: String.raw`De Morgan's law: \(\neg(X \lor Y) \equiv \neg X \land \neg Y\)` },
+    { tex: String.raw`p \land \neg q`, law: String.raw`double negation: \(\neg\neg p \equiv p\)` },
+  ];
+
   DM.module({
     id: 'logic',
     num: 2,
@@ -809,6 +838,95 @@
             good: 'if weight > 20:\n    rate = "freight"\nelif weight > 2:\n    rate = "parcel"\nelse:\n    rate = "letter"',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: a truth table, column by column',
+        kind: 'example',
+        id: 'ex-truth-table',
+        problem: String.raw`<p>Build the truth table for \(\big[(p \to q) \land (q \to r)\big] \to (p \to r)\) and classify it: tautology, contradiction, or contingency?</p>`,
+        steps: [
+          { cols: 0, caption: 'Start with the inputs. Three variables have 2 × 2 × 2 = 8 combinations of T and F, so the table needs 8 rows. Writing every combination first matters: one missing row could hide the single case that breaks the formula.' },
+          { cols: 1, caption: 'Work inside-out, smallest piece first: p → q. A conditional is false in exactly one situation — hypothesis true, conclusion false — so this column is F exactly in the rows with p = T and q = F, and T everywhere else.' },
+          { cols: 2, caption: 'The next piece is q → r, the same rule with the roles shifted: F only where q = T and r = F. Building one column at a time means every entry can be checked against a single rule.' },
+          { cols: 3, caption: 'Combine the two finished columns with ∧. A conjunction is true only where both of its pieces are true. This column is also the hypothesis of the whole formula, so it marks the rows that could possibly make the formula false.' },
+          { cols: 4, caption: 'Finish with the whole formula: hypothesis → (p → r). It fails only in a row where the hypothesis is true and p → r is false. Read down the new column: there is no F in it.' },
+          { cols: 4, check: true, caption: 'Check the dangerous rows — the highlighted ones, where the hypothesis is true. In each of them the conclusion p → r is true as well, which is exactly why the implication survived. The other rows pass automatically, because a conditional with a false hypothesis is true.' },
+          { cols: 4, check: true, answer: true, caption: 'Answer: the formula is a tautology — true in all 8 rows. This pattern is the hypothetical syllogism: if p → q and q → r both hold, then p → r must hold. The check in the previous step is the proof: every row that could have broken it was examined.' },
+        ],
+        answer: 'tautology',
+        verify() {
+          const direct = EX_TT_ENVS.every((e) => { const pq = !e.p || e.q, qr = !e.q || e.r, pr = !e.p || e.r; return !(pq && qr) || pr; });
+          const tree = parse('((p -> q) & (q -> r)) -> (p -> r)');
+          return direct && EX_TT_ENVS.every((e) => ev(tree, e));
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const shown = step.cols;
+          const head = EX_TT_VARS.map((v) => h('th', { html: `\\(${v}\\)` }))
+            .concat(EX_TT_COLS.map((c, ci) => h('th', { html: `\\(${c.tex}\\)`, class: ci < shown ? (ci === shown - 1 && !step.check ? 'cur' : '') : 'muted' })));
+          const rows = EX_TT_ENVS.map((e, ri) => h('tr', { class: step.check && EX_TT_DANGER.includes(ri) ? 'hit' : '' },
+            EX_TT_VARS.map((v) => h('td', tf(e[v]))),
+            EX_TT_COLS.map((c, ci) => (ci < shown ? h('td', { class: ci === shown - 1 && !step.check ? 'cur' : '' }, tf(c.f(e))) : h('td.muted', '·')))));
+          const table = h('table.tt', h('thead', h('tr', head)), h('tbody', rows));
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            table,
+            step.answer ? h('div.ex-answer', 'Answer: a tautology — T in all 8 rows') : null,
+            step.check && !step.answer ? h('p.small', { style: { textAlign: 'center' } }, 'Highlighted rows: the hypothesis is true, so these are the rows that had to be checked.') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: rewriting a negated conditional',
+        kind: 'example',
+        id: 'ex-negated-conditional',
+        problem: String.raw`<p>Rewrite \(\neg(p \to q)\) as a formula with no \(\to\) and no outer \(\neg\), naming the law used at each step, and prove that the result is equivalent to the original formula.</p>`,
+        steps: [
+          { lines: 1, table: 0, caption: 'Start with ¬(p → q) and the plan: turn the conditional into a disjunction first, because the implication law is the only law that removes a →. Each later law then has the shape it needs to apply.' },
+          { lines: 2, table: 0, caption: 'Apply the implication law, p → q ≡ ¬p ∨ q, inside the outer negation, so the formula becomes ¬(¬p ∨ q). The arrow is gone, but the outer ¬ still covers the whole disjunction, so one more law is needed to move it inside.' },
+          { lines: 3, table: 0, caption: 'Apply De Morgan\'s law, ¬(X ∨ Y) ≡ ¬X ∧ ¬Y: the ∨ flips to ∧ and each part is negated, giving ¬¬p ∧ ¬q. Pushing ¬ inside is what turns "not a conditional" into a positive claim about p and q.' },
+          { lines: 4, table: 0, caption: 'Apply double negation, ¬¬p ≡ p, to clean up the first part, and the formula becomes p ∧ ¬q. The rewrite is done — no → and no outer ¬ remain — but a chain of rewrites still has to be checked against the original.' },
+          { lines: 4, table: 1, caption: 'Check the one revealing row, p = T and q = F: the original gives ¬(T → F) = ¬F = T, and the rewrite gives T ∧ ¬F = T ∧ T = T. This row matters most because it is the only row where either formula is true, so agreement here carries the proof.' },
+          { lines: 4, table: 2, answer: true, caption: 'Answer: ¬(p → q) ≡ p ∧ ¬q, because the two columns agree in all 4 rows, reading T, F, F, F. In words, the only way to break the promise p → q is for p to be true and q false, and the table is the check that nothing else breaks it.' },
+        ],
+        answer: 'p ∧ ¬q',
+        verify(M) {
+          const byLaw = sameMeaning('~(p -> q)', 'p & ~q');
+          const original = parse('~(p -> q)');
+          const rewritten = parse('p & ~q');
+          const envs = assignments(['p', 'q']);
+          const byTrees = envs.every((e) => ev(original, e) === ev(rewritten, e));
+          const byHand = envs.every((e) => (!(!e.p || e.q)) === (e.p && !e.q));
+          return byLaw && byTrees && byHand;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const lineEls = EX_NC_LINES.slice(0, step.lines).map((ln, i) => {
+            const isNew = i === step.lines - 1;
+            return h('div', { class: isNew ? '' : 'muted', style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.2rem 1rem' } },
+              h('span', { html: `\\(${ln.tex}\\)`, style: { fontSize: step.table ? '1.02rem' : isNew ? '1.2rem' : '1.05rem', fontWeight: isNew ? '600' : '400' } }),
+              h('span.small.muted', { html: ln.law }));
+          });
+          let table = null;
+          if (step.table) {
+            const head = EX_NC_VARS.map((v) => h('th', { html: `\\(${v}\\)` }))
+              .concat(EX_NC_COLS.map((c) => h('th', { html: `\\(${c.tex}\\)`, class: step.table === 1 ? 'cur' : '' })));
+            const rows = EX_NC_ENVS.map((e, ri) => {
+              const revealing = ri === 0;
+              const shown = step.table === 2 || revealing;
+              return h('tr', { class: step.table === 1 && revealing ? 'hit' : '' },
+                EX_NC_VARS.map((v) => h('td', tf(e[v]))),
+                EX_NC_COLS.map((c) => (shown ? h('td', { class: step.table === 1 && revealing ? 'cur' : '' }, tf(c.f(e))) : h('td.muted', '·'))));
+            });
+            table = h('table.tt', h('thead', h('tr', head)), h('tbody', rows));
+          }
+          stage.append(h('div.stack', { style: { alignItems: 'stretch', gap: '0.4rem', width: 'min(38rem, 100%)' } },
+            ...lineEls,
+            step.lines === 1 ? h('p.small.muted', 'Laws we will use: the implication law, the De Morgan law, and double negation — in that order, because each law creates the shape the next one needs.') : null,
+            table ? h('div', { style: { display: 'flex', justifyContent: 'center' } }, table) : null,
+            step.table === 1 ? h('div.small', { html: String.raw`Revealing row: \(p = \mathrm{T}\) and \(q = \mathrm{F}\) give \(\neg(\mathrm{T} \to \mathrm{F}) = \neg\mathrm{F} = \mathrm{T}\) and \(\mathrm{T} \land \neg\mathrm{F} = \mathrm{T} \land \mathrm{T} = \mathrm{T}\). The other rows are still unchecked.` }) : null,
+            step.answer ? h('div.ex-answer', 'Answer: ¬(p → q) ≡ p ∧ ¬q · check: both columns agree in all 4 rows — T, F, F, F') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

@@ -209,6 +209,30 @@
   const plainNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? 'undefined' : x > 0 ? '∞' : '−∞');
   const texNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? '\\text{undefined}' : x > 0 ? '\\infty' : '-\\infty');
 
+  // ---- worked example: Warshall's algorithm on R = {(1, 2), (2, 3), (3, 1), (3, 4)}, precomputed once ----
+  const EX_WAR_EDGES = [[0, 1], [1, 2], [2, 0], [2, 3]]; // the pairs of R, written 0-based
+  const EX_WAR_MATS = []; // EX_WAR_MATS[p] is the matrix after pass p (pass 0 is the starting matrix)
+  const EX_WAR_NEW = []; // EX_WAR_NEW[p] lists the pairs that pass p turned on
+  {
+    let cur = range(4).map((i) => range(4).map((j) => (EX_WAR_EDGES.some(([a, b]) => a === i && b === j) ? 1 : 0)));
+    EX_WAR_MATS.push(cur);
+    EX_WAR_NEW.push([]);
+    for (let k = 0; k < 4; k++) {
+      const next = cur.map((r) => r.slice());
+      const addedPairs = [];
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (!next[i][j] && cur[i][k] && cur[k][j]) { next[i][j] = 1; addedPairs.push([i, j]); }
+      EX_WAR_MATS.push(next);
+      EX_WAR_NEW.push(addedPairs);
+      cur = next;
+    }
+  }
+  const EX_WAR_ANSWER = EX_WAR_MATS[4];
+  const EX_WAR_PAIR = ([i, j]) => `(${i + 1}, ${j + 1})`;
+
+  // ---- worked example: the equivalence relation "3 divides a - b" on {0, 1, ..., 7} ----
+  const EX_EQ_SET = [0, 1, 2, 3, 4, 5, 6, 7];
+  const EX_EQ_CLASSES = [[0, 3, 6], [1, 4, 7], [2, 5]];
+
   DM.module({
     id: 'relations',
     num: 4,
@@ -1065,6 +1089,132 @@
             good: 'def is_onto(f, Y):\n    return set(f.values()) == Y',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked examples */
+      {
+        title: 'Worked example: transitive closure by Warshall\u2019s algorithm',
+        kind: 'example',
+        id: 'ex-warshall',
+        problem: String.raw`<p>Let \(R\) be the relation on \(\{1, 2, 3, 4\}\) with pairs \((1, 2), (2, 3), (3, 1)\) and \((3, 4)\). Use Warshall's algorithm — allowing paths through one intermediate vertex at a time — to find the transitive closure of \(R\).</p>`,
+        steps: [
+          { pass: 0, k: 0, caption: 'Start with the adjacency matrix of R: a 1 in row i, column j means the pair (i, j) is present. The rule for every pass is the same: when paths may pass through vertex k, cell (i, j) turns on whenever both (i, k) and (k, j) are already on.' },
+          { pass: 1, k: 1, caption: 'Pass k = 1 lets paths step through vertex 1. Only row 3 reaches 1, and from 1 the path continues to 2, so exactly one new pair appears: (3, 2), which records the two-step path 3 → 1 → 2 as a direct pair.' },
+          { pass: 2, k: 2, caption: 'Pass k = 2 lets paths step through vertex 2, which points to 3. Rows 1 and 3 both reach 2, so (1, 3) and (3, 3) turn on: the paths 1 → 2 → 3 and 3 → 2 → 3 become direct pairs of the closure.' },
+          { pass: 3, k: 3, caption: 'Pass k = 3 is the big one, because vertex 3 now points to 1, 2, 3 and 4. Every row that reaches 3 gains all of those targets, adding (1, 1), (1, 4), (2, 1), (2, 2) and (2, 4) in a single pass.' },
+          { pass: 4, k: 4, caption: 'Pass k = 4 changes no matrix value, and the picture shows why: column 4 has 1s, so paths can arrive at 4, but row 4 is all 0s. No path can leave 4 and continue onward, so this pass adds no new pairs.' },
+          { pass: 4, k: 0, answer: true, caption: 'Answer: the closure has rows of all 1s for sources 1, 2 and 3, and an all-0 row for source 4. Check: from 1 the path 1 → 2 → 3 → 4 reaches every vertex, the same holds starting from 2 or 3, and 4 has no outgoing pair, so it reaches nothing.' },
+        ],
+        answer: EX_WAR_ANSWER,
+        verify(M) {
+          // Independent check: a plain depth-first search over the original pairs, with no Warshall passes.
+          const adj = [[1], [2], [0, 3], []];
+          const reach = [0, 1, 2, 3].map((src) => {
+            const seen = new Set();
+            const stack = adj[src].slice();
+            while (stack.length) {
+              const v = stack.pop();
+              if (seen.has(v)) continue;
+              seen.add(v);
+              for (const w of adj[v]) if (!seen.has(w)) stack.push(w);
+            }
+            return [0, 1, 2, 3].map((j) => (seen.has(j) ? 1 : 0));
+          });
+          return JSON.stringify(reach) === JSON.stringify(EX_WAR_ANSWER);
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const mat = EX_WAR_MATS[step.pass];
+          const added = step.pass ? EX_WAR_NEW[step.pass] : [];
+          const isNew = (i, j) => added.some(([a, b]) => a === i && b === j);
+          const cell = (i, j) => {
+            const attrs = {};
+            if (isNew(i, j)) attrs.class = 'cur';
+            else if (step.k && (i === step.k - 1 || j === step.k - 1)) attrs.style = { background: 'var(--accent-2)' };
+            if (!mat[i][j]) attrs.style = { ...(attrs.style || {}), color: 'var(--ink-3)' };
+            return h('td', attrs, isNew(i, j) ? h('b', '1') : String(mat[i][j]));
+          };
+          const table = h('table.tt',
+            h('thead', h('tr', h('th', 'R'), ...range(4).map((j) => h('th', step.k === j + 1 ? { class: 'cur' } : null, String(j + 1))))),
+            h('tbody', ...range(4).map((i) => h('tr', h('th', step.k === i + 1 ? { class: 'cur' } : null, String(i + 1)), ...range(4).map((j) => cell(i, j))))));
+          const svg = digraph(ctx.s, {
+            n: 4, prefix: 'exwar', size: 230, labels: ['1', '2', '3', '4'], label: 'Digraph of the relation after this pass',
+            edge: (i, j) => (mat[i][j] ? { kind: step.answer ? 'acc' : isNew(i, j) ? 'good' : 'base' } : null),
+          });
+          svg.style.width = '13rem';
+          const status = step.answer ? null
+            : step.pass === 0 ? 'No intermediate vertex is allowed yet: only the 4 given pairs are on.'
+            : added.length ? `Pass k = ${step.k}: the new pairs ${added.map(EX_WAR_PAIR).join(', ')} turn on, drawn heavier in the digraph.`
+            : `Pass k = ${step.k}: no new pairs — nothing leaves vertex 4, so no path can continue through it.`;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem' } },
+            h('div.row', { style: { gap: '1.4rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' } },
+              h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+                table,
+                h('p.tiny.muted', { style: { maxWidth: '16rem', textAlign: 'center' } }, 'Row i, column j is 1 when i reaches j by a path whose middle vertices are all allowed so far. A bold 1 on a tinted cell was added by this pass; the tinted row and column belong to the active vertex k.')),
+              svg),
+            status ? h('p.small', { style: { textAlign: 'center' } }, status) : null,
+            step.answer ? h('div.ex-answer', 'Answer: transitive closure = [[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [0, 0, 0, 0]] — check: 1 → 2 → 3 → 4 reaches every vertex from 1, and vertex 4 reaches nothing.') : null));
+        },
+      },
+      {
+        title: 'Worked example: equivalence classes mod 3',
+        kind: 'example',
+        id: 'ex-equivalence-classes',
+        problem: String.raw`<p>On the set \(\{0, 1, 2, 3, 4, 5, 6, 7\}\), define \(a \sim b\) to mean that \(3\) divides \(a - b\). Show that \(\sim\) is an equivalence relation, and find all of its equivalence classes.</p>`,
+        steps: [
+          { phase: 'setup', caption: 'Setup: a ~ b means a and b leave the same remainder when divided by 3, because 3 divides a − b exactly when the two remainders match. Each element below is labeled with its remainder mod 3, and the work ahead is to test three properties: reflexive, symmetric and transitive.' },
+          { phase: 'reflexive', caption: 'Reflexive: for every element a, the difference a − a is 0, and 3 divides 0 because 0 = 3 · 0. So every element is related to itself, which is why each chip now carries its own loop and a check mark for the first property.' },
+          { phase: 'symmetric', caption: 'Symmetric: if 3 divides a − b, then it also divides b − a, because b − a is just −(a − b) and flipping the sign keeps divisibility. The highlighted pair checks this with numbers: 4 − 1 = 3 and 1 − 4 = −3, and 3 divides both differences.' },
+          { phase: 'transitive', caption: 'Transitive: if a − b = 3m and b − c = 3n, then adding the two equations gives a − c = 3(m + n), which is a multiple of 3 again. The highlighted triple checks this: 7 − 4 = 3 and 4 − 1 = 3, so 7 − 1 = 6, and 3 divides 6.' },
+          { phase: 'classes', caption: 'With all three properties confirmed, group the elements by their remainder mod 3, putting elements that share a remainder into one box. Elements in the same box differ by a multiple of 3, so they are related to each other, and the set splits into exactly three boxes.' },
+          { phase: 'answer', answer: true, caption: 'Answer: ~ is an equivalence relation, with classes {0, 3, 6}, {1, 4, 7} and {2, 5}. Check: the classes are disjoint, their union is all 8 elements of the set, and their sizes add up as 3 + 3 + 2 = 8, so nothing is missing and nothing is counted twice.' },
+        ],
+        answer: EX_EQ_CLASSES,
+        verify(M) {
+          // Independent check: the stated classes cover 0..7 exactly once, and for all 64 pairs,
+          // "3 divides a - b" (tested with the engine's mod) agrees with "same class".
+          const flat = EX_EQ_CLASSES.flat().slice().sort((x, y) => x - y);
+          if (JSON.stringify(flat) !== JSON.stringify(EX_EQ_SET)) return false;
+          for (let a = 0; a < 8; a++) for (let b = 0; b < 8; b++) {
+            const rel = M.mod(a - b, 3) === 0;
+            const same = EX_EQ_CLASSES.some((c) => c.includes(a) && c.includes(b));
+            if (rel !== same) return false;
+          }
+          return true;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const phase = step.phase;
+          const checked = { setup: 0, reflexive: 1, symmetric: 2, transitive: 3, classes: 3, answer: 3 }[phase];
+          const highlighted = phase === 'symmetric' ? [1, 4] : phase === 'transitive' ? [7, 4, 1] : [];
+          const chip = (a) => {
+            const hl = highlighted.includes(a);
+            return h('div', { style: { border: `2px solid ${hl ? 'var(--false)' : CLASS_COLORS[a % 3]}`, borderRadius: '0.4rem', padding: '0.3rem 0.55rem', textAlign: 'center', background: hl ? 'var(--mark)' : 'var(--sheet)', minWidth: '3.4rem' } },
+              h('div', { style: { fontWeight: 700, fontSize: '1.05rem' } }, phase === 'reflexive' ? `${a} ✓` : String(a)),
+              h('div.tiny.muted', `mod 3 = ${a % 3}`),
+              phase === 'reflexive' ? h('div.tiny', `${a} ~ ${a}`) : null);
+          };
+          const classBox = (cls) => h('div', { style: { border: `2px solid ${CLASS_COLORS[cls[0] % 3]}`, borderRadius: '0.5rem', padding: '0.45rem 0.8rem', textAlign: 'center', background: 'var(--sheet)' } },
+            h('div.small.muted', `[${cls[0]}] · remainder ${cls[0] % 3}`),
+            h('div', { style: { fontWeight: 700, fontSize: '1.15rem' } }, `{${cls.join(', ')}}`));
+          const grouped = phase === 'classes' || phase === 'answer';
+          const main = grouped
+            ? h('div.row', { style: { gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' } }, ...EX_EQ_CLASSES.map(classBox))
+            : h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '34rem' } }, ...EX_EQ_SET.map(chip));
+          const prop = (name, i) => h('span', { style: { border: '1px solid var(--rule)', borderRadius: '1rem', padding: '0.15rem 0.6rem', fontWeight: i < checked ? 700 : 400, background: i < checked ? 'var(--true-bg)' : 'var(--paper)' } }, `${i < checked ? '✓' : '?'} ${name}`);
+          const info = {
+            setup: 'Three properties to test: reflexive, symmetric and transitive. Passing all three is what makes ~ an equivalence relation.',
+            reflexive: 'For every a: a − a = 0 = 3 · 0, so 3 divides 0 and a ~ a. The first property holds for all 8 elements at once.',
+            symmetric: 'Highlighted check: 1 ~ 4 because 4 − 1 = 3. Reversed, 1 − 4 = −3, which is −(4 − 1), and 3 divides −3 as well, so 4 ~ 1.',
+            transitive: 'Highlighted check: 7 ~ 4 and 4 ~ 1, since 7 − 4 = 3 and 4 − 1 = 3. Adding the differences gives 7 − 1 = 6 = 3 + 3, so 7 ~ 1.',
+            classes: 'One box per remainder: remainder 0, remainder 1 and remainder 2. Every element of the set lands in exactly one box.',
+            answer: '',
+          }[phase];
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.55rem', maxWidth: '58rem' } },
+            main,
+            h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' } }, prop('Reflexive', 0), prop('Symmetric', 1), prop('Transitive', 2)),
+            info ? h('p.small', { style: { textAlign: 'center' } }, info) : null,
+            step.answer ? h('div.ex-answer', 'Answer: ~ is an equivalence relation with classes {0, 3, 6}, {1, 4, 7}, {2, 5} — check: the classes are disjoint, their union is all 8 elements, and 3 + 3 + 2 = 8.') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

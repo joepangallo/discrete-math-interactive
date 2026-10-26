@@ -422,6 +422,36 @@
   }
   const EXAMPLE_EXPR = parseExpr('(3 + 4) * (5 - 2)');
 
+  /* ---------------- worked example data: BST insertion ---------------- */
+  // Fixed final positions for the tree built from 50, 30, 70, 20, 40, 60, 80 (balanced for this order).
+  const EX_BST_KEYS = [50, 30, 70, 20, 40, 60, 80];
+  const EX_BST_POS = { 50: [320, 42], 30: [160, 112], 70: [480, 112], 20: [80, 182], 40: [240, 182], 60: [400, 182], 80: [560, 182] };
+  const EX_BST_PARENT = { 50: null, 30: 50, 70: 50, 20: 30, 40: 30, 60: 70, 80: 70 };
+  // the comparison path each key follows, root first, ending at the new key itself
+  const EX_BST_PATH = { 50: [50], 30: [50, 30], 70: [50, 70], 20: [50, 30, 20], 40: [50, 30, 40], 60: [50, 70, 60], 80: [50, 70, 80] };
+  const EX_BST_INORDER = [20, 30, 40, 50, 60, 70, 80];
+
+  /* ---------------- worked example data: Huffman coding ---------------- */
+  const EX_HUFF_FREQ = [['A', 45], ['B', 13], ['C', 12], ['D', 16], ['E', 9], ['F', 5]];
+  const EX_HUFF_SORTED = [['F', 5], ['E', 9], ['C', 12], ['B', 13], ['D', 16], ['A', 45]];
+  // Final layout: leaves share the bottom row, internal nodes sit above the pair they merged.
+  // Left edge = 0, right edge = 1, so the codewords below are read off these positions.
+  const EX_HUFF_NODES = [
+    { id: 'C', label: 'C', sub: '12', x: 80, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'B', label: 'B', sub: '13', x: 160, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'F', label: 'F', sub: '5', x: 260, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'E', label: 'E', sub: '9', x: 340, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'D', label: 'D', sub: '16', x: 440, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'A', label: 'A', sub: '45', x: 570, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'n25', label: '25', x: 120, y: 168, r: 17, created: 2, left: 'C', right: 'B' },
+    { id: 'n14', label: '14', x: 300, y: 168, r: 17, created: 1, left: 'F', right: 'E' },
+    { id: 'n30', label: '30', x: 370, y: 120, r: 17, created: 3, left: 'n14', right: 'D' },
+    { id: 'n55', label: '55', x: 245, y: 76, r: 17, created: 4, left: 'n25', right: 'n30' },
+    { id: 'n100', label: '100', x: 408, y: 32, r: 18, created: 5, left: 'n55', right: 'A' },
+  ];
+  const EX_HUFF_CODES = { A: '1', B: '001', C: '000', D: '011', E: '0101', F: '0100' };
+  const EX_HUFF_ANSWER = { lengths: { A: 1, B: 3, C: 3, D: 3, E: 4, F: 4 }, wpl: 224 };
+
   /* ---------------- lab data ---------------- */
   const ANAT = [['a', 'b'], ['a', 'c'], ['a', 'd'], ['b', 'e'], ['b', 'f'], ['c', 'g'], ['d', 'h'], ['d', 'i'], ['d', 'j'], ['f', 'k'], ['f', 'l'], ['h', 'm']];
   const MST_V = { A: [70, 84], B: [262, 46], C: [452, 82], D: [150, 226], E: [342, 208], F: [520, 248], G: [78, 362], H: [312, 362] };
@@ -1640,6 +1670,142 @@
             good: 'for keys in ([], [7], list(range(2000)), [5] * 10):\n    root = build(keys)\n    assert list(keys_inorder(root)) == sorted(keys)\n    assert height(root) <= max(len(keys) - 1, 0)',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: building a binary search tree by insertion',
+        kind: 'example',
+        id: 'ex-bst-insert',
+        problem: String.raw`<p>Insert the keys \(50, 30, 70, 20, 40, 60, 80\), in that order, into an empty binary search tree. Draw the tree after each insertion, then give its inorder traversal.</p>`,
+        steps: [
+          { inserted: 0, note: 'The empty tree · insert order: 50, 30, 70, 20, 40, 60, 80', caption: 'Start with an empty tree and the binary search tree rule: at every node, smaller keys go to the left subtree and larger keys go to the right subtree. That single rule decides every placement, because each insertion just follows the comparisons down from the root.' },
+          { inserted: 1, note: 'Inserted 50 — it becomes the root', caption: 'Insert 50 into the empty tree: there is nothing to compare it against, so it simply becomes the root. Every later key is measured against 50 first, which is why the first key shapes the whole tree.' },
+          { inserted: 2, note: 'Inserted 30 — left child of 50', caption: 'Insert 30: 30 < 50, so go left from the root, and the left child of 50 is empty, so 30 lands there. Being smaller than the root is exactly what places it in the left subtree.' },
+          { inserted: 3, note: 'Inserted 70 — right child of 50', caption: 'Insert 70: 70 > 50, so go right from the root, and the right child of 50 is empty, so 70 lands there. The root now has both children, and its two subtrees will grow independently from here.' },
+          { inserted: 4, note: 'Inserted 20 — left child of 30', caption: 'Insert 20: 20 < 50, go left; 20 < 30, go left again; the left child of 30 is empty, so 20 lands there. It is the smallest key of all, and it ends up tucked at the far left of the tree.' },
+          { inserted: 5, note: 'Inserted 40 — right child of 30', caption: 'Insert 40: 40 < 50, go left; 40 > 30, go right; the right child of 30 is empty, so 40 lands there. In value 40 sits between 30 and 50, and the tree places it between them in position as well.' },
+          { inserted: 6, note: 'Inserted 60 — left child of 70', caption: 'Insert 60: 60 > 50, go right; 60 < 70, go left; the left child of 70 is empty, so 60 lands there. The right subtree is now growing into a mirror of the left one, with 60 as its smaller leaf.' },
+          { inserted: 7, note: 'Inserted 80 — right child of 70', caption: 'Insert 80: 80 > 50, go right; 80 > 70, go right again; the right child of 70 is empty, so 80 lands there. All seven keys are in, and for this insertion order the tree came out perfectly balanced.' },
+          { inserted: 7, note: 'The finished tree — all 7 keys placed', answer: true, caption: 'Answer: an inorder traversal of any binary search tree visits keys in sorted order, and ours comes out perfectly sorted — 20, 30, 40, 50, 60, 70, 80 — which cross-checks every placement. The finished tree has 50 at the root, 30 and 70 below it, and the other four keys as leaves.' },
+        ],
+        answer: EX_BST_INORDER,
+        verify(M) {
+          const keys = [50, 30, 70, 20, 40, 60, 80];
+          const ins = (node, k) => { if (!node) return { k, l: null, r: null }; if (k < node.k) node.l = ins(node.l, k); else node.r = ins(node.r, k); return node; };
+          let root = null;
+          for (const k of keys) root = ins(root, k);
+          const inorder = [];
+          (function walk(n) { if (!n) return; walk(n.l); inorder.push(n.k); walk(n.r); })(root);
+          const bstOk = (function check(n, lo, hi) { return !n || (n.k > lo && n.k < hi && check(n.l, lo, n.k) && check(n.r, n.k, hi)); })(root, -Infinity, Infinity);
+          return bstOk && inorder.join(',') === EX_BST_INORDER.join(',') && M.sortNum(keys).join(',') === inorder.join(',');
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const placed = EX_BST_KEYS.slice(0, step.inserted);
+          const current = step.answer || step.inserted === 0 ? null : EX_BST_KEYS[step.inserted - 1];
+          const path = current ? EX_BST_PATH[current] : [];
+          const onPath = (a, b) => { const i = path.indexOf(a); return i >= 0 && path[i + 1] === b; };
+          let g = '';
+          if (step.inserted === 0) {
+            const [x, y] = EX_BST_POS[50];
+            g += `<circle cx="${x}" cy="${y}" r="22" fill="none" stroke="var(--ink-3)" stroke-width="1.6" stroke-dasharray="5 4"/><text x="${x}" y="${y + 46}" text-anchor="middle" font-size="13" fill="var(--ink-3)">empty: the first key inserted becomes the root</text>`;
+          }
+          for (const k of placed) {
+            const p = EX_BST_PARENT[k];
+            if (p == null) continue;
+            const [x1, y1] = EX_BST_POS[p], [x2, y2] = EX_BST_POS[k];
+            const hot = onPath(p, k);
+            g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hot ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${hot ? 3.6 : 1.6}"/>`;
+          }
+          for (const k of placed) {
+            const [x, y] = EX_BST_POS[k];
+            const isNew = k === current;
+            if (isNew) g += `<circle cx="${x}" cy="${y}" r="27" fill="none" stroke="var(--kw)" stroke-width="2" stroke-dasharray="4 3"/><text x="${x}" y="${y - 36}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--kw)">new</text>`;
+            g += `<circle cx="${x}" cy="${y}" r="20" fill="${isNew ? 'var(--mark)' : 'var(--sheet)'}" stroke="${isNew ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${isNew ? 3 : 1.6}"/><text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="${isNew ? 'var(--mark-ink)' : 'var(--ink)'}">${k}</text>`;
+          }
+          const svg = `<svg class="tr-svg" viewBox="0 0 640 232" role="img" aria-label="Binary search tree being built by insertion" style="width:100%;height:auto;display:block">${g}</svg>`;
+          const chips = EX_BST_KEYS.map((k, i) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.82rem', fontWeight: i === step.inserted - 1 && !step.answer ? 700 : 400, border: i === step.inserted - 1 && !step.answer ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: '0.08rem 0.42rem', background: i < step.inserted ? (i === step.inserted - 1 && !step.answer ? 'var(--mark)' : 'var(--accent-2)') : 'var(--sheet)', opacity: i < step.inserted ? 1 : 0.55 } }, String(k)));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, step.note),
+            h('div', { style: { width: 'min(40rem, 100%)' }, html: svg }),
+            h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } }, h('span.tiny.mono.muted', 'insert order:'), chips),
+            step.answer ? h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_BST_INORDER.map((k) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.85rem', fontWeight: 700, border: '1px solid var(--true)', borderRadius: '0.3rem', padding: '0.08rem 0.42rem', background: 'var(--true-bg)' } }, String(k)))) : null,
+            step.answer ? h('div.ex-answer', 'Answer: the finished tree — inorder traversal 20, 30, 40, 50, 60, 70, 80 · check: the traversal is perfectly sorted, exactly as an inorder walk of a binary search tree must be ✓') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: building a Huffman code',
+        kind: 'example',
+        id: 'ex-huffman',
+        problem: String.raw`<p>Build a Huffman code for the symbols and frequencies \(A{:}45,\ B{:}13,\ C{:}12,\ D{:}16,\ E{:}9,\ F{:}5\) (out of 100). Give each symbol's codeword and the expected code length in bits per symbol.</p>`,
+        steps: [
+          { merges: 0, forest: [5, 9, 12, 13, 16, 45], note: 'Six leaves, sorted by frequency: F 5, E 9, C 12, B 13, D 16, A 45', caption: 'Setup: write the six symbols as leaves sorted by frequency, lightest first: F 5, E 9, C 12, B 13, D 16, A 45. The Huffman rule is to repeatedly merge the two lightest trees, because the rarest symbols should travel the deepest and merging them first keeps them deep.' },
+          { merges: 1, forest: [12, 13, 14, 16, 45], note: 'Merge 1: F (5) + E (9) = 14 · forest weights now 12, 13, 14, 16, 45', caption: 'Merge F (5) and E (9), the two lightest trees, into a new tree of weight 14, drawn with F on the left and E on the right. The two rarest symbols now sit one level deeper than before, which is exactly where rare symbols belong in a good code.' },
+          { merges: 2, forest: [14, 16, 25, 45], note: 'Merge 2: C (12) + B (13) = 25 · forest weights now 14, 16, 25, 45', caption: 'Merge C (12) and B (13), now the two lightest separate trees, into a tree of weight 25, with C on the left and B on the right. The forest shrinks to four trees, and C and B each gain a level of depth.' },
+          { merges: 3, forest: [25, 30, 45], note: 'Merge 3: 14 + D (16) = 30 · forest weights now 25, 30, 45', caption: 'Merge the 14 tree and D (16), the two lightest trees left, into a tree of weight 30, keeping the 14 tree on the left and D on the right. F and E sink one level deeper still, while D gains its first level of depth.' },
+          { merges: 4, forest: [45, 55], note: 'Merge 4: 25 + 30 = 55 · forest weights now 45, 55', caption: 'Merge the 25 tree and the 30 tree, the two lightest trees remaining, into a tree of weight 55, with 25 on the left and 30 on the right. Every symbol except A is now in a single tree, and all of them gain one more level of depth.' },
+          { merges: 5, forest: [100], note: 'Merge 5: 55 + A (45) = 100 · the tree is complete, left edge = 0, right edge = 1', caption: 'Merge the 55 tree and A (45) into the root of weight 100, with the 55 tree on the left and A on the right, and label every left edge 0 and every right edge 1. A joins last and highest, so the most frequent symbol gets the shortest path down from the root.' },
+          { merges: 5, forest: [100], note: 'The finished Huffman tree: codewords read off the root-to-leaf paths', answer: true, caption: 'Answer: reading each root-to-leaf path gives A = 1, B = 001, C = 000, D = 011, E = 0101 and F = 0100, with expected length (45·1 + 12·3 + 13·3 + 16·3 + 9·4 + 5·4) / 100 = 224 / 100 = 2.24 bits per symbol. Check: the code is prefix-free because every symbol is a leaf, and the weighted path length 224 equals the sum of the merge weights 14 + 25 + 30 + 55 + 100 = 224.' },
+        ],
+        answer: EX_HUFF_ANSWER,
+        verify(M) {
+          const freq = { A: 45, B: 13, C: 12, D: 16, E: 9, F: 5 };
+          let forest = Object.entries(freq).map(([sym, w]) => ({ w, depths: { [sym]: 0 } }));
+          let cost = 0;
+          while (forest.length > 1) {
+            forest.sort((a, b) => a.w - b.w);
+            const a = forest.shift(), b = forest.shift();
+            cost += a.w + b.w;
+            const depths = {};
+            for (const src of [a, b]) for (const [sym, d] of Object.entries(src.depths)) depths[sym] = d + 1;
+            forest.push({ w: a.w + b.w, depths });
+          }
+          const derived = forest[0].depths;
+          const wpl = Object.entries(freq).reduce((sum, [sym, f]) => sum + f * derived[sym], 0);
+          const kraft = Object.values(derived).reduce((sum, len) => sum + 2 ** (-len), 0);
+          const same = Object.keys(freq).every((sym) => derived[sym] === EX_HUFF_ANSWER.lengths[sym]);
+          return same && cost === 224 && wpl === 224 && EX_HUFF_ANSWER.wpl === 224 && Math.abs(kraft - 1) < 1e-12;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const byId = {};
+          for (const n of EX_HUFF_NODES) byId[n.id] = n;
+          let g = '';
+          if (step.merges === 0) {
+            g += `<text x="320" y="34" text-anchor="middle" font-size="13" fill="var(--ink-3)">six leaves, sorted by frequency, lightest first — the lightest two merge first</text>`;
+            EX_HUFF_SORTED.forEach(([sym, f], i) => {
+              const x = 70 + i * 100, y = 118;
+              g += `<circle cx="${x}" cy="${y}" r="22" fill="var(--sheet)" stroke="var(--ink-3)" stroke-width="1.6"/><text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="600" fill="var(--ink)">${sym}</text><text x="${x}" y="${y + 38}" text-anchor="middle" font-size="12.5" fill="var(--ink-2)">${f} of 100</text>`;
+              if (i < EX_HUFF_SORTED.length - 1) g += `<text x="${x + 50}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="14" fill="var(--ink-3)">≤</text>`;
+            });
+          } else {
+            for (const n of EX_HUFF_NODES) {
+              if (n.leaf || n.created > step.merges) continue;
+              const hot = n.created === step.merges && !step.answer;
+              for (const [side, cid] of [['left', n.left], ['right', n.right]]) {
+                const c = byId[cid];
+                g += `<line x1="${n.x}" y1="${n.y}" x2="${c.x}" y2="${c.y}" stroke="${hot ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${hot ? 3.4 : 1.6}"/>`;
+                if (step.merges === 5) g += `<text x="${(n.x + c.x) / 2 + (side === 'left' ? -9 : 9)}" y="${(n.y + c.y) / 2}" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="700" fill="${side === 'left' ? 'var(--fnc)' : 'var(--num)'}">${side === 'left' ? '0' : '1'}</text>`;
+              }
+            }
+            for (const n of EX_HUFF_NODES) {
+              if (!n.leaf && n.created > step.merges) continue;
+              const isNew = !n.leaf && n.created === step.merges && !step.answer;
+              if (isNew) g += `<text x="${n.x}" y="${n.y - n.r - 8}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--kw)">new</text>`;
+              g += `<circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${isNew ? 'var(--mark)' : 'var(--sheet)'}" stroke="${isNew ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${isNew ? 3 : 1.6}"/><text x="${n.x}" y="${n.y}" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="600" fill="${isNew ? 'var(--mark-ink)' : 'var(--ink)'}">${n.label}</text>`;
+              if (n.leaf) g += `<text x="${n.x}" y="${n.y + n.r + 13}" text-anchor="middle" font-size="12" fill="var(--ink-2)">${n.sub}</text>`;
+            }
+          }
+          const svg = `<svg class="tr-svg" viewBox="0 0 640 ${step.merges === 0 ? 176 : 262}" role="img" aria-label="Huffman trees being merged bottom-up" style="width:100%;height:auto;display:block">${g}</svg>`;
+          const forestChips = step.forest.map((w) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.82rem', border: '1px solid var(--rule)', borderRadius: '0.3rem', padding: '0.08rem 0.42rem', background: 'var(--sheet)' } }, String(w)));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, step.note),
+            h('div', { style: { width: 'min(40rem, 100%)' }, html: svg }),
+            h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } }, h('span.tiny.mono.muted', 'forest weights:'), forestChips),
+            step.answer ? h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_HUFF_FREQ.map(([sym, f]) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.82rem', border: '1px solid var(--accent)', borderRadius: '0.3rem', padding: '0.1rem 0.45rem', background: 'var(--accent-2)' } }, `${sym} = ${EX_HUFF_CODES[sym]} (${EX_HUFF_ANSWER.lengths[sym]} bits)`))) : null,
+            step.answer ? h('div.ex-answer', 'Answer: expected length 2.24 bits per symbol — weighted path length 224 · check: 14 + 25 + 30 + 55 + 100 = 224, and the code is prefix-free because every symbol sits at a leaf ✓') : null));
+        },
       },
       /* ---------------------------------------------------------------- 17 */
       {

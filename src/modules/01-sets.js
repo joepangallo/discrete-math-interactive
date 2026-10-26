@@ -521,6 +521,121 @@
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked examples */
+      {
+        title: 'Worked example: shading (A ∪ B) ∩ C′ on a Venn diagram',
+        kind: 'example',
+        id: 'ex-venn-shading',
+        problem: String.raw`<p>With universe \(U = \{1, 2, \dots, 10\}\), \(A = \{1, 2, 3, 4, 5\}\), \(B = \{4, 5, 6, 7\}\) and \(C = \{2, 5, 8\}\), compute \((A \cup B) \cap C'\), building the answer one sub-expression at a time on a Venn diagram.</p>`,
+        steps: [
+          { phase: 0, status: 'Regions placed · nothing shaded yet', caption: 'Plan first: place every element of U in its region, then work inside-out — shade A, grow the shading to A ∪ B, switch to the complement of C, and keep only what both shadings share. Nothing is shaded yet, so this first picture is the map for every later step.' },
+          { phase: 1, status: 'Shaded: A = {1, 2, 3, 4, 5}', caption: 'Shade all of circle A, because the first sub-expression is just A = {1, 2, 3, 4, 5}. Every region inside circle A is now shaded, including the parts that also lie inside B or inside C.' },
+          { phase: 2, status: 'Shaded: A ∪ B = {1, 2, 3, 4, 5, 6, 7}', caption: 'Extend the shading to all of circle B as well, because a union keeps anything that is in either set: A ∪ B = {1, 2, 3, 4, 5, 6, 7}. The shaded area is now the whole of both circles, with the overlap shaded once, not twice.' },
+          { phase: 3, status: 'Shaded: C′ = {1, 3, 4, 6, 7, 9, 10} (everything outside C)', caption: 'Start over with a different shading: everything outside circle C, because the complement C′ = {1, 3, 4, 6, 7, 9, 10} holds all of U except 2, 5 and 8. Even the corners of the universe, outside every circle, are shaded this time.' },
+          { phase: 4, status: 'Kept: in A ∪ B and outside C = {1, 3, 4, 6, 7}', caption: 'Intersect the two shadings: keep only the regions that were shaded in both senses, meaning in A ∪ B and also outside C. The elements 2 and 5 drop out because they lie inside C, and 9 and 10 drop out because they were never in A ∪ B.' },
+          { phase: 4, answer: true, status: 'Final regions outlined in bold: {1, 3, 4, 6, 7}', caption: 'Answer: (A ∪ B) ∩ C′ = {1, 3, 4, 6, 7}, read region by region — 1 and 3 from A only, 4 from A ∩ B outside C, and 6 and 7 from B only. Check each one: it is in A or in B and it is not in C, while the only other members of A ∪ B, namely 2 and 5, fail because they lie in C.' },
+        ],
+        answer: [1, 3, 4, 6, 7],
+        verify(M) {
+          const U = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], A = [1, 2, 3, 4, 5], B = [4, 5, 6, 7], C = [2, 5, 8];
+          const got = U.filter((x) => (A.includes(x) || B.includes(x)) && !C.includes(x));
+          const want = [1, 3, 4, 6, 7];
+          return got.length === want.length && got.every((x, i) => x === want[i]);
+        },
+        draw(stage, ctx, step, k) {
+          const { h, s } = ctx;
+          const CTRS = { A: [195, 92], B: [325, 92], C: [260, 150] };
+          const RAD = 80;
+          const REGIONS = [
+            { a: 1, b: 0, c: 0, pos: [138, 87], label: '1, 3' },
+            { a: 0, b: 1, c: 0, pos: [382, 87], label: '6, 7' },
+            { a: 0, b: 0, c: 1, pos: [260, 210], label: '8' },
+            { a: 1, b: 1, c: 0, pos: [260, 62], label: '4' },
+            { a: 1, b: 0, c: 1, pos: [193, 160], label: '2' },
+            { a: 0, b: 1, c: 1, pos: [327, 160], label: '' },
+            { a: 1, b: 1, c: 1, pos: [260, 120], label: '5' },
+            { a: 0, b: 0, c: 0, pos: [448, 244], label: '9, 10' },
+          ];
+          const shaded = (r) => step.phase === 1 ? r.a === 1
+            : step.phase === 2 ? (r.a === 1 || r.b === 1)
+            : step.phase === 3 ? r.c === 0
+            : step.phase >= 4 ? ((r.a === 1 || r.b === 1) && r.c === 0) : false;
+          const circ = (key, attrs) => s('circle', { cx: CTRS[key][0], cy: CTRS[key][1], r: RAD, ...attrs });
+          const kids = [];
+          kids.push(s('defs',
+            s('mask', { id: 'exv-nc' }, s('rect', { x: 0, y: 0, width: 520, height: 270, fill: 'white' }), circ('C', { fill: 'black' })),
+            s('clipPath', { id: 'exv-ab' }, circ('A', {}), circ('B', {}))));
+          kids.push(s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'var(--sheet)', stroke: 'var(--rule)', 'stroke-width': 1.5 }));
+          kids.push(s('text', { x: 24, y: 34, 'font-size': 16, 'font-weight': 600, fill: 'var(--ink-3)', text: 'U' }));
+          if (step.phase === 1) kids.push(circ('A', { fill: 'var(--accent)', opacity: 0.38, stroke: 'none' }));
+          else if (step.phase === 2) kids.push(circ('A', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }));
+          else if (step.phase === 3) kids.push(s('g', { mask: 'url(#exv-nc)' }, s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'var(--num)', opacity: 0.3 })));
+          else if (step.phase >= 4) kids.push(s('g', { mask: 'url(#exv-nc)' }, circ('A', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' })));
+          for (const key of ['A', 'B', 'C']) kids.push(circ(key, { fill: 'none', stroke: key === 'A' ? 'var(--accent)' : key === 'B' ? 'var(--fnc)' : 'var(--num)', 'stroke-width': 2.2 }));
+          if (step.answer) {
+            kids.push(s('g', { mask: 'url(#exv-nc)' }, circ('A', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 }), circ('B', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
+            kids.push(s('g', { 'clip-path': 'url(#exv-ab)' }, circ('C', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
+          }
+          kids.push(s('text', { x: 100, y: 36, 'font-size': 19, 'font-weight': 700, fill: 'var(--accent)', text: 'A' }));
+          kids.push(s('text', { x: 408, y: 36, 'font-size': 19, 'font-weight': 700, fill: 'var(--fnc)', text: 'B' }));
+          kids.push(s('text', { x: 253, y: 257, 'font-size': 19, 'font-weight': 700, fill: 'var(--num)', text: 'C' }));
+          for (const r of REGIONS) {
+            if (!r.label) continue;
+            kids.push(s('text', { x: r.pos[0], y: r.pos[1], 'text-anchor': 'middle', 'font-size': 15, 'font-weight': shaded(r) ? 700 : 400, fill: shaded(r) ? 'var(--ink)' : 'var(--ink-3)', text: r.label }));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 270', role: 'img', 'aria-label': 'Three-circle Venn diagram of A, B and C inside U, shaded step by step', style: { width: '440px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...kids);
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            svg,
+            step.answer ? h('div.ex-answer', '(A ∪ B) ∩ C′ = {1, 3, 4, 6, 7} — check: every listed element is in A or in B, and none of them is in C') : null));
+        },
+      },
+      {
+        title: 'Worked example: De Morgan’s law by a membership table',
+        kind: 'example',
+        id: 'ex-demorgan-membership',
+        problem: String.raw`<p>Prove De Morgan's law \((A \cup B)' = A' \cap B'\) for \(A = \{1, 2, 3\}\) and \(B = \{3, 4\}\) in the universe \(U = \{1, 2, 3, 4, 5, 6\}\), by building a membership table with one row per element of \(U\).</p>`,
+        steps: [
+          { cols: 2, fresh: [0, 1], compare: false, status: 'Columns so far: x, in A, in B', caption: 'Start with the raw facts only: one row for each element of U = {1, 2, 3, 4, 5, 6}, with a T where the element belongs to A = {1, 2, 3} or to B = {3, 4}. Every later column is computed from these two columns, row by row.' },
+          { cols: 3, fresh: [2], compare: false, status: 'New column: in A ∪ B = {1, 2, 3, 4}', caption: 'Add the union column: an element is in A ∪ B when its row has a T in the A column, in the B column, or in both. Only 5 and 6 get an F here, because they are the two elements that belong to neither set.' },
+          { cols: 4, fresh: [3], compare: false, status: 'New column: in (A ∪ B)′ = {5, 6}', caption: 'Flip the union column to get (A ∪ B)′: every T becomes F and every F becomes T, because a complement keeps exactly the elements the original set missed. This column is T only for 5 and 6, so the left-hand side of the law is {5, 6}.' },
+          { cols: 6, fresh: [4, 5], compare: false, status: 'New columns: in A′ = {4, 5, 6} and in B′ = {1, 2, 5, 6}', caption: 'Now build the right-hand side in pieces: A′ flips the A column and B′ flips the B column, each one keeping the elements outside that single set. These two columns are the ingredients for the intersection that finishes the right-hand side.' },
+          { cols: 7, fresh: [6], compare: false, status: 'New column: in A′ ∩ B′ = {5, 6}', caption: 'Intersect the last two columns: A′ ∩ B′ is T only where a row has a T in both A′ and B′, because an intersection demands both conditions at once. That happens only for 5 and 6, the elements that are outside A and also outside B.' },
+          { cols: 7, fresh: [], compare: true, answer: true, status: 'Compare: the (A ∪ B)′ column and the A′ ∩ B′ column — identical', caption: 'Answer: the (A ∪ B)′ column and the A′ ∩ B′ column are identical in all 6 rows — F, F, F, F, T, T — so the two sets are equal and (A ∪ B)′ = A′ ∩ B′ = {5, 6}. The check is the row-by-row match itself, and it fits the picture: 5 and 6 are exactly the elements in neither A nor B.' },
+        ],
+        answer: [5, 6],
+        verify(M) {
+          const U = [1, 2, 3, 4, 5, 6], A = [1, 2, 3], B = [3, 4];
+          const lhs = U.filter((x) => !(A.includes(x) || B.includes(x)));
+          const rhs = U.filter((x) => !A.includes(x) && !B.includes(x));
+          const want = [5, 6];
+          const eq = (p, q) => p.length === q.length && p.every((x, i) => x === q[i]);
+          return eq(lhs, rhs) && eq(lhs, want);
+        },
+        draw(stage, ctx, step, k) {
+          const { h } = ctx;
+          const U = [1, 2, 3, 4, 5, 6], A = [1, 2, 3], B = [3, 4];
+          const COLS = [
+            { head: 'in A', f: (x) => A.includes(x) },
+            { head: 'in B', f: (x) => B.includes(x) },
+            { head: 'in A ∪ B', f: (x) => A.includes(x) || B.includes(x) },
+            { head: 'in (A ∪ B)′', f: (x) => !(A.includes(x) || B.includes(x)) },
+            { head: 'in A′', f: (x) => !A.includes(x) },
+            { head: 'in B′', f: (x) => !B.includes(x) },
+            { head: 'in A′ ∩ B′', f: (x) => !A.includes(x) && !B.includes(x) },
+          ];
+          const cellCls = (ci) => (step.fresh.includes(ci) || (step.compare && (ci === 3 || ci === 6)) ? 'cur' : '');
+          const table = h('table.tt', { style: { fontSize: '0.85rem' } },
+            h('thead', h('tr', h('th', 'x'), COLS.map((c, ci) => h('th', { class: ci < step.cols ? cellCls(ci) : 'muted' }, c.head)))),
+            h('tbody', U.map((x) => h('tr', { class: step.compare && (x === 5 || x === 6) ? 'hit' : '' },
+              h('td', String(x)),
+              COLS.map((c, ci) => (ci < step.cols ? h('td', { class: cellCls(ci) }, c.f(x) ? 'T' : 'F') : h('td.muted', '·')))))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            table,
+            step.answer ? h('div.ex-answer', '(A ∪ B)′ = A′ ∩ B′ = {5, 6} — check: the two highlighted columns match in all 6 rows, and 5 and 6 are exactly the elements in neither A nor B') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 11 */
       {
         title: 'Practice: sets',

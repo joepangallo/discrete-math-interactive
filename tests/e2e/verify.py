@@ -218,6 +218,19 @@ with sync_playwright() as p:
                 page.wait_for_timeout(100)
                 overflow_check("edit")
                 page.click(".slide:not([hidden]) .cw-bar [role=tab]:nth-child(1)")
+        elif kind == "example":
+            nsteps = page.evaluate("() => { const c = document.querySelector('.slide:not([hidden]) .ex-count'); return c ? parseInt(c.textContent.split(' of ')[1], 10) : 0; }")
+            if not nsteps:
+                err("worked example shows no step counter")
+            for _ in range(max(0, nsteps - 1)):
+                page.keyboard.press("ArrowDown")
+                page.wait_for_timeout(35)
+            overflow_check("final step")
+            if not page.evaluate("() => !!document.querySelector('.slide:not([hidden]) .ex-stage .ex-answer')"):
+                err("the final step shows no answer banner")
+            page.evaluate("() => document.querySelector('.slide:not([hidden]) .ex-ctl button[aria-label=\"Back to the first step\"]')?.click()")
+            page.wait_for_timeout(60)
+            overflow_check("back at first step")
         elif kind == "design":
             n = page.evaluate("() => document.querySelectorAll('.slide:not([hidden]) .dp-list button').length")
             for i in range(n):

@@ -85,6 +85,11 @@ if (registered < mods.length) throw new Error(`expected ${mods.length} DM.module
 if (/<!--(HEAD|BODY)-->/.test(full)) throw new Error('a template marker survived into the output');
 const minBytes = mods.length === modFiles.length ? 1200 * 1024 : 120 * 1024; // the full course is about 1.6 MB; a welcome-only build about 160 KB
 if (full.length < minBytes) throw new Error(`output is suspiciously small (${full.length} bytes for ${mods.length} module files)`);
+/* Worked examples build their pictures at run time and embed no images, so the page must stay
+   lean: a hard ceiling catches a change that starts inlining assets or runaway generated data. */
+const maxBytes = 2.2 * 1024 * 1024;
+const outBytes = Buffer.byteLength(full, 'utf8');
+if (mods.length === modFiles.length && outBytes > maxBytes) throw new Error(`output is too large (${outBytes} bytes, ceiling ${maxBytes}); build states and pictures at run time instead of embedding them`);
 writeFileSync(out, full);
 console.log(`wrote ${out} (${(full.length / 1024).toFixed(0)} KB, ${mods.length} module files)`);
 

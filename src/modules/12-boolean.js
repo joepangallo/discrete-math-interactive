@@ -442,6 +442,21 @@
     return runs;
   }
 
+  /* ---------------- worked examples ---------------- */
+  // ex-kmap: f(a, b, c) = Σm(0, 2, 4, 5, 6); rows are a, columns are bc in Gray order
+  const EX_KMAP_ONES = [0, 2, 4, 5, 6];
+  const EX_KMAP_QUAD = [0, 2, 4, 6];
+  const EX_KMAP_PAIR = [4, 5];
+  const EX_KMAP_CELL = (r, c) => (r << 2) | GRAY[c]; // minterm index 4a + 2b + c for row a = r, column bc = GRAY[c]
+
+  // ex-adder-eval: 1011 + 0110, one entry per bit position, bit 0 (rightmost) first
+  const EX_ADD_COLS = [
+    { i: 0, a: 1, b: 0, cin: 0, sum: 1, cout: 0 },
+    { i: 1, a: 1, b: 1, cin: 0, sum: 0, cout: 1 },
+    { i: 2, a: 0, b: 1, cin: 1, sum: 0, cout: 1 },
+    { i: 3, a: 1, b: 0, cin: 1, sum: 0, cout: 1 },
+  ];
+
   DM.module({
     id: 'boolean',
     num: 12,
@@ -1364,6 +1379,119 @@
         ],
       },
       /* ---------------------------------------------------------------- 14 */
+      {
+        title: 'Worked example: minimizing with a Karnaugh map',
+        kind: 'example',
+        id: 'ex-kmap',
+        problem: String.raw`<p>A function \(f(a, b, c)\) is 1 exactly for the minterms \(m_0, m_2, m_4, m_5, m_6\) — that is, \((a, b, c)\) is one of \(000, 010, 100, 101, 110\). Use a Karnaugh map to find a minimal sum of products for \(f\).</p>`,
+        steps: [
+          { groups: 0, plotted: false, caption: 'The map has one row for each value of a and one column for each value of bc, listed in Gray order 00, 01, 11, 10. Gray order matters because neighboring cells then differ in exactly one variable, even across the wrap-around edges, and that is what lets neighboring 1s merge into bigger groups.' },
+          { groups: 0, plotted: true, caption: 'Now transfer the truth table into the map: a 1 goes in each of the five minterm cells m0, m2, m4, m5 and m6, and a 0 goes everywhere else. Nothing about the function changes here; only its layout changes, from a list of rows into a picture where patterns become visible.' },
+          { groups: 1, plotted: true, caption: 'Circle the four cells m0, m2, m4 and m6 as one quad, shown with the dashed outline. The group wraps around the left and right edges of the map, which is allowed because those edges are neighbors in Gray order, and in all four cells c stays 0 while a and b change, so the quad gives the single literal c′.' },
+          { groups: 2, plotted: true, caption: 'Next circle the pair m4 and m5, shown with the solid outline; m4 already belongs to the quad, and overlap is allowed. Across the pair a = 1 and b = 0 stay constant while c changes, so c drops out of this term and the pair gives ab′.' },
+          { groups: 2, plotted: true, expr: true, caption: 'Read the two groups off as a sum of products: f = c′ + ab′. Every 1 on the map is covered and each group is as large as it can possibly be, which is exactly what minimal means here: two terms and three literals instead of five full minterms.' },
+          { groups: 2, plotted: true, expr: true, check: true, answer: true, caption: 'Answer: f = c′ + ab′. The check is in the strip below the map: evaluating c′ + ab′ on all eight inputs gives 1 exactly on rows 000, 010, 100, 101 and 110, which is precisely the minterm list {0, 2, 4, 5, 6} we started with.' },
+        ],
+        answer: "c′ + ab′",
+        verify() {
+          const fromSet = (m) => (EX_KMAP_ONES.includes(m) ? 1 : 0);
+          const fromExpr = (m) => { const a = m >> 2, b = (m >> 1) & 1, c = m & 1; return (!c || (a && !b)) ? 1 : 0; };
+          const allRows = range(8).every((m) => fromSet(m) === fromExpr(m));
+          const quadOk = EX_KMAP_QUAD.every((m) => (m & 1) === 0 && EX_KMAP_ONES.includes(m));
+          const pairOk = EX_KMAP_PAIR.every((m) => (m >> 2) === 1 && ((m >> 1) & 1) === 0 && EX_KMAP_ONES.includes(m));
+          return allRows && quadOk && pairOk;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const inQuad = (m) => step.groups >= 1 && EX_KMAP_QUAD.includes(m);
+          const inPair = (m) => step.groups >= 2 && EX_KMAP_PAIR.includes(m);
+          const cell = (r, c) => {
+            const m = EX_KMAP_CELL(r, c);
+            const v = EX_KMAP_ONES.includes(m) ? 1 : 0;
+            const st = {};
+            if (inQuad(m)) { st.border = '3px dashed var(--accent)'; st.background = 'var(--accent-2)'; }
+            if (inPair(m)) { st.border = '3px solid var(--true)'; st.background = 'var(--true-bg)'; if (inQuad(m)) st.boxShadow = 'inset 0 0 0 3px var(--accent)'; }
+            const cls = [inQuad(m) ? 'grp1' : '', inPair(m) ? 'grp2' : ''].join(' ').trim();
+            return h('td', { class: cls, style: st },
+              h('div', { style: { fontSize: '0.62rem', color: 'var(--ink-3)' } }, `m${m}`),
+              h('div', { style: { fontSize: '1.1rem', fontWeight: step.plotted && v ? 700 : 400 } }, step.plotted ? String(v) : '·'));
+          };
+          const table = h('table.tt',
+            h('thead', h('tr', h('th', 'a \\ bc'), GRAY.map((g) => h('th', g.toString(2).padStart(2, '0'))))),
+            h('tbody', [0, 1].map((r) => h('tr', h('th', String(r)), GRAY.map((_, c) => cell(r, c))))));
+          const checkStrip = step.check ? h('table.tt.bl-sm',
+            h('thead', h('tr', h('th.l', 'abc'), range(8).map((m) => h('th', m.toString(2).padStart(3, '0'))))),
+            h('tbody',
+              h('tr', h('th.l', 'f (minterms)'), range(8).map((m) => h('td', String(EX_KMAP_ONES.includes(m) ? 1 : 0)))),
+              h('tr', h('th.l', "c′ + ab′"), range(8).map((m) => { const a = m >> 2, b = (m >> 1) & 1, c = m & 1; return h('td', String((!c || (a && !b)) ? 1 : 0)); })))) : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            table,
+            h('p.small.mono', 'f(a, b, c) = Σm(0, 2, 4, 5, 6)'),
+            step.groups >= 1 ? h('p.small', 'Dashed outline (grp1): the quad m0, m2, m4, m6 wraps around the left and right edges — c = 0 in every cell, giving c′.') : null,
+            step.groups >= 2 ? h('p.small', 'Solid outline (grp2): the pair m4, m5 — a = 1 and b = 0 in both cells, giving ab′.') : null,
+            step.expr ? h('div.big-math', { html: String.raw`\(f = c' + ab'\)` }) : null,
+            checkStrip,
+            step.answer ? h('div.ex-answer', "Answer: f = c′ + ab′ — check: c′ + ab′ is 1 exactly on {0, 2, 4, 5, 6}, matching the given minterms") : null));
+        },
+      },
+      /* ---------------------------------------------------------------- 15 */
+      {
+        title: 'Worked example: evaluating a ripple-carry adder',
+        kind: 'example',
+        id: 'ex-adder-eval',
+        problem: String.raw`<p>The ripple-carry adder of this module adds \(1011_2\) (eleven) and \(0110_2\) (six). Evaluate it bit by bit from the least significant bit, tracking every carry, the way the circuit does.</p>`,
+        steps: [
+          { bits: 0, caption: 'Line the two numbers up in columns, 1011 over 0110, with an empty carry row above them. A ripple-carry adder is just a chain of full adders, and each column must wait for the carry from its right neighbor, so the work has to go from right to left, starting at bit 0.' },
+          { bits: 1, caption: 'Bit 0: the full adder receives a0 = 1, b0 = 0 and the starting carry c0 = 0, a total of one 1. The sum bit is the parity of the three inputs, so s0 = 1, and the carry-out is 1 only when at least two inputs are 1, so c1 = 0.' },
+          { bits: 2, caption: 'Bit 1: a1 = 1, b1 = 1 and c1 = 0 give two 1s, an even count. The parity rule makes s1 = 0, and because at least two inputs are 1 the majority rule sends a carry out, so c2 = 1, passed on to the next column.' },
+          { bits: 3, caption: 'Bit 2: a2 = 0, b2 = 1 and the incoming carry c2 = 1 also give two 1s. So s2 = 0 by parity and c3 = 1 by majority, and that carry ripples one more column to the left.' },
+          { bits: 4, caption: 'Bit 3: a3 = 1, b3 = 0 and c3 = 1 give two 1s for the third time in a row. The sum bit is s3 = 0 and the carry-out is c4 = 1, but now there is no next full adder to receive that carry.' },
+          { bits: 5, caption: 'The leftover carry c4 = 1 becomes a fifth sum bit, s4 = 1, sitting to the left of s3. The full result now reads 10001, and dropping that final carry would have lost the most valuable bit of the answer.' },
+          { bits: 5, answer: true, caption: 'Answer: 1011 + 0110 = 10001, which is 17 in decimal. The check agrees two ways: eleven plus six is seventeen, and every sum bit above was the parity of its three inputs while every carry was their majority, recomputed column by column.' },
+        ],
+        answer: '10001',
+        verify() {
+          const sumOk = (0b1011 + 0b0110) === 17 && parseInt('10001', 2) === 17;
+          let carry = 0, bits = '';
+          for (let i = 0; i < 4; i++) {
+            const a = (0b1011 >> i) & 1, b = (0b0110 >> i) & 1;
+            bits = String(a ^ b ^ carry) + bits;
+            carry = (a + b + carry) >= 2 ? 1 : 0;
+          }
+          bits = String(carry) + bits;
+          const chainOk = EX_ADD_COLS.every((c, i) => c.cin === (i === 0 ? 0 : EX_ADD_COLS[i - 1].cout));
+          const colsOk = EX_ADD_COLS.every((c, i) => {
+            const a = (0b1011 >> i) & 1, b = (0b0110 >> i) & 1;
+            return c.a === a && c.b === b && c.sum === (a ^ b ^ c.cin) && c.cout === ((a + b + c.cin) >= 2 ? 1 : 0);
+          });
+          return sumOk && bits === '10001' && chainOk && colsOk;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const POS = [4, 3, 2, 1, 0]; // display order, most significant column first
+          const active = step.bits >= 1 && step.bits <= 4 ? step.bits - 1 : step.bits === 5 ? 4 : -1;
+          const cur = (i) => (i === active ? 'cur' : '');
+          const carryIn = (i) => (i === 4 ? EX_ADD_COLS[3].cout : EX_ADD_COLS[i].cin);
+          const carryShown = (i) => (i === 4 ? step.bits >= 5 : i <= step.bits);
+          const row = (label, fn) => h('tr', h('th.l', label), POS.map((i) => h('td', { class: cur(i) }, fn(i))));
+          const table = h('table.tt',
+            h('thead', h('tr', h('th', ''), POS.map((i) => h('th', { class: cur(i) }, `bit ${i}`)))),
+            h('tbody',
+              row('carry in', (i) => (carryShown(i) ? String(carryIn(i)) : '·')),
+              row('a = 1011', (i) => (i === 4 ? '—' : String(EX_ADD_COLS[i].a))),
+              row('b = 0110', (i) => (i === 4 ? '—' : String(EX_ADD_COLS[i].b))),
+              row('sum', (i) => (i === 4 ? (step.bits >= 5 ? '1' : '·') : i < step.bits ? String(EX_ADD_COLS[i].sum) : '·'))));
+          const col = step.bits >= 1 && step.bits <= 4 ? EX_ADD_COLS[step.bits - 1] : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            table,
+            step.bits === 0 ? h('p.small', 'Columns are numbered from bit 0 at the right. c0 = 0: no carry enters the first column.') : null,
+            col ? h('p.small.mono', `bit ${col.i}: ${col.a} + ${col.b} + ${col.cin} = ${col.cout}${col.sum} in binary — write s${col.i} = ${col.sum}, carry c${col.i + 1} = ${col.cout} to the next column`) : null,
+            step.bits === 5 && !step.answer ? h('p.small.mono', 'c4 = 1 becomes s4 = 1: the result is 10001') : null,
+            step.answer ? h('p.small', 'Check: 1011 is 11 and 0110 is 6, and 11 + 6 = 17, which is 10001 in binary.') : null,
+            step.answer ? h('div.ex-answer', 'Answer: 1011 + 0110 = 10001 (17) — check: 11 + 6 = 17, and each sum bit was the parity of its three inputs') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- 16 */
       {
         title: 'Practice: Boolean algebra and circuits',
         kind: 'practice',

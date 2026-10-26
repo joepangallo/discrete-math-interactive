@@ -9,6 +9,7 @@
   const egcd = (a, b) => { let [r0, r1, s0, s1, t0, t1] = [a, b, 1, 0, 0, 1]; while (r1) { const q = Math.floor(r0 / r1); [r0, r1] = [r1, r0 - q * r1]; [s0, s1] = [s1, s0 - q * s1]; [t0, t1] = [t1, t0 - q * t1]; } return [r0, s0, t0]; };
   const inverse = (a, n) => { const [g, s] = egcd(mod(a, n), n); return g === 1 ? mod(s, n) : null; };
   const euclidRows = (a, b) => { const rows = []; while (b !== 0) { const q = Math.floor(a / b), r = a - q * b; rows.push({ a, b, q, r }); [a, b] = [b, r]; } return { rows, g: a }; };
+  const EX_GCD = euclidRows(252, 198); // the worked example below, computed once: 4 division rows, gcd 18
   const neg = (x) => String(x).replace('-', '−'); // typographic minus for plain text
   const par = (x) => (x < 0 ? `(${x})` : String(x)); // parenthesize negatives inside TeX
   const DIG = '0123456789ABCDEF';
@@ -973,6 +974,85 @@
             good: 'import random\nrandom.seed(42)\nsplit = random.sample(range(1000), 200)  # same every run',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: Euclid\u2019s algorithm for gcd(252, 198)',
+        kind: 'example',
+        id: 'ex-euclid-gcd',
+        problem: String.raw`<p>Use Euclid's algorithm to find \(\gcd(252, 198)\), showing every division.</p>`,
+        steps: [
+          { shown: 0, caption: 'The plan: replace the pair (a, b) by (b, the remainder when a is divided by b). The gcd survives every replacement, because any common divisor of a and b also divides that remainder — and the numbers shrink each time, so the process must stop.' },
+          { shown: 1, caption: '252 = 1 · 198 + 54. One copy of 198 fits into 252 and 54 is left over, so gcd(252, 198) = gcd(198, 54): the same question about smaller numbers.' },
+          { shown: 2, caption: '198 = 3 · 54 + 36. Three copies of 54 fit into 198, leaving 36, so gcd(198, 54) = gcd(54, 36). Each step keeps only the remainder, which is why the algorithm is fast.' },
+          { shown: 3, caption: '54 = 1 · 36 + 18. One copy of 36 fits, leaving 18, so gcd(54, 36) = gcd(36, 18). The remainder is now smaller than the number we will divide by next.' },
+          { shown: 4, caption: '36 = 2 · 18 + 0. This time 18 fits exactly and nothing is left over. A remainder of 0 is the stop signal: dividing further is impossible, and the last nonzero remainder is the answer.' },
+          { shown: 4, answer: true, caption: 'Answer: gcd(252, 198) = 18. Check: 252 = 18 · 14 and 198 = 18 · 11, so 18 divides both numbers — and 14 and 11 share no factor bigger than 1, so no number larger than 18 can divide both. That confirms 18 is the greatest common divisor.' },
+        ],
+        answer: 18,
+        verify(M) { return M.gcd(252, 198) === 18 && EX_GCD.g === 18 && 252 % 18 === 0 && 198 % 18 === 0 && M.gcd(14, 11) === 1; },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = EX_GCD.rows.slice(0, step.shown).map((r, i) => h('tr', { class: i === step.shown - 1 && !step.answer ? 'hit' : '' },
+            h('td', String(r.a)), h('td', String(r.q)), h('td', String(r.b)), h('td', String(r.r)),
+            h('td.l.mono', `${r.a} = ${r.q} · ${r.b} + ${r.r}`)));
+          const pair = step.shown === 0 ? 'gcd(252, 198) = ?' : step.answer ? 'gcd(252, 198) = 18' : `gcd(${EX_GCD.rows[step.shown - 1].b}, ${EX_GCD.rows[step.shown - 1].r})`;
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            h('div.big-math.mono', pair),
+            rows.length ? h('table.tt', h('thead', h('tr', h('th', 'a'), h('th', 'q'), h('th', 'b'), h('th', 'r'), h('th.l', 'division'))), h('tbody', rows)) : h('p.small.muted', 'No divisions yet — press Step to divide.'),
+            step.answer ? h('div.ex-answer', 'gcd(252, 198) = 18 · check: 18 · 14 = 252 and 18 · 11 = 198, with gcd(14, 11) = 1') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: the inverse of 7 modulo 26',
+        kind: 'example',
+        id: 'ex-mod-inverse',
+        problem: String.raw`<p>Find the modular inverse of \(7\) modulo \(26\) — the number \(x\) with \(7x \equiv 1 \pmod{26}\) — by running Euclid's algorithm forward and then back-substituting.</p>`,
+        steps: [
+          { lines: 0, phase: 'setup', caption: 'Setup: an inverse of 7 modulo 26 is a number x with 7x ≡ 1 (mod 26), and it can exist only because gcd(7, 26) = 1. The plan is to run Euclid forward to remainder 1, then work backward to write 1 as a combination of 26 and 7.' },
+          { lines: 3, phase: 'forward', caption: 'Forward pass: 26 = 3 · 7 + 5, then 7 = 1 · 5 + 2, then 5 = 2 · 2 + 1, so the three division lines are now on the page. We run Euclid only until remainder 1 appears, because 1 is exactly the number the backward pass has to express.' },
+          { lines: 4, phase: 'back', caption: 'Back-substitution starts by rearranging the last division, 5 = 2 · 2 + 1, into 1 = 5 − 2 · 2. Every backward step replaces a remainder by the expression the forward pass gave for it, so the value stays equal to 1 throughout.' },
+          { lines: 5, phase: 'back', caption: 'Replace the remainder 2 by 7 − 1 · 5, giving 1 = 5 − 2(7 − 5) = 3 · 5 − 2 · 7 after the terms in 5 are collected. The highlighted piece is the substitution itself, and now only the remainders 5 and 7 remain in the expression.' },
+          { lines: 6, phase: 'back', caption: 'Replace the remainder 5 by 26 − 3 · 7, giving 1 = 3(26 − 3 · 7) − 2 · 7 = 3 · 26 − 11 · 7. The highlighted piece is this second substitution, and now 1 is written using only the original numbers 26 and 7.' },
+          { lines: 7, phase: 'read', caption: 'Read off the inverse: modulo 26 the term 3 · 26 is 0, so −11 · 7 ≡ 1 (mod 26) and the coefficient of 7 is the inverse, still in negative form. Adding 26 turns −11 into the standard residue 15, because residues are named by a number from 0 to 25.' },
+          { lines: 7, phase: 'answer', answer: true, caption: 'Answer: 7⁻¹ ≡ 15 (mod 26). Check: 7 · 15 = 105 = 4 · 26 + 1, so 105 ≡ 1 (mod 26) and the inverse works, with no smaller positive candidate left to test because an inverse modulo n is unique when it exists.' },
+        ],
+        answer: 15,
+        verify(M) {
+          const [g, s, t] = egcd(7, 26);
+          const fwd = euclidRows(26, 7);
+          let count = 0, found = null;
+          for (let x = 1; x < 26; x++) if (M.mod(7 * x, 26) === 1) { count++; found = x; }
+          return M.mod(7 * 15, 26) === 1 && inverse(7, 26) === 15 && g === 1 && s * 7 + t * 26 === g && M.mod(s, 26) === 15 && fwd.g === 1 && fwd.rows.length === 4 && count === 1 && found === 15;
+        },
+        draw(stage, ctx, step, k) {
+          const { h } = ctx;
+          const fwd = euclidRows(26, 7).rows.slice(0, 3).map((r) => `${r.a} = ${r.q} · ${r.b} + ${r.r}`);
+          const all = [
+            { tag: 'Forward', parts: [[fwd[0], false]] },
+            { tag: 'Forward', parts: [[fwd[1], false]] },
+            { tag: 'Forward', parts: [[fwd[2], false]] },
+            { tag: 'Back', parts: [['1 = 5 − 2 · 2', false]] },
+            { tag: 'Back', parts: [['1 = 5 − 2', false], ['(7 − 5)', true], [' = 3 · 5 − 2 · 7', false]] },
+            { tag: 'Back', parts: [['1 = 3', false], ['(26 − 3 · 7)', true], [' − 2 · 7 = 3 · 26 − 11 · 7', false]] },
+            { tag: 'Read off', parts: [['−11 · 7 ≡ 1 (mod 26), and −11 + 26 = 15', false]] },
+          ];
+          const shown = all.slice(0, step.lines);
+          const lineEls = shown.map((ln, i) => {
+            const isNew = i === shown.length - 1 && !step.answer;
+            return h('div.mono', { style: { fontSize: '0.9rem', lineHeight: 1.35, padding: '0.14rem 0.5rem', borderRadius: '0.35rem', ...(isNew ? { background: 'var(--accent-2)', fontWeight: 700 } : {}) } },
+              h('span.tiny.muted', { style: { marginRight: '0.55rem' } }, ln.tag),
+              ...ln.parts.map(([txt, hl]) => (hl ? h('span.hl', txt) : txt)));
+          });
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem', maxWidth: '46rem', width: '100%' } },
+            h('div.big-math.mono', '7x ≡ 1 (mod 26)'),
+            step.lines === 0
+              ? h('div.small.muted', { style: { border: '1px dashed var(--rule)', borderRadius: 'var(--radius)', padding: '0.5rem 0.8rem', textAlign: 'center' } }, 'Forward work will appear here: divide 26 by 7, then keep dividing remainders until 1 appears.')
+              : h('div.stack', { style: { gap: '0.12rem', alignItems: 'stretch' } }, ...lineEls),
+            step.phase === 'read' || step.answer ? h('div.small', 'Modulo 26, the term 3 · 26 counts as 0, so only −11 · 7 remains.') : null,
+            step.answer ? h('div.ex-answer', '7⁻¹ ≡ 15 (mod 26) · check: 7 · 15 = 105 = 4 · 26 + 1, so 105 ≡ 1 (mod 26)') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

@@ -1038,6 +1038,59 @@
           };
         },
       },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: designing the duplicate sign-up check',
+        kind: 'example',
+        id: 'ex-duplicate-signups',
+        problem: String.raw`<p>A sign-up service expects up to \(10^6\) registered e-mail addresses. Every new sign-up must be rejected if its address has registered before, and accepted otherwise. Take this problem through the design loop — model, specify, analyze the cost, then verify and measure — and decide how to store the addresses.</p>`,
+        steps: [
+          { phase: -1, caption: 'Setup: the service must reject a sign-up exactly when its address has registered before, at a scale of up to a million addresses. Run it through the design loop before coding, because each phase produces one artifact and coding first would bury the decisions inside the code.' },
+          { phase: 0, caption: 'Model: the only question is "has this address been seen?", so the accepted addresses form a set and the only operation is membership. A set is the honest model because order does not matter and repeats are exactly what must be rejected, not stored twice.' },
+          { phase: 1, caption: 'Specify: the contract says the set never holds an address twice, and a sign-up is rejected exactly when its address is already in the set; otherwise the address is added and the sign-up is accepted. Writing that invariant down turns the requirement into something code and tests can both be checked against.' },
+          { phase: 2, caption: String.raw`Analyze: count the cost before choosing storage, because scanning a list costs \(O(n)\) per sign-up and about \(n^2/2 = 5 \times 10^{11}\) comparisons in total for \(n = 10^6\), while a hash set answers membership in \(O(1)\) average time, about \(10^6\) steps in total. The count, not taste, is what eliminates the list.` },
+          { phase: 3, caption: 'Verify and measure: induction on the number of sign-ups proves the invariant — it holds after 0 sign-ups, and each step adds an address only when it is absent — and testing against a nested-loop oracle on 1,000 random lists backs the proof. A simulation of a million sign-ups taking about 0.4 seconds then confirms the cost model; an hour would send us back to the count.' },
+          { phase: 3, answer: true, caption: String.raw`Answer: store the addresses in a hash set, because membership is the only operation the model needs and the invariant is exactly the requirement. The check closes the loop: about \(5 \times 10^{11}\) list comparisons against about \(10^6\) hash steps is roughly half a million times less work, and correctness and cost were both verified before any code shipped.` },
+        ],
+        answer: 'hash set',
+        verify(M) {
+          const n = 1e6;
+          const listComparisons = (n * (n - 1)) / 2;
+          const hashSteps = n;
+          return listComparisons === 499999500000 && listComparisons > 1e11 && Math.abs(listComparisons / 5e11 - 1) < 0.01 && hashSteps === 1e6 && listComparisons / hashSteps > 1e5;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const phases = [
+            { name: '1 · Model', empty: 'the structure goes here', body: 'A set of addresses. The only operation is membership: is this address in the set? Order does not matter, and repeats are what get rejected.' },
+            { name: '2 · Specify', empty: 'the contract goes here', body: 'Invariant: the set never holds an address twice. Rule: if the address is in the set, reject the sign-up; otherwise add the address and accept.' },
+            { name: '3 · Analyze: count the cost', empty: 'the cost figures go here', body: 'List scan: about n\u00B2/2 = 5 \u00D7 10\u00B9\u00B9 comparisons for n = 10\u2076. Hash set: O(1) average lookup, about 10\u2076 steps in total.' },
+            { name: '4 · Verify and measure', empty: 'the checks go here', body: 'Correctness by induction on sign-ups; testing against a nested-loop oracle on 1,000 random lists; a million simulated sign-ups in about 0.4 s confirm the estimate.' },
+          ];
+          const cards = phases.map((p, j) => {
+            const filled = step.phase >= j;
+            const current = step.phase === j && !step.answer;
+            return h('div', {
+              style: {
+                flex: '1 1 12rem', minWidth: '0', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius)',
+                background: 'var(--paper)',
+                border: current ? '2px solid var(--accent)' : filled ? '1px solid var(--true)' : '1px dashed var(--rule)',
+              },
+            },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem' } },
+                h('b', { style: { fontSize: '0.92rem' } }, p.name),
+                h('span.tiny.mono', { style: { color: current ? 'var(--accent)' : filled ? 'var(--true)' : 'var(--ink-3)', fontWeight: '700', textTransform: 'uppercase' } }, current ? 'current' : filled ? 'done' : 'waiting')),
+              filled
+                ? h('p.small', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, p.body)
+                : h('p.small.muted', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, 'Empty slot \u2014 ' + p.empty + '.'));
+          });
+          stage.append(h('div.stack', { style: { alignItems: 'stretch', gap: '0.55rem', width: 'min(62rem, 100%)' } },
+            h('div', { style: { padding: '0.45rem 0.7rem', border: '1px solid var(--rule)', borderLeft: '3px solid var(--accent)', borderRadius: 'var(--radius)', background: 'var(--paper)', fontSize: '0.92rem', lineHeight: '1.45' } },
+              h('b', 'The problem: '), 'reject a new sign-up exactly when its e-mail address has registered before. Scale: up to 10\u2076 registered addresses. Four phases, four artifacts \u2014 no code until the last card is filled.'),
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem' } }, cards),
+            step.answer ? h('div.ex-answer', 'Decision: store the addresses in a hash set \u00B7 check: 5 \u00D7 10\u00B9\u00B9 list comparisons vs about 10\u2076 hash steps \u2014 roughly 500,000 times less work, with the invariant proved by induction') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 12 */
       {
         title: 'Practice: cumulative review',

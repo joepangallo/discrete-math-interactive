@@ -151,6 +151,18 @@ bsearch(s, i, j, key) {     // search s[i..j]
     return st;
   }
 
+  // ---- worked-example data, computed once ----
+  const EX_BIN_LIST = [3, 7, 12, 19, 25, 31, 42, 56];
+  const EX_INS_INPUT = [5, 2, 4, 6, 1, 3];
+  const EX_INS_STATES = [
+    [5, 2, 4, 6, 1, 3],
+    [2, 5, 4, 6, 1, 3],
+    [2, 4, 5, 6, 1, 3],
+    [2, 4, 5, 6, 1, 3],
+    [1, 2, 4, 5, 6, 3],
+    [1, 2, 3, 4, 5, 6],
+  ];
+
   // ---- sorting, as lists of snapshots so the lab can step forward and back ----
   function insEvents(arr) {
     const a = arr.slice(), ev = [];
@@ -931,6 +943,116 @@ bsearch(s, i, j, key) {     // search s[i..j]
             good: '# closest pair of scores:\n# 1. sort the scores                 O(n log n)\n# 2. scan once, compare neighbors     O(n)\n# 3. return the pair with least gap\n# total: O(n log n), not O(n²) over all pairs',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: binary search for 31',
+        kind: 'example',
+        id: 'ex-binary-search',
+        problem: String.raw`<p>Use binary search to find 31 in the sorted list \([3, 7, 12, 19, 25, 31, 42, 56]\), showing \(lo\), \(hi\) and \(mid\) at every probe. Indices start at 0, and \(mid = \lfloor (lo + hi)/2 \rfloor\).</p>`,
+        steps: [
+          { probe: 0, lo: 0, hi: 7, mid: -1, out: -1, found: false, confirm: false, caption: 'Setup: the list [3, 7, 12, 19, 25, 31, 42, 56] is sorted and the target is 31, with lo = 0 and hi = 7 marking the whole range as still possible. Binary search needs a sorted list and works by ruling out half of what remains with each probe — that halving is where the speed comes from.' },
+          { probe: 1, lo: 0, hi: 7, mid: 3, out: 3, found: false, confirm: false, caption: 'First probe: mid = (0 + 7) // 2 = 3 and list[3] = 19, and since 19 < 31 the target, if present, is strictly to the right of mid. Cells 0 to 3 are ruled out — mid itself goes too, because we just compared it and it was too small — so lo becomes 4.' },
+          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: false, caption: 'Second probe: with lo = 4 and hi = 7, mid = (4 + 7) // 2 = 5 and list[5] = 31, which equals the target exactly. The search stops at once, because an equal probe is the success case and no smaller range needs to be checked.' },
+          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: true, caption: 'Confirm the hit before reporting it: index 5 lies inside the narrowed range from lo = 4 to hi = 7, and the value stored there is exactly 31. Checking the index and the value together guards against reporting a position produced by an arithmetic slip.' },
+          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: true, answer: true, caption: 'Answer: 31 is at index 5, found in only 2 probes where linear search could need up to 8. Check: the list really is sorted and list[5] = 31, and each probe at most halves the candidates, going from 8 candidates to 4 and then to the found cell.' },
+        ],
+        answer: 5,
+        verify(M) {
+          const a = [3, 7, 12, 19, 25, 31, 42, 56];
+          const sorted = a.every((x, i) => i === 0 || a[i - 1] < x);
+          let lo = 0, hi = a.length - 1, probes = 0, found = -1;
+          while (lo <= hi) {
+            const mid = Math.floor((lo + hi) / 2);
+            probes++;
+            if (a[mid] === 31) { found = mid; break; }
+            if (a[mid] < 31) lo = mid + 1; else hi = mid - 1;
+          }
+          return a.indexOf(31) === 5 && sorted && found === 5 && probes === 2 && a[5] === 31 && EX_BIN_LIST[5] === 31;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const status = step.probe === 0
+            ? 'Target 31 · lo = 0 · hi = 7 · all 8 values are still candidates'
+            : step.probe === 1
+              ? 'Probe 1: mid = 3 · list[3] = 19 < 31 · indices 0–3 ruled out · lo moves to 4'
+              : step.confirm
+                ? 'Probe 2: mid = 5 · list[5] = 31 = target · found — now confirm it'
+                : 'Probe 2: lo = 4 · hi = 7 · mid = 5 · list[5] = 31 = target · found';
+          const tagFor = (i) => {
+            if (step.found && i === step.mid) return 'mid · found ★';
+            if (i === step.mid) return 'mid';
+            if (i <= step.out) return 'ruled out';
+            if (i === step.lo) return 'lo';
+            if (i === step.hi) return 'hi';
+            return ' ';
+          };
+          const clsFor = (i) => (step.found && i === step.mid ? 'm5-cell found' : i === step.mid ? 'm5-cell cur' : i <= step.out ? 'm5-cell out' : 'm5-cell');
+          const cells = EX_BIN_LIST.map((v, i) => h('div', { class: clsFor(i), style: { flex: '1 1 0', minWidth: '2rem' } },
+            String(v), h('small', `index ${i}`), h('small', tagFor(i))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: 'min(46rem, 100%)' } },
+            h('div.small', h('b.mono', status)),
+            h('div', { style: { display: 'flex', gap: '0.35rem', width: '100%' } }, ...cells),
+            h('p.small.muted', step.probe === 0
+              ? 'The labels under the cells name the two ends of the range still in play: lo on the left and hi on the right.'
+              : step.probe === 1
+                ? 'Dimmed cells are ruled out: no later probe will look at indices 0 to 3 again.'
+                : 'Dimmed cells stay ruled out, and the starred cell is the probe that matched the target.'),
+            step.confirm && !step.answer ? h('p.small', 'Confirm: index 5 is between lo = 4 and hi = 7, and list[5] = 31 exactly ✓') : null,
+            step.answer ? h('div.ex-answer', 'Answer: 31 is at index 5 · check: the list is sorted, list[5] = 31, and the search took only 2 probes ✓') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: insertion sort, pass by pass',
+        kind: 'example',
+        id: 'ex-insertion-sort',
+        problem: String.raw`<p>Sort \([5, 2, 4, 6, 1, 3]\) with insertion sort, one pass per step, growing a sorted prefix from the left and sliding each new key into its place.</p>`,
+        steps: [
+          { pass: 0, keyPos: -1, sorted: 1, stays: false, caption: 'Setup: start with [5, 2, 4, 6, 1, 3], where the sorted prefix is just [5] because a single item is always in order by itself. Insertion sort grows that sorted prefix one key at a time, inserting each new key into its place — like sorting a hand of cards.' },
+          { pass: 1, keyPos: 0, sorted: 2, stays: false, caption: 'Pass 1 takes the key 2 from index 1: 2 is smaller than 5, so it slides left past 5 and lands at the front of the list. The list becomes [2, 5, 4, 6, 1, 3] and the sorted prefix grows to [2, 5].' },
+          { pass: 2, keyPos: 1, sorted: 3, stays: false, caption: 'Pass 2 takes the key 4: 4 is smaller than 5, so it moves left once, but it is not smaller than 2, so it stops right there. The list becomes [2, 4, 5, 6, 1, 3] and the sorted prefix grows to [2, 4, 5].' },
+          { pass: 3, keyPos: 3, sorted: 4, stays: true, caption: 'Pass 3 takes the key 6: 6 is not smaller than 5, the last item of the sorted prefix, so it does not move at all and stays at index 3. The list is unchanged, [2, 4, 5, 6, 1, 3], but the sorted prefix still grows to include that staying 6.' },
+          { pass: 4, keyPos: 0, sorted: 5, stays: false, caption: 'Pass 4 takes the key 1: it is smaller than 6, 5, 4 and 2 in turn, so it slides left past all four of them to the very front. The list becomes [1, 2, 4, 5, 6, 3] and only the last item is still outside the sorted prefix.' },
+          { pass: 5, keyPos: 2, sorted: 6, stays: false, caption: 'Pass 5 takes the key 3: it is smaller than 6, 5 and 4, so it slides left past those three, but it is not smaller than 2, so it stops at index 2. The list becomes [1, 2, 3, 4, 5, 6] and the sorted prefix now covers the whole list.' },
+          { pass: 5, keyPos: -1, sorted: 6, stays: false, answer: true, caption: 'Answer: the sorted list is [1, 2, 3, 4, 5, 6], in ascending order at every neighboring pair. Check: it is the same multiset as the input — both lists have 6 elements and both sum to 21, so nothing was lost, added or duplicated while sorting.' },
+        ],
+        answer: [1, 2, 3, 4, 5, 6],
+        verify(M) {
+          const input = [5, 2, 4, 6, 1, 3];
+          const ans = [1, 2, 3, 4, 5, 6];
+          const sorted = M.sortNum(input);
+          const same = sorted.length === ans.length && sorted.every((x, i) => x === ans[i]);
+          const nondec = ans.every((x, i) => i === 0 || ans[i - 1] <= x);
+          const sum = (arr) => arr.reduce((t, x) => t + x, 0);
+          return same && nondec && sum(ans) === 21 && sum(ans) === sum(input) && EX_INS_STATES[5].every((x, i) => x === ans[i]) && EX_INS_INPUT.every((x, i) => x === input[i]);
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const a = EX_INS_STATES[step.pass];
+          const status = step.answer
+            ? 'All 5 passes done · the sorted prefix covers the whole list'
+            : step.pass === 0
+              ? 'Input [5, 2, 4, 6, 1, 3] · sorted prefix: [5] · 5 passes to go'
+              : `Pass ${step.pass} of 5 · key = ${a[step.keyPos]} · sorted prefix: [${a.slice(0, step.sorted).join(', ')}]${step.stays ? ' · the key stays in place' : ''}`;
+          const cells = a.map((v, i) => {
+            const isKey = i === step.keyPos;
+            const inSorted = i < step.sorted;
+            const tag = isKey && step.stays ? 'key · stays' : isKey ? 'key' : inSorted ? 'sorted' : 'waiting';
+            const style = { flex: '1 1 0', minWidth: '2.4rem', ...(isKey ? { transform: 'translateY(-6px)' } : {}), ...(inSorted && !isKey ? { background: 'var(--accent-2)' } : {}) };
+            return h('div', { class: isKey ? 'm5-cell cur' : 'm5-cell', style },
+              String(v), h('small', `index ${i}`), h('small', tag));
+          });
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: 'min(40rem, 100%)' } },
+            h('div.small', h('b.mono', status)),
+            h('div', { style: { display: 'flex', gap: '0.35rem', width: '100%', paddingTop: '0.4rem' } }, ...cells),
+            h('p.small.muted', step.pass === 0
+              ? 'Cells tagged “sorted” form the prefix that is already in order; the raised cell in later steps is the key being inserted.'
+              : step.stays
+                ? 'Nothing moved this pass — the change is the marker: 6 joined the sorted prefix exactly where it already stood.'
+                : 'Cells tagged “sorted” form the prefix that is already in order, and the raised cell is the key that was just placed.'),
+            step.answer ? h('div.ex-answer', 'Answer: [1, 2, 3, 4, 5, 6] · check: 6 items summing to 21, exactly like the input, and every neighboring pair is in ascending order ✓') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

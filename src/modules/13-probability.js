@@ -20,6 +20,9 @@
   // probability that at least two of n people share a birthday (365 equally likely days)
   const shareProb = (n) => { let q = 1; for (let i = 0; i < n; i++) q *= (365 - i) / 365; return 1 - q; };
   const yoursProb = (n) => 1 - (364 / 365) ** Math.max(0, n - 1);
+  // ---- worked example data: the 16 outcome strings of 4 coin flips, built H-first so the tree order is fixed ----
+  const EX_BIN_LEAVES = (() => { let cur = ['']; for (let f = 0; f < 4; f++) { const nxt = []; for (const p of cur) { nxt.push(p + 'H'); nxt.push(p + 'T'); } cur = nxt; } return cur; })();
+  const EX_BIN_HEADS = (leaf) => leaf.split('').filter((c) => c === 'H').length;
 
   DM.module({
     id: 'probability',
@@ -863,6 +866,117 @@
             good: 'hand = random.sample(deck, k=5)   # 5 different cards\nrolls = random.choices(range(1, 7), k=5)\n# repeats are fine for dice',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: Bayes with 1,000 dots',
+        kind: 'example',
+        id: 'ex-bayes-dots',
+        problem: String.raw`<p>A condition affects 2% of a population. A test catches 95% of the people who have it (its sensitivity) and wrongly flags 5% of the people who do not (its false-positive rate). Out of 1,000 people, your test comes back positive. What is the probability that you actually have the condition? Count it with all 1,000 people drawn as dots.</p>`,
+        steps: [
+          { phase: 0, note: 'Setup: 1,000 people · 2% have the condition · sensitivity 95% · false-positive rate 5%', caption: 'Counting people first and turning counts into a probability at the end keeps the base rate visible, which is the whole point of this method. All 1,000 dots start neutral, because no group has been marked yet.' },
+          { phase: 1, note: 'Have the condition: 20 people · Do not have it: 980 people', caption: 'Mark the people who have the condition: 2% of 1,000 is 20 people. This small group is the base rate, and forgetting how small it is causes the usual far-too-high guess.' },
+          { phase: 2, note: 'Sick and test positive: 19 · Sick but missed: 1 · Positive so far: 19', caption: 'Apply the 95% sensitivity to the 20 sick people: 19 test positive and 1 is missed. The dark ring and plus sign mark a positive result, so the test outcome never rests on color alone.' },
+          { phase: 3, note: 'Healthy but test positive (false positives): 49 · Total positive: 19 + 49 = 68', caption: 'Now mark the healthy group: 5% sounds small, but 5% of 980 is 49 false positives. That is more than twice the entire group of 20 people who have the condition.' },
+          { phase: 4, note: 'Inside the 68 positive results: 19 are true cases and 49 are false positives', caption: 'Dim everyone who tested negative and focus on the 68 positive results only. A positive result puts you inside this group of 68, so the relevant question is now 19 out of 68.' },
+          { phase: 5, note: 'Inside the 68 positive results: 19 are true cases and 49 are false positives', answer: true, caption: 'Check by Bayes\' rule with exact fractions: (95/100 × 2/100) / (95/100 × 2/100 + 5/100 × 98/100) = 190/680 = 19/68. The dot count and the formula agree, so a positive result means about a 28% chance.' },
+        ],
+        answer: '19/68',
+        verify(M) {
+          const sick = (1000 * 2) / 100;
+          const tp = (sick * 95) / 100;
+          const healthy = 1000 - sick;
+          const fp = (healthy * 5) / 100;
+          const f = M.frac(95 * 2, 95 * 2 + 5 * 98);
+          return sick === 20 && tp === 19 && healthy === 980 && fp === 49 && tp + fp === 68
+            && f.n === 19 && f.d === 68 && String(f) === '19/68' && String(M.frac(tp, tp + fp)) === '19/68';
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const phase = step.phase;
+          const circles = [];
+          const pluses = [];
+          for (let i = 0; i < 1000; i++) {
+            const sick = i < 20;
+            const pos = sick ? i < 19 : i >= 20 && i < 69;
+            let fill = 'var(--rule)', stroke = 'none', sw = 0, op = 1;
+            if (phase >= 1 && sick) fill = 'var(--false)';
+            if (phase >= 2 && sick && !pos) { fill = 'var(--sheet)'; stroke = 'var(--false)'; sw = 1.6; }
+            if (phase >= 3 && !sick && pos) fill = 'var(--warn)';
+            if (phase >= 2 && pos) { stroke = 'var(--ink)'; sw = 1.3; }
+            if (phase >= 4 && !pos) op = 0.13;
+            const cx = 15 + (i % 40) * 25, cy = 14 + Math.floor(i / 40) * 11.7;
+            circles.push(s('circle', { cx, cy, r: 4.8, fill, stroke, 'stroke-width': sw, opacity: op }));
+            if (phase >= 2 && pos) pluses.push(s('text', { x: cx, y: cy + 2.4, 'text-anchor': 'middle', 'font-size': 7, 'font-weight': 700, fill: sick ? 'var(--sheet)' : 'var(--ink)', opacity: op, text: '+' }));
+          }
+          const svg = s('svg', { viewBox: '0 0 1000 300', class: 'pb-svg', role: 'img', 'aria-label': '1,000 dots, one per person, marked by condition and test result', style: 'max-height:13.5rem' }, ...circles, ...pluses);
+          const legendKids = [h('span', h('i', { style: { background: 'var(--rule)' } }), phase === 0 ? '1,000 people, no groups marked yet' : 'Healthy, test negative')];
+          if (phase >= 1) legendKids.push(h('span', h('i', { style: { background: 'var(--false)' } }), 'Has the condition (20)'));
+          if (phase >= 2) legendKids.push(h('span', 'Ring and + : tests positive'), h('span', h('i', { style: { background: 'var(--sheet)', borderColor: 'var(--false)' } }), 'Sick but missed (1)'));
+          if (phase >= 3) legendKids.push(h('span', h('i', { style: { background: 'var(--warn)' } }), 'Healthy, tests positive: false positive (49)'));
+          if (phase >= 4) legendKids.push(h('span', 'Dimmed: tested negative (932), out of the question now'));
+          stage.append(h('div.stack', { style: { gap: '0.35rem', width: '100%' } },
+            h('div.pb-legend', legendKids),
+            svg,
+            h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
+            step.answer ? h('div.ex-answer', 'P(sick | positive) = 19/68, about 28% · check: 19 true positives out of 68 positive results (19 + 49 = 68), and Bayes\' rule gives 190/680 = 19/68') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: exactly 2 heads in 4 flips, by tree',
+        kind: 'example',
+        id: 'ex-binomial-tree',
+        problem: String.raw`<p>A fair coin is flipped 4 times. What is the probability of exactly 2 heads? Build the full outcome tree: list every outcome string, collect the ones with exactly 2 heads, and count.</p>`,
+        steps: [
+          { depth: 1, note: 'After 1 flip: 2 prefixes · after 4 flips there will be 2 × 2 × 2 × 2 = 16 outcome strings', caption: 'Each flip doubles the number of outcomes, so after 4 flips there are 2^4 = 16 equally likely outcome strings. The tree starts at the root and makes its first split into H and T.' },
+          { depth: 2, note: 'Level 2: 4 prefixes — HH, HT, TH, TT', caption: 'Level 2 is complete with 4 prefixes: HH, HT, TH, and TT. The tree keeps outcomes that feel similar, HT and TH, separate, and that distinction is exactly what counting needs.' },
+          { depth: 3, note: 'Level 3: 8 prefixes, each one flip away from a finished outcome string', caption: 'Level 3 doubles the prefixes again to 8, because each level-2 prefix branches into one ending in H and one ending in T. Nothing has merged, so every prefix still stands for distinct flip sequences.' },
+          { depth: 4, note: 'Level 4: all 16 outcome strings, each labeled with its head count', caption: 'Level 4 completes the tree with all 16 outcome strings as leaves, and each leaf is labeled with its head count. The same head count can come from several different leaves, which is why the next step collects them.' },
+          { depth: 4, collect: true, note: 'Exactly 2 heads: 6 leaves — HHTT, HTHT, HTTH, THHT, THTH, TTHH', caption: 'Collect the leaves with exactly 2 heads: HHTT, HTHT, HTTH, THHT, THTH, and TTHH. There are C(4, 2) = 6 ways to choose which 2 of the 4 flips are heads, and the tree shows all 6 of them.' },
+          { depth: 4, collect: true, note: 'Head-count distribution: 0 heads: 1 · 1 head: 4 · 2 heads: 6 · 3 heads: 4 · 4 heads: 1 · total 16', answer: true, caption: 'Check: the full distribution from the tree is 1, 4, 6, 4, 1 for 0 to 4 heads, which sums to 16 leaves. The formula C(4, 2) / 2^4 = 6/16 = 3/8 agrees with the leaf count exactly.' },
+        ],
+        answer: '3/8',
+        verify(M) {
+          const dist = [0, 0, 0, 0, 0];
+          let count2 = 0;
+          for (let mask = 0; mask < 16; mask++) {
+            let ones = 0;
+            for (let b = 0; b < 4; b++) if (mask & (1 << b)) ones++;
+            dist[ones]++;
+            if (ones === 2) count2++;
+          }
+          const f = M.frac(6, 16);
+          return count2 === 6 && dist.join(',') === '1,4,6,4,1' && dist.reduce((a, b) => a + b, 0) === 16
+            && M.C(4, 2) === 6 && f.n === 3 && f.d === 8 && String(f) === '3/8' && EX_BIN_LEAVES.length === 16
+            && EX_BIN_LEAVES.filter((leaf) => EX_BIN_HEADS(leaf) === 2).length === 6;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = [h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'flex-start' } },
+            h('div.tiny.mono.muted', { style: { minWidth: '3.6rem', paddingTop: '0.25rem' } }, 'Start'),
+            h('div.pb-chips', h('span', 'no flips yet')))];
+          for (let L = 1; L <= step.depth; L++) {
+            const prefs = [...new Set(EX_BIN_LEAVES.map((leaf) => leaf.slice(0, L)))];
+            const chips = prefs.map((p) => {
+              if (L < 4) return h('span', p);
+              const heads = EX_BIN_HEADS(p);
+              const label = `${p} · ${heads} head${heads === 1 ? '' : 's'}`;
+              if (step.collect && heads === 2) return h('span.hit', `✓ ${label}`);
+              if (step.collect) return h('span', { style: { opacity: '0.45' } }, label);
+              return h('span', label);
+            });
+            rows.push(h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'flex-start' } },
+              h('div.tiny.mono.muted', { style: { minWidth: '3.6rem', paddingTop: '0.25rem' } }, `Flip ${L}`),
+              h('div.pb-chips', chips)));
+          }
+          stage.append(h('div.stack', { style: { gap: '0.45rem', width: '100%' } },
+            rows,
+            h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
+            step.answer ? h('div.pb-chips', { style: { justifyContent: 'center' } },
+              h('span', '0 heads: 1'), h('span', '1 head: 4'), h('span.hit', '✓ 2 heads: 6'), h('span', '3 heads: 4'), h('span', '4 heads: 1'), h('span', 'total: 16')) : null,
+            step.answer ? h('div.ex-answer', 'P(exactly 2 heads) = 6/16 = 3/8 · check: C(4, 2) = 6 favorable leaves out of 2^4 = 16, and the distribution 1, 4, 6, 4, 1 sums to 16') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

@@ -299,6 +299,29 @@
   const INVARIANT_CODE = ['total, k = 0, 0', 'while k < n:', '    k += 1', '    total += k', '# invariant: total == 1 + 2 + ... + k'].map(DM.hlPy).join('\n');
   const RECURSION_CODE = ['def sum_to(n):', '    return 0 if n == 0 else sum_to(n - 1) + n'].map(DM.hlPy).join('\n');
 
+  // ---- worked example: the sum formula by induction, as proof lines plus the domino strip ----
+  const EX_IND_ROWS = [
+    { tag: 'The claim', html: String.raw`\(P(n):\ 1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every integer \(n \ge 1\). Induction needs two things: a <b>base case</b> and an <b>inductive step</b>.` },
+    { tag: 'Base case', html: String.raw`\(n = 1\): the left side is \(1\), and the right side is \(\dfrac{1 \cdot 2}{2} = 1\). The two sides agree, so \(P(1)\) is true.` },
+    { tag: 'Inductive hypothesis', html: String.raw`Assume \(P(k)\) is true for one fixed \(k \ge 1\): \(\;1 + 2 + \cdots + k = \dfrac{k(k+1)}{2}\).` },
+    { tag: 'The goal', html: String.raw`Show \(P(k+1)\): \(\;1 + 2 + \cdots + k + (k+1) = \dfrac{(k+1)(k+2)}{2}\).` },
+    { tag: 'Algebra', html: String.raw`\((1 + \cdots + k) + (k+1) = \dfrac{k(k+1)}{2} + (k+1)\) <span class="muted">[by the inductive hypothesis]</span>` },
+    { tag: '', html: String.raw`\(= \)<span class="hl">\((k+1)\)</span>\(\left(\dfrac{k}{2} + 1\right)\) <span class="muted">[factor out \(k+1\)]</span>` },
+    { tag: '', html: String.raw`\(= \dfrac{(k+1)(k+2)}{2}\) — exactly the goal, so \(P(k) \to P(k+1)\).` },
+    { tag: 'Conclusion', html: String.raw`By induction, \(P(n)\) is true for every positive integer \(n\). ∎` },
+  ];
+  const EX_IND_TOTAL = 6; // dominoes in the strip
+
+  // ---- worked example: sqrt(2) is irrational, as stacked deduction lines ----
+  const EX_SQRT_ROWS = [
+    { tag: 'The assumption', html: String.raw`Suppose, for contradiction, that \(\sqrt2 = \dfrac{a}{b}\) for integers \(a, b\) with \(b \ne 0\), in <b>lowest terms</b>: \(a\) and \(b\) share no common factor bigger than \(1\).` },
+    { tag: 'Square', html: String.raw`Squaring both sides and clearing the fraction: \(\;a^2 = 2b^2\). So \(a^2\) is <b>even</b>, because it is \(2\) times the integer \(b^2\).` },
+    { tag: 'Parity', html: String.raw`An odd number squared is odd: \((2m+1)^2 = 4m^2 + 4m + 1 = 2(2m^2 + 2m) + 1\). Since \(a^2\) is even, \(a\) itself is <b>even</b>.` },
+    { tag: 'Substitute', html: String.raw`Write \(a = 2c\). Then \((2c)^2 = 2b^2\), so \(4c^2 = 2b^2\), and dividing by \(2\): \(\;b^2 = 2c^2\). Now \(b^2\) is even too.` },
+    { tag: 'Contradiction', warn: true, html: String.raw`By the same parity argument, \(b\) is <b>even</b> too. So \(a\) and \(b\) share the factor \(2\), which contradicts lowest terms.` },
+    { tag: 'Conclusion', html: String.raw`The assumption was false, so no such fraction exists: \(\sqrt2\) is <b>irrational</b>. ∎` },
+  ];
+
   DM.module({
     id: 'proofs',
     num: 3,
@@ -1027,6 +1050,90 @@
             good: '# 1 + 2 + ... + n = n(n + 1) / 2, proved by induction\ntotal = n * (n + 1) // 2',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: the sum formula by induction',
+        kind: 'example',
+        id: 'ex-induction-sum',
+        problem: String.raw`<p>Prove by mathematical induction that \(1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every positive integer \(n\).</p>`,
+        steps: [
+          { lines: 1, fallen: 0, caption: 'State the claim as P(n) and name the two things induction needs: a base case and an inductive step. In the domino picture from the induction lab, the base case tips the first domino, and the inductive step is why each falling domino knocks over the next one.' },
+          { lines: 2, fallen: 1, caption: 'The base case checks n = 1 directly: the left side is 1 and the right side is 1 · 2 / 2 = 1, so the two sides agree and P(1) is true. In the picture, the first domino has fallen.' },
+          { lines: 3, fallen: 2, caption: 'Next, the inductive hypothesis: assume P(k) is true for one fixed k ≥ 1, that is, 1 + ⋯ + k = k(k+1)/2. We do not prove this line; we assume it for a single k — domino k is falling — and use it to push the next domino over.' },
+          { lines: 4, fallen: 2, caption: 'Before doing any algebra, write out the goal for k + 1: 1 + ⋯ + k + (k+1) = (k+1)(k+2)/2. Writing the target first matters because it gives every manipulation that follows a destination to aim at.' },
+          { lines: 7, fallen: 3, caption: 'The algebra is the heart of the step: group the sum as (1 + ⋯ + k) + (k+1), replace the bracket with k(k+1)/2 by the inductive hypothesis, then factor out (k+1), highlighted in the middle line, to land exactly on the goal. Domino k has knocked over domino k + 1.' },
+          { lines: 8, fallen: 6, answer: true, caption: 'Answer: by induction, 1 + 2 + ⋯ + n = n(n+1)/2 for every positive integer n, and every domino is down. Spot check at n = 5: 1 + 2 + 3 + 4 + 5 = 15 and 5 · 6 / 2 = 15, so the formula agrees with a direct count.' },
+        ],
+        answer: 'n(n+1)/2',
+        verify(M) {
+          for (let n = 1; n <= 60; n++) {
+            let s = 0;
+            for (let i = 1; i <= n; i++) s += i;
+            if (s !== (n * (n + 1)) / 2) return false;
+          }
+          for (let k = 1; k <= 60; k++) if ((k * (k + 1)) / 2 + (k + 1) !== ((k + 1) * (k + 2)) / 2) return false;
+          return true;
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const doms = [];
+          doms.push(s('line', { x1: 8, y1: 48, x2: 352, y2: 48, stroke: 'var(--ink-3)', 'stroke-width': 2 }));
+          for (let i = 0; i < EX_IND_TOTAL; i++) {
+            const down = i < step.fallen;
+            doms.push(s('rect', { class: 'domino' + (down ? ' down' : ''), x: 26 + i * 54, y: 6, width: 15, height: 42, rx: 2, fill: down ? 'var(--accent)' : 'var(--sheet)', stroke: 'var(--accent)', 'stroke-width': 2 }));
+          }
+          const strip = s('svg', { viewBox: '0 0 360 56', class: 'pf-dom', role: 'img', 'aria-label': `${step.fallen} of ${EX_IND_TOTAL} dominoes fallen`, style: { width: '100%', maxWidth: '30rem', height: '3.1rem', flex: 'none' } }, doms);
+          const rows = EX_IND_ROWS.slice(0, step.lines).map((r, i) => h('div',
+            { style: { display: 'flex', gap: '0.6rem', width: '100%', padding: '0.28rem 0.55rem', border: '1px solid var(--rule)', borderRadius: 'var(--radius)', background: i === step.lines - 1 ? 'var(--accent-2)' : 'var(--sheet)', fontSize: '0.84rem', lineHeight: 1.4, textAlign: 'left' } },
+            h('span.tiny.mono.muted', { style: { flex: '0 0 7.6rem', paddingTop: '0.15rem' } }, r.tag.toUpperCase()),
+            h('span', { style: { flex: '1 1 auto', minWidth: 0 }, html: r.html })));
+          stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%', maxWidth: '46rem', alignItems: 'center' } },
+            strip,
+            h('div.stack', { style: { gap: '0.25rem', width: '100%' } }, rows),
+            step.answer ? h('div.ex-answer', { html: String.raw`Proved: \(1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every positive integer \(n\) · check at \(n = 5\): \(1+2+3+4+5 = 15\) and \(\dfrac{5 \cdot 6}{2} = 15\) ✓` }) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: the square root of 2 is irrational',
+        kind: 'example',
+        id: 'ex-sqrt2-contradiction',
+        problem: String.raw`<p>Prove that \(\sqrt2\) is irrational: there are no integers \(a\) and \(b\) with \(b \ne 0\) and \(\sqrt2 = a/b\).</p>`,
+        steps: [
+          { lines: 1, caption: 'For contradiction, suppose sqrt(2) = a/b for integers a and b, with the fraction in lowest terms, so a and b share no common factor bigger than 1. Naming the assumption precisely matters, because the contradiction at the end is aimed exactly at the words "lowest terms".' },
+          { lines: 2, caption: 'Square both sides and clear the fraction: a squared equals 2 times b squared. That one equation is the engine of the proof, because it says a squared is even — it is 2 times the integer b squared.' },
+          { lines: 3, caption: 'So a itself is even. The reason is parity: the square of an odd number is odd, since (2m + 1) squared expands to 4m squared plus 4m plus 1, so an even square cannot come from an odd number.' },
+          { lines: 4, caption: 'Since a is even, write a = 2c and substitute: (2c) squared = 2 b squared gives 4 c squared = 2 b squared, and dividing by 2 gives b squared = 2 c squared. The same evenness has now moved from a over to b.' },
+          { lines: 5, caption: 'By the same parity argument, b is even too. But then a and b share the factor 2, which directly contradicts the lowest-terms assumption the proof started with — that clash is the point of the whole argument.' },
+          { lines: 6, answer: true, caption: 'Answer: sqrt(2) is irrational — the assumption collapses. The logic is proof by contradiction: a lowest-terms fraction forced both a and b to be even forever, an infinite descent that no lowest-terms fraction can survive, and every step used only lowest terms and basic parity.' },
+        ],
+        answer: 'irrational',
+        verify(M) {
+          let noSolution = true;
+          for (let b = 1; b <= 300 && noSolution; b++) for (let a = 1; a <= 450; a++) if (a * a === 2 * b * b) { noSolution = false; break; }
+          let parity = true;
+          for (let m = 0; m <= 200; m++) {
+            if ((2 * m + 1) * (2 * m + 1) % 2 !== 1) parity = false;
+            if ((2 * m) * (2 * m) % 2 !== 0) parity = false;
+          }
+          return noSolution && parity;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = EX_SQRT_ROWS.slice(0, step.lines).map((r, i) => h('div',
+            { style: { display: 'flex', gap: '0.6rem', width: '100%', padding: '0.28rem 0.55rem', border: '1px solid ' + (r.warn && i === step.lines - 1 ? 'var(--false)' : 'var(--rule)'), borderRadius: 'var(--radius)', background: i === step.lines - 1 ? 'var(--accent-2)' : 'var(--sheet)', fontSize: '0.84rem', lineHeight: 1.4, textAlign: 'left' } },
+            h('span.tiny.mono.muted', { style: { flex: '0 0 7.6rem', paddingTop: '0.15rem' } }, r.tag.toUpperCase()),
+            h('span', { style: { flex: '1 1 auto', minWidth: 0 }, html: r.html })));
+          const clash = step.lines >= 5 ? h('div', { style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', width: '100%', background: 'var(--false-bg)', border: '1px solid var(--false)', borderRadius: 'var(--radius)', padding: '0.35rem 0.6rem', fontSize: '0.86rem' } },
+            h('span', { html: String.raw`\(a\) is <b>even</b>` }),
+            h('span', { html: String.raw`\(b\) is <b>even</b>` }),
+            h('b', '→ shared factor 2, contradicting lowest terms')) : null;
+          stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%', maxWidth: '46rem', alignItems: 'center' } },
+            h('div.stack', { style: { gap: '0.25rem', width: '100%' } }, rows),
+            clash,
+            step.answer ? h('div.ex-answer', { html: String.raw`Answer: \(\sqrt2\) is irrational — the check: \(a^2 = 2b^2\) forced \(a\) and \(b\) both even, contradicting lowest terms, so no such fraction exists ✓` }) : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

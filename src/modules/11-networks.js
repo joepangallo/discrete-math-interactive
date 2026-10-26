@@ -186,6 +186,57 @@
     ],
   });
 
+  /* ---------- worked examples: one shared network, layout, edge list and flow snapshots ---------- */
+  const EX_NET_POS = { s: [60, 120], a: [210, 50], b: [210, 190], t: [440, 120] };
+  const EX_NET_EDGES = [
+    { key: 'sa', u: 's', v: 'a', c: 10 }, { key: 'sb', u: 's', v: 'b', c: 8 }, { key: 'ab', u: 'a', v: 'b', c: 3 },
+    { key: 'at', u: 'a', v: 't', c: 6 }, { key: 'bt', u: 'b', v: 't', c: 12 },
+  ];
+  const EX_NET_FLOWS = [
+    { sa: 0, sb: 0, ab: 0, at: 0, bt: 0 },
+    { sa: 6, sb: 0, ab: 0, at: 6, bt: 0 },
+    { sa: 6, sb: 8, ab: 0, at: 6, bt: 8 },
+    { sa: 9, sb: 8, ab: 3, at: 6, bt: 11 },
+  ];
+  // SVG elements for one snapshot of the shared network; o is pure step data:
+  // { flows, label: 'flow' | 'residual', path: [edge keys], cut: [edge keys], reachable: [vertices], shade, tagReach }
+  function exNetKids(s, o) {
+    const kids = [];
+    const flows = o.flows || {};
+    const path = o.path || [], cut = o.cut || [], reach = o.reachable || [];
+    if (o.shade) kids.push(s('ellipse', { cx: 135, cy: 85, rx: 128, ry: 60, transform: 'rotate(-25 135 85)', fill: 'var(--accent-2)', opacity: 0.55, stroke: 'var(--accent)', 'stroke-width': 2, 'stroke-dasharray': '8 5' }));
+    for (const e of EX_NET_EDGES) {
+      const f = flows[e.key] || 0;
+      const sat = f === e.c && f > 0;
+      const isCut = cut.includes(e.key), isPath = path.includes(e.key);
+      let col, w, dash;
+      if (isCut) { col = 'var(--false)'; w = 4.2; dash = '7 5'; }
+      else if (isPath) [col, w, dash] = EDGE.hot;
+      else if (o.label === 'residual' && e.c - f === 0) [col, w, dash] = EDGE.ignore;
+      else if (sat) [col, w, dash] = EDGE.sat;
+      else if (f > 0) [col, w, dash] = EDGE.flow;
+      else[col, w, dash] = EDGE.base;
+      const g = geom(EX_NET_POS[e.u], EX_NET_POS[e.v], 20, 20, 0);
+      const head = 5 + w * 1.35;
+      const bx = g.x2 - g.ux * head, by = g.y2 - g.uy * head, hw = head * 0.55;
+      kids.push(s('line', { x1: r1(g.x1), y1: r1(g.y1), x2: r1(bx), y2: r1(by), stroke: col, 'stroke-width': w, fill: 'none', 'stroke-linecap': dash ? 'butt' : 'round', ...(dash ? { 'stroke-dasharray': dash } : {}) }));
+      kids.push(s('polygon', { points: `${r1(g.x2)},${r1(g.y2)} ${r1(bx + g.nx * hw)},${r1(by + g.ny * hw)} ${r1(bx - g.nx * hw)},${r1(by - g.ny * hw)}`, fill: col }));
+      const text = o.label === 'residual' ? `fwd ${e.c - f} · back ${f}` : `${f}/${e.c}${sat ? ' full' : ''}${isCut ? ' ✕' : ''}`;
+      const fs = 13, bw = text.length * fs * 0.6 + 10, bh = fs + 7;
+      const [bg, bd, ink] = LAB[isCut ? 'cut' : isPath ? 'hot' : 'plain'];
+      kids.push(s('rect', { x: r1(g.mx - bw / 2), y: r1(g.my - bh / 2), width: r1(bw), height: bh, rx: 4, fill: bg, stroke: bd, 'stroke-width': isPath || isCut ? 2 : 1 }));
+      kids.push(s('text', { x: r1(g.mx), y: r1(g.my + 1), 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': fs, fill: ink, text }));
+    }
+    for (const [n, p] of Object.entries(EX_NET_POS)) {
+      const [fill, stroke, ink] = NODE[reach.includes(n) ? 'S' : 'plain'];
+      const term = n === 's' || n === 't';
+      kids.push(s('circle', { cx: p[0], cy: p[1], r: 20, fill, stroke, 'stroke-width': term ? 2.6 : 1.8 }));
+      kids.push(s('text', { x: p[0], y: p[1] + 1, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 16, 'font-weight': term ? 700 : 600, fill: ink, text: n }));
+      if (o.tagReach) kids.push(s('text', { x: p[0], y: p[1] + 40, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: reach.includes(n) ? 'var(--accent)' : 'var(--ink-3)', text: reach.includes(n) ? 'reachable' : 'not reached' }));
+    }
+    return kids;
+  }
+
   /* ---------- practice helpers: random five-vertex networks on a fixed layout ---------- */
   const TPL = { s: [30, 95], a: [140, 30], b: [140, 160], c: [252, 95], t: [352, 95] };
   function randomNet(R, lo, hi) {
@@ -1056,6 +1107,91 @@
             good: 'import networkx as nx\nG = nx.DiGraph()\nG.add_edge("s", "a", capacity=10)\nvalue, flows = nx.maximum_flow(G, "s", "t")\ncut_value, (S, T) = nx.minimum_cut(G, "s", "t")',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: maximum flow by augmenting paths',
+        kind: 'example',
+        id: 'ex-maxflow',
+        problem: String.raw`<p>Find the maximum flow from \(s\) to \(t\) by the Ford–Fulkerson method, one augmenting path at a time, in the network with capacities \(s \to a = 10\), \(s \to b = 8\), \(a \to b = 3\), \(a \to t = 6\) and \(b \to t = 12\).</p>`,
+        steps: [
+          { flows: EX_NET_FLOWS[0], label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'All flows 0 · labels read flow / capacity · flow value |f| = 0', caption: 'Setup: every flow starts at 0, and a flow must respect each capacity and keep flow in equal to flow out at a and at b. We improve the flow one augmenting path at a time, always looking for spare room in the residual network.' },
+          { flows: EX_NET_FLOWS[1], label: 'flow', path: ['sa', 'at'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → a → t · bottleneck min(10, 6) = 6 · push 6 · |f| = 6', caption: 'Augment along s → a → t, whose bottleneck is min(10, 6) = 6, so we push 6 units along both edges. The total flow value rises to 6, and a → t is now saturated at 6/6 because its capacity is completely used.' },
+          { flows: EX_NET_FLOWS[2], label: 'flow', path: ['sb', 'bt'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → b → t · bottleneck min(8, 12) = 8 · push 8 · |f| = 14', caption: 'Augment along s → b → t, whose bottleneck is min(8, 12) = 8, so we push 8 more units through b. The total flow value rises to 14, and s → b is now saturated at 8/8, leaving b → t with 4 units of room.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: ['sa', 'ab', 'bt'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → a → b → t · bottleneck min(4, 3, 4) = 3 · push 3 · |f| = 17', caption: 'Augment along s → a → b → t, whose bottleneck is min(4, 3, 4) = 3, set by the untouched edge a → b. Pushing 3 makes s → a read 9/10 and a → b saturated at 3/3, while b → t rises to 11/12 and the total reaches 17.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: [], reachable: ['s', 'a'], shade: true, tagReach: true, status: 'Residual reachability: s and a are reachable · b and t are not · no augmenting path remains', caption: 'No augmenting path remains, because in the residual network s can still reach a through 1 unit of forward room on s → a, but every forward edge out of a is saturated and s → b is full. The reachable set {s, a} therefore splits the network into a cut, and counting that cut in the answer step will prove that 17 cannot be beaten.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Maximum flow = 17 · cut ({s, a} | {b, t}) capacity = 8 + 3 + 6 = 17', answer: true, caption: 'Answer: the maximum flow is 17, and conservation checks out at a (in 9, out 6 + 3 = 9) and at b (in 8 + 3 = 11, out 11), with every capacity respected. The cut ({s, a} | {b, t}) has capacity 8 + 3 + 6 = 17, so a flow and a cut with equal values certify each other by the max-flow min-cut theorem and 17 is provably maximal.' },
+        ],
+        answer: 17,
+        verify(M) {
+          const cap = { s: { a: 10, b: 8 }, a: { b: 3, t: 6 }, b: { t: 12 }, t: {} };
+          const res = {};
+          for (const u of Object.keys(cap)) { res[u] = res[u] || {}; for (const [v, c] of Object.entries(cap[u])) { res[u][v] = c; res[v] = res[v] || {}; if (!(u in res[v])) res[v][u] = 0; } }
+          let total = 0;
+          for (;;) {
+            const parent = { s: null };
+            const queue = ['s'];
+            while (queue.length) {
+              const u = queue.shift();
+              for (const [v, room] of Object.entries(res[u])) if (room > 0 && !(v in parent)) { parent[v] = u; queue.push(v); }
+            }
+            if (!('t' in parent)) break;
+            let push = Infinity;
+            for (let v = 't'; v !== 's'; v = parent[v]) push = Math.min(push, res[parent[v]][v]);
+            for (let v = 't'; v !== 's'; v = parent[v]) { res[parent[v]][v] -= push; res[v][parent[v]] += push; }
+            total += push;
+          }
+          const f = { sa: 9, sb: 8, ab: 3, at: 6, bt: 11 };
+          const caps = { sa: 10, sb: 8, ab: 3, at: 6, bt: 12 };
+          const withinCaps = Object.keys(caps).every((k) => f[k] >= 0 && f[k] <= caps[k]);
+          const consA = f.sa === f.ab + f.at;
+          const consB = f.sb + f.ab === f.bt;
+          const value = f.sa + f.sb;
+          return total === 17 && withinCaps && consA && consB && value === 17;
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            svg,
+            step.answer ? h('div.ex-answer', 'Maximum flow = 17 · check: conservation holds at a (in 9, out 9) and at b (in 11, out 11), and the cut ({s, a} | {b, t}) has capacity 8 + 3 + 6 = 17') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: a minimum cut from the residual network',
+        kind: 'example',
+        id: 'ex-mincut',
+        problem: String.raw`<p>For the same network — capacities \(s \to a = 10\), \(s \to b = 8\), \(a \to b = 3\), \(a \to t = 6\) and \(b \to t = 12\) — whose maximum flow is 17, from the previous example, find a minimum \(s\)-\(t\) cut by reading the final residual network.</p>`,
+        steps: [
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'Final flow · s → a 9/10 · s → b 8/8 · a → b 3/3 · a → t 6/6 · b → t 11/12 · |f| = 17', caption: 'Setup: start from the final flow of the previous example, which has value 17, and build its residual network to see what can still move. The method is to mark every vertex reachable from s in that residual network, because those vertices will form the source side of the cut.' },
+          { flows: EX_NET_FLOWS[3], label: 'residual', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'Residual room · forward = capacity − flow · backward = flow · dashed edges have 0 forward room', caption: 'Compute the residual room on every edge: forward room is capacity minus flow, and backward room is the flow that could be canceled. The forward rooms are s → a 1, s → b 0, a → b 0, a → t 0 and b → t 1, and the three edges with 0 forward room are drawn dashed because nothing more can pass that way.' },
+          { flows: EX_NET_FLOWS[3], label: 'residual', path: [], cut: [], reachable: ['s', 'a'], shade: true, tagReach: true, status: 'Reachability walk: s → a only · reachable set = {s, a}', caption: 'Walk the residual network from s: the only usable residual edge out of s leads to a, since s → a still has 1 unit of forward room. From a every forward residual edge has 0 room, so the walk stops and the reachable set is exactly {s, a}.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Cut edges: s → b (8) · a → b (3) · a → t (6) · total 8 + 3 + 6 = 17', caption: 'The cut edges are the original edges that run from the reachable side {s, a} to the other side {b, t}: s → b, a → b and a → t, drawn dashed with an X. Adding only their capacities gives 8 + 3 + 6 = 17, and edges that point back into {s, a} are never counted.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Minimum cut capacity = 17 · all four cuts: {s} 18 · {s, a} 17 · {s, b} 22 · {s, a, b} 18', answer: true, caption: 'Answer: the minimum cut capacity is 17, because every s-t path must cross one of the cut edges — it starts with s → a or s → b, and from a it must take a → b or a → t. Checking all four cuts gives {s}: 18, {s, a}: 17, {s, b}: 22 and {s, a, b}: 18, and 17 also equals the maximum flow, exactly as the max-flow min-cut theorem promises.' },
+        ],
+        answer: 17,
+        verify(M) {
+          const cap = [['s', 'a', 10], ['s', 'b', 8], ['a', 'b', 3], ['a', 't', 6], ['b', 't', 12]];
+          const mids = ['a', 'b'];
+          let count = 0, best = Infinity, bestSet = '';
+          for (let mask = 0; mask < 4; mask++) {
+            const S = new Set(['s', ...mids.filter((_, i) => mask & (1 << i))]);
+            count++;
+            const sum = cap.filter(([u, v]) => S.has(u) && !S.has(v)).reduce((acc, e) => acc + e[2], 0);
+            if (sum < best) { best = sum; bestSet = [...S].sort().join(','); }
+          }
+          return count === 4 && best === 17 && bestSet === 'a,s';
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            svg,
+            step.answer ? h('div.ex-answer', 'Minimum cut capacity = 17 · check: cut ({s, a} | {b, t}) = 8 + 3 + 6 = 17, which equals the maximum flow') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {

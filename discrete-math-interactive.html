@@ -322,6 +322,8 @@ table.tt th, table.tt td { border: 1px solid var(--rule); padding: 0.22rem 0.6re
 table.tt th { font-family: var(--font-mono); font-weight: 600; background: var(--paper); color: var(--ink-2); }
 table.tt td.l, table.tt th.l { text-align: left; }
 table.tt tr.hit td { background: var(--mark); color: var(--mark-ink); }
+table.tt td.cur, table.tt th.cur { background: var(--mark); color: var(--mark-ink); font-weight: 600; }
+table.tt td.muted, table.tt th.muted { color: var(--ink-3); }
 table.data { border-collapse: collapse; font-size: 0.88rem; width: 100%; background: var(--sheet); }
 table.data th, table.data td { border-bottom: 1px solid var(--rule); padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }
 table.data th { font-size: 0.72rem; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
@@ -464,6 +466,30 @@ li.on .tok-kw, li.on .tok-str, li.on .tok-num, li.on .tok-fn, li.on .tok-bi, li.
 .qz-dots button.cur { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .qz-dots button.right { background: var(--true-bg); color: var(--true); border-color: var(--true); }
 .qz-dots button.wrong { background: var(--false-bg); color: var(--false); border-color: var(--false); }
+
+/* ---------- worked examples ---------- */
+.kind-tag.example { border-color: var(--fnc); color: var(--fnc); }
+.ex-problem { border: 1px solid var(--rule); border-left: 3px solid var(--fnc); border-radius: var(--radius); background: var(--sheet); padding: 0.55rem 0.85rem; font-size: 0.98rem; line-height: 1.5; }
+.ex-problem-tag { display: block; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--fnc); margin-bottom: 0.2rem; }
+.ex-player { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.ex-stage { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.6rem 0.8rem; box-shadow: var(--shadow); overflow: hidden; }
+.ex-stage.ex-done { border-color: var(--true); border-width: 2px; }
+.ex-stage svg { max-width: 100%; max-height: 100%; height: auto; }
+.ex-stage .ex-answer { background: var(--true-bg); border: 1px solid var(--true); border-radius: var(--radius); padding: 0.45rem 0.8rem; font-weight: 600; text-align: center; }
+.ex-stage .ex-check { color: var(--true); font-weight: 600; }
+.ex-caption { flex: none; min-height: 3.2em; font-size: 0.95rem; line-height: 1.5; background: var(--accent-2); border-radius: var(--radius); padding: 0.5rem 0.8rem; }
+.ex-ctl { flex: none; display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+.ex-scrub { flex: 1 1 9rem; min-width: 6rem; display: flex; align-items: center; }
+.ex-count { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-2); white-space: nowrap; }
+.ex-keys { flex: none; }
+.ex-try { flex: none; }
+.ex-board { font-size: 0.84rem; line-height: 1.5; }
+.ex-board .ex-answer-line { font-weight: 600; }
+.print-page .ex-final { flex: none; max-height: 15rem; }
+.print-page .ex-board { column-count: 2; column-gap: 1.4rem; }
+@media (max-width: 760px) {
+  .ex-caption { min-height: 0; }
+}
 
 /* ---------- dialogs + popover ---------- */
 dialog { border: 1px solid var(--rule); border-radius: 0.8rem; background: var(--sheet); color: var(--ink); padding: 0; box-shadow: 0 30px 80px -20px oklch(10% 0.03 165 / 0.55); width: min(46rem, calc(100vw - 2rem)); max-height: min(85vh, 44rem); }
@@ -1288,7 +1314,7 @@ onmessage = (e) => {
   });
 
   /* ---------------- slide kinds ---------------- */
-  const KIND_LABEL = { concept: 'Concept', lab: 'Interactive lab', code: 'Code walkthrough', design: 'Design practice', practice: 'Practice', quiz: 'Check yourself' };
+  const KIND_LABEL = { concept: 'Concept', lab: 'Interactive lab', code: 'Code walkthrough', design: 'Design practice', practice: 'Practice', quiz: 'Check yourself', example: 'Worked example' };
 
   DM.kinds.concept = (body, sl, ctx) => {
     if (sl.html) body.append(...rich('div', sl.html).childNodes);
@@ -1793,6 +1819,39 @@ onmessage = (e) => {
     show(0);
   };
 
+  /* Worked example: a stated problem, then a narrated step-by-step solution on the shared
+     player, ending in a checked answer and a jump to this module's practice problems.
+     The slide carries pure data (problem, steps, answer, verify) plus draw(stage, ctx, step, k),
+     which renders one step's snapshot. In print the player becomes a storyboard — the final
+     frame plus every caption in order — so the PDF never shows a question without its answer. */
+  DM.kinds.example = (body, sl, ctx) => {
+    if (sl.html) body.append(...rich('div', sl.html).childNodes);
+    const prob = h('div.ex-problem', h('span.ex-problem-tag', 'Problem'));
+    if (sl.problem) prob.append(...rich('div', sl.problem).childNodes);
+    body.append(prob);
+    const last = sl.steps.length - 1;
+    if (ctx.print) {
+      const stage = h('div.ex-stage.ex-final');
+      try { sl.draw(stage, ctx, sl.steps[last], last); } catch (e) { console.error('[DM] example print frame failed:', e); }
+      body.append(stage, h('ol.ex-board', sl.steps.map((st) => { const li = rich('li', st.caption || ''); if (st.answer) li.className = 'ex-answer-line'; return li; })));
+      return;
+    }
+    const player = ctx.player({ steps: sl.steps, draw: (stage, step, k) => sl.draw(stage, ctx, step, k) });
+    body.append(player.el);
+    const pr = ctx.module.slides.find((x) => x.kind === 'practice');
+    if (pr) body.append(h('div.row.ex-try',
+      h('button.btn.primary', { onclick: () => ctx.go(`${ctx.module.id}-${pr._key}`) }, 'Now you try: practice problems →'),
+      h('span.small.muted', 'Same method, fresh numbers, checked as you go.')));
+    ctx.keys = (e) => {
+      if (e.key === 'ArrowDown') { player.next(); return true; }
+      if (e.key === 'ArrowUp') { player.prev(); return true; }
+      return false;
+    };
+    ctx.onHide(player.stop);
+    DM._exampleHooks.push({ slide: sl, player });
+  };
+  DM._exampleHooks = [];
+
   /* ---------------- module registry ---------------- */
   DM.module = (m) => {
     if (!m || !m.id || !Array.isArray(m.slides)) { console.error('[DM] bad module', m); return; }
@@ -1891,6 +1950,74 @@ onmessage = (e) => {
         hide.push(() => t.stop());
         sync();
         return t;
+      },
+      /** player({ steps, draw }) builds the shared worked-example player. steps[k] is a complete
+          snapshot ({ caption, answer?, ...data }); draw(stage, step, k) renders step k from its
+          snapshot alone, so jumping, scrubbing or stepping back always shows the same picture.
+          Controls: Back / Play / Step / Restart, a scrubber, 0.5x / 1x / 2x speed and a step
+          counter. Play stops at the last step and when the slide is hidden (via `hide`), and
+          nothing ever autoplays on load, so prefers-reduced-motion needs no special path beyond
+          the global CSS that stills transitions. The caption is announced politely for manual
+          steps and muted during autoplay, like the code-trace player. */
+      player(opts) {
+        const steps = opts.steps;
+        const n = steps.length;
+        let i = 0;
+        let speed = 1;
+        let timer = null;
+        const stage = h('div.ex-stage');
+        const caption = h('div.ex-caption', { 'aria-live': 'polite' });
+        const count = h('span.ex-count');
+        const backB = h('button.btn.sm', { onclick: () => { stop(); go(i - 1); }, 'aria-label': 'Previous step' }, '◀ Back');
+        const playB = h('button.btn.sm.primary', { onclick: () => toggle(), 'aria-label': 'Play the steps', 'aria-pressed': 'false' }, '▶ Play');
+        const fwdB = h('button.btn.sm', { onclick: () => { stop(); go(i + 1); }, 'aria-label': 'Next step' }, 'Step ▶');
+        const restartB = h('button.btn.sm', { onclick: () => { stop(); go(0); }, 'aria-label': 'Back to the first step' }, '↺ Restart');
+        const scrub = h('input', { type: 'range', min: 0, max: n - 1, value: 0, step: 1, 'aria-label': 'Jump to a step', oninput: (e) => { stop(); go(+e.target.value); } });
+        const speedSeg = h('div.seg', { 'aria-label': 'Playback speed' },
+          [0.5, 1, 2].map((sp) => h('button', { 'aria-pressed': String(sp === 1), onclick: () => setSpeed(sp) }, `${sp}×`)));
+        const el = h('div.ex-player',
+          stage, caption,
+          h('div.ex-ctl', backB, playB, fwdB, restartB, h('div.ex-scrub', scrub), speedSeg, count),
+          h('p.tiny.muted.ex-keys', 'Keys: ', h('kbd', '↑'), ' / ', h('kbd', '↓'), ' step through the example · ', h('kbd', 'Space'), ' plays or pauses when the player has focus'));
+        el.addEventListener('keydown', (e) => {
+          if (e.key === ' ' && !e.target.closest('button, input, select, textarea, a, [role="tab"]')) { e.preventDefault(); toggle(); }
+        });
+        function syncPlay() {
+          playB.textContent = timer ? '❚❚ Pause' : '▶ Play';
+          playB.setAttribute('aria-label', timer ? 'Pause' : 'Play the steps');
+          playB.setAttribute('aria-pressed', String(!!timer));
+          caption.setAttribute('aria-live', timer ? 'off' : 'polite');
+        }
+        function start() {
+          if (timer || PRINT || i >= n - 1) return;
+          timer = setInterval(() => { if (i >= n - 1) { stop(); return; } go(i + 1); if (i >= n - 1) stop(); }, 1500 / speed);
+          syncPlay();
+        }
+        function stop() { if (timer) clearInterval(timer); timer = null; syncPlay(); }
+        function toggle() { if (timer) stop(); else if (i >= n - 1) { go(0); start(); } else start(); }
+        function setSpeed(sp) {
+          speed = sp;
+          $$('button', speedSeg).forEach((b, j) => b.setAttribute('aria-pressed', String([0.5, 1, 2][j] === sp)));
+          if (timer) { stop(); start(); }
+        }
+        function go(k) {
+          i = Math.max(0, Math.min(n - 1, k));
+          rc(stage);
+          try { opts.draw(stage, steps[i], i); } catch (e) { console.error('[DM] example step failed:', e); stage.append(h('div.warn', `This step could not be drawn: ${e.message}`)); }
+          renderMath(stage);
+          caption.innerHTML = steps[i].caption || '';
+          renderMath(caption);
+          count.textContent = `Step ${i + 1} of ${n}`;
+          scrub.value = String(i);
+          scrub.setAttribute('aria-valuetext', `Step ${i + 1} of ${n}`);
+          backB.disabled = i === 0;
+          fwdB.disabled = i === n - 1;
+          restartB.disabled = i === 0;
+          stage.classList.toggle('ex-done', !!steps[i].answer);
+        }
+        hide.push(stop);
+        go(0);
+        return { el, go, stop, next() { stop(); go(i + 1); }, prev() { stop(); go(i - 1); }, get index() { return i; }, get playing() { return !!timer; } };
       },
     };
   }
@@ -3485,6 +3612,121 @@ DM.module({
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked examples */
+      {
+        title: 'Worked example: shading (A ∪ B) ∩ C′ on a Venn diagram',
+        kind: 'example',
+        id: 'ex-venn-shading',
+        problem: String.raw`<p>With universe \(U = \{1, 2, \dots, 10\}\), \(A = \{1, 2, 3, 4, 5\}\), \(B = \{4, 5, 6, 7\}\) and \(C = \{2, 5, 8\}\), compute \((A \cup B) \cap C'\), building the answer one sub-expression at a time on a Venn diagram.</p>`,
+        steps: [
+          { phase: 0, status: 'Regions placed · nothing shaded yet', caption: 'Plan first: place every element of U in its region, then work inside-out — shade A, grow the shading to A ∪ B, switch to the complement of C, and keep only what both shadings share. Nothing is shaded yet, so this first picture is the map for every later step.' },
+          { phase: 1, status: 'Shaded: A = {1, 2, 3, 4, 5}', caption: 'Shade all of circle A, because the first sub-expression is just A = {1, 2, 3, 4, 5}. Every region inside circle A is now shaded, including the parts that also lie inside B or inside C.' },
+          { phase: 2, status: 'Shaded: A ∪ B = {1, 2, 3, 4, 5, 6, 7}', caption: 'Extend the shading to all of circle B as well, because a union keeps anything that is in either set: A ∪ B = {1, 2, 3, 4, 5, 6, 7}. The shaded area is now the whole of both circles, with the overlap shaded once, not twice.' },
+          { phase: 3, status: 'Shaded: C′ = {1, 3, 4, 6, 7, 9, 10} (everything outside C)', caption: 'Start over with a different shading: everything outside circle C, because the complement C′ = {1, 3, 4, 6, 7, 9, 10} holds all of U except 2, 5 and 8. Even the corners of the universe, outside every circle, are shaded this time.' },
+          { phase: 4, status: 'Kept: in A ∪ B and outside C = {1, 3, 4, 6, 7}', caption: 'Intersect the two shadings: keep only the regions that were shaded in both senses, meaning in A ∪ B and also outside C. The elements 2 and 5 drop out because they lie inside C, and 9 and 10 drop out because they were never in A ∪ B.' },
+          { phase: 4, answer: true, status: 'Final regions outlined in bold: {1, 3, 4, 6, 7}', caption: 'Answer: (A ∪ B) ∩ C′ = {1, 3, 4, 6, 7}, read region by region — 1 and 3 from A only, 4 from A ∩ B outside C, and 6 and 7 from B only. Check each one: it is in A or in B and it is not in C, while the only other members of A ∪ B, namely 2 and 5, fail because they lie in C.' },
+        ],
+        answer: [1, 3, 4, 6, 7],
+        verify(M) {
+          const U = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], A = [1, 2, 3, 4, 5], B = [4, 5, 6, 7], C = [2, 5, 8];
+          const got = U.filter((x) => (A.includes(x) || B.includes(x)) && !C.includes(x));
+          const want = [1, 3, 4, 6, 7];
+          return got.length === want.length && got.every((x, i) => x === want[i]);
+        },
+        draw(stage, ctx, step, k) {
+          const { h, s } = ctx;
+          const CTRS = { A: [195, 92], B: [325, 92], C: [260, 150] };
+          const RAD = 80;
+          const REGIONS = [
+            { a: 1, b: 0, c: 0, pos: [138, 87], label: '1, 3' },
+            { a: 0, b: 1, c: 0, pos: [382, 87], label: '6, 7' },
+            { a: 0, b: 0, c: 1, pos: [260, 210], label: '8' },
+            { a: 1, b: 1, c: 0, pos: [260, 62], label: '4' },
+            { a: 1, b: 0, c: 1, pos: [193, 160], label: '2' },
+            { a: 0, b: 1, c: 1, pos: [327, 160], label: '' },
+            { a: 1, b: 1, c: 1, pos: [260, 120], label: '5' },
+            { a: 0, b: 0, c: 0, pos: [448, 244], label: '9, 10' },
+          ];
+          const shaded = (r) => step.phase === 1 ? r.a === 1
+            : step.phase === 2 ? (r.a === 1 || r.b === 1)
+            : step.phase === 3 ? r.c === 0
+            : step.phase >= 4 ? ((r.a === 1 || r.b === 1) && r.c === 0) : false;
+          const circ = (key, attrs) => s('circle', { cx: CTRS[key][0], cy: CTRS[key][1], r: RAD, ...attrs });
+          const kids = [];
+          kids.push(s('defs',
+            s('mask', { id: 'exv-nc' }, s('rect', { x: 0, y: 0, width: 520, height: 270, fill: 'white' }), circ('C', { fill: 'black' })),
+            s('clipPath', { id: 'exv-ab' }, circ('A', {}), circ('B', {}))));
+          kids.push(s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'var(--sheet)', stroke: 'var(--rule)', 'stroke-width': 1.5 }));
+          kids.push(s('text', { x: 24, y: 34, 'font-size': 16, 'font-weight': 600, fill: 'var(--ink-3)', text: 'U' }));
+          if (step.phase === 1) kids.push(circ('A', { fill: 'var(--accent)', opacity: 0.38, stroke: 'none' }));
+          else if (step.phase === 2) kids.push(circ('A', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }));
+          else if (step.phase === 3) kids.push(s('g', { mask: 'url(#exv-nc)' }, s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'var(--num)', opacity: 0.3 })));
+          else if (step.phase >= 4) kids.push(s('g', { mask: 'url(#exv-nc)' }, circ('A', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' })));
+          for (const key of ['A', 'B', 'C']) kids.push(circ(key, { fill: 'none', stroke: key === 'A' ? 'var(--accent)' : key === 'B' ? 'var(--fnc)' : 'var(--num)', 'stroke-width': 2.2 }));
+          if (step.answer) {
+            kids.push(s('g', { mask: 'url(#exv-nc)' }, circ('A', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 }), circ('B', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
+            kids.push(s('g', { 'clip-path': 'url(#exv-ab)' }, circ('C', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
+          }
+          kids.push(s('text', { x: 100, y: 36, 'font-size': 19, 'font-weight': 700, fill: 'var(--accent)', text: 'A' }));
+          kids.push(s('text', { x: 408, y: 36, 'font-size': 19, 'font-weight': 700, fill: 'var(--fnc)', text: 'B' }));
+          kids.push(s('text', { x: 253, y: 257, 'font-size': 19, 'font-weight': 700, fill: 'var(--num)', text: 'C' }));
+          for (const r of REGIONS) {
+            if (!r.label) continue;
+            kids.push(s('text', { x: r.pos[0], y: r.pos[1], 'text-anchor': 'middle', 'font-size': 15, 'font-weight': shaded(r) ? 700 : 400, fill: shaded(r) ? 'var(--ink)' : 'var(--ink-3)', text: r.label }));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 270', role: 'img', 'aria-label': 'Three-circle Venn diagram of A, B and C inside U, shaded step by step', style: { width: '440px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...kids);
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            svg,
+            step.answer ? h('div.ex-answer', '(A ∪ B) ∩ C′ = {1, 3, 4, 6, 7} — check: every listed element is in A or in B, and none of them is in C') : null));
+        },
+      },
+      {
+        title: 'Worked example: De Morgan’s law by a membership table',
+        kind: 'example',
+        id: 'ex-demorgan-membership',
+        problem: String.raw`<p>Prove De Morgan's law \((A \cup B)' = A' \cap B'\) for \(A = \{1, 2, 3\}\) and \(B = \{3, 4\}\) in the universe \(U = \{1, 2, 3, 4, 5, 6\}\), by building a membership table with one row per element of \(U\).</p>`,
+        steps: [
+          { cols: 2, fresh: [0, 1], compare: false, status: 'Columns so far: x, in A, in B', caption: 'Start with the raw facts only: one row for each element of U = {1, 2, 3, 4, 5, 6}, with a T where the element belongs to A = {1, 2, 3} or to B = {3, 4}. Every later column is computed from these two columns, row by row.' },
+          { cols: 3, fresh: [2], compare: false, status: 'New column: in A ∪ B = {1, 2, 3, 4}', caption: 'Add the union column: an element is in A ∪ B when its row has a T in the A column, in the B column, or in both. Only 5 and 6 get an F here, because they are the two elements that belong to neither set.' },
+          { cols: 4, fresh: [3], compare: false, status: 'New column: in (A ∪ B)′ = {5, 6}', caption: 'Flip the union column to get (A ∪ B)′: every T becomes F and every F becomes T, because a complement keeps exactly the elements the original set missed. This column is T only for 5 and 6, so the left-hand side of the law is {5, 6}.' },
+          { cols: 6, fresh: [4, 5], compare: false, status: 'New columns: in A′ = {4, 5, 6} and in B′ = {1, 2, 5, 6}', caption: 'Now build the right-hand side in pieces: A′ flips the A column and B′ flips the B column, each one keeping the elements outside that single set. These two columns are the ingredients for the intersection that finishes the right-hand side.' },
+          { cols: 7, fresh: [6], compare: false, status: 'New column: in A′ ∩ B′ = {5, 6}', caption: 'Intersect the last two columns: A′ ∩ B′ is T only where a row has a T in both A′ and B′, because an intersection demands both conditions at once. That happens only for 5 and 6, the elements that are outside A and also outside B.' },
+          { cols: 7, fresh: [], compare: true, answer: true, status: 'Compare: the (A ∪ B)′ column and the A′ ∩ B′ column — identical', caption: 'Answer: the (A ∪ B)′ column and the A′ ∩ B′ column are identical in all 6 rows — F, F, F, F, T, T — so the two sets are equal and (A ∪ B)′ = A′ ∩ B′ = {5, 6}. The check is the row-by-row match itself, and it fits the picture: 5 and 6 are exactly the elements in neither A nor B.' },
+        ],
+        answer: [5, 6],
+        verify(M) {
+          const U = [1, 2, 3, 4, 5, 6], A = [1, 2, 3], B = [3, 4];
+          const lhs = U.filter((x) => !(A.includes(x) || B.includes(x)));
+          const rhs = U.filter((x) => !A.includes(x) && !B.includes(x));
+          const want = [5, 6];
+          const eq = (p, q) => p.length === q.length && p.every((x, i) => x === q[i]);
+          return eq(lhs, rhs) && eq(lhs, want);
+        },
+        draw(stage, ctx, step, k) {
+          const { h } = ctx;
+          const U = [1, 2, 3, 4, 5, 6], A = [1, 2, 3], B = [3, 4];
+          const COLS = [
+            { head: 'in A', f: (x) => A.includes(x) },
+            { head: 'in B', f: (x) => B.includes(x) },
+            { head: 'in A ∪ B', f: (x) => A.includes(x) || B.includes(x) },
+            { head: 'in (A ∪ B)′', f: (x) => !(A.includes(x) || B.includes(x)) },
+            { head: 'in A′', f: (x) => !A.includes(x) },
+            { head: 'in B′', f: (x) => !B.includes(x) },
+            { head: 'in A′ ∩ B′', f: (x) => !A.includes(x) && !B.includes(x) },
+          ];
+          const cellCls = (ci) => (step.fresh.includes(ci) || (step.compare && (ci === 3 || ci === 6)) ? 'cur' : '');
+          const table = h('table.tt', { style: { fontSize: '0.85rem' } },
+            h('thead', h('tr', h('th', 'x'), COLS.map((c, ci) => h('th', { class: ci < step.cols ? cellCls(ci) : 'muted' }, c.head)))),
+            h('tbody', U.map((x) => h('tr', { class: step.compare && (x === 5 || x === 6) ? 'hit' : '' },
+              h('td', String(x)),
+              COLS.map((c, ci) => (ci < step.cols ? h('td', { class: cellCls(ci) }, c.f(x) ? 'T' : 'F') : h('td.muted', '·')))))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            table,
+            step.answer ? h('div.ex-answer', '(A ∪ B)′ = A′ ∩ B′ = {5, 6} — check: the two highlighted columns match in all 6 rows, and 5 and 6 are exactly the elements in neither A nor B') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 11 */
       {
         title: 'Practice: sets',
@@ -3710,6 +3952,35 @@ DM.module({
     }
     return parse('(p → q) ∧ ¬r');
   }
+
+  // ---- worked example: the truth table for [(p -> q) and (q -> r)] -> (p -> r), built column by column ----
+  const EX_TT_VARS = ['p', 'q', 'r'];
+  const EX_TT_ENVS = assignments(EX_TT_VARS);
+  const EX_TT_COLS = [
+    { tex: String.raw`p \to q`, f: (e) => !e.p || e.q },
+    { tex: String.raw`q \to r`, f: (e) => !e.q || e.r },
+    { tex: String.raw`(p \to q) \land (q \to r)`, f: (e) => (!e.p || e.q) && (!e.q || e.r) },
+    { tex: String.raw`\big[(p \to q) \land (q \to r)\big] \to (p \to r)`, f: (e) => { const pq = !e.p || e.q, qr = !e.q || e.r, pr = !e.p || e.r; return !(pq && qr) || pr; } },
+  ];
+  // rows where the hypothesis of the whole formula holds: the only rows that could make it false
+  const EX_TT_DANGER = EX_TT_ENVS.map((e, i) => (EX_TT_COLS[2].f(e) ? i : -1)).filter((i) => i >= 0);
+
+  // ---- worked example: rewriting the negated conditional ¬(p -> q) as p ∧ ¬q, one named law per line ----
+  const EX_NC_VARS = ['p', 'q'];
+  const EX_NC_ALL = assignments(EX_NC_VARS);
+  // the revealing row (p = T, q = F) comes first, then the remaining rows in textbook order,
+  // so both formula columns read T, F, F, F from top to bottom
+  const EX_NC_ENVS = [EX_NC_ALL[1], EX_NC_ALL[0], EX_NC_ALL[2], EX_NC_ALL[3]];
+  const EX_NC_COLS = [
+    { tex: String.raw`\neg(p \to q)`, f: (e) => !(!e.p || e.q) },
+    { tex: String.raw`p \land \neg q`, f: (e) => e.p && !e.q },
+  ];
+  const EX_NC_LINES = [
+    { tex: String.raw`\neg(p \to q)`, law: 'starting formula' },
+    { tex: String.raw`\neg(\neg p \lor q)`, law: String.raw`implication law: \(p \to q \equiv \neg p \lor q\)` },
+    { tex: String.raw`\neg\neg p \land \neg q`, law: String.raw`De Morgan's law: \(\neg(X \lor Y) \equiv \neg X \land \neg Y\)` },
+    { tex: String.raw`p \land \neg q`, law: String.raw`double negation: \(\neg\neg p \equiv p\)` },
+  ];
 
   DM.module({
     id: 'logic',
@@ -4401,6 +4672,95 @@ DM.module({
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: a truth table, column by column',
+        kind: 'example',
+        id: 'ex-truth-table',
+        problem: String.raw`<p>Build the truth table for \(\big[(p \to q) \land (q \to r)\big] \to (p \to r)\) and classify it: tautology, contradiction, or contingency?</p>`,
+        steps: [
+          { cols: 0, caption: 'Start with the inputs. Three variables have 2 × 2 × 2 = 8 combinations of T and F, so the table needs 8 rows. Writing every combination first matters: one missing row could hide the single case that breaks the formula.' },
+          { cols: 1, caption: 'Work inside-out, smallest piece first: p → q. A conditional is false in exactly one situation — hypothesis true, conclusion false — so this column is F exactly in the rows with p = T and q = F, and T everywhere else.' },
+          { cols: 2, caption: 'The next piece is q → r, the same rule with the roles shifted: F only where q = T and r = F. Building one column at a time means every entry can be checked against a single rule.' },
+          { cols: 3, caption: 'Combine the two finished columns with ∧. A conjunction is true only where both of its pieces are true. This column is also the hypothesis of the whole formula, so it marks the rows that could possibly make the formula false.' },
+          { cols: 4, caption: 'Finish with the whole formula: hypothesis → (p → r). It fails only in a row where the hypothesis is true and p → r is false. Read down the new column: there is no F in it.' },
+          { cols: 4, check: true, caption: 'Check the dangerous rows — the highlighted ones, where the hypothesis is true. In each of them the conclusion p → r is true as well, which is exactly why the implication survived. The other rows pass automatically, because a conditional with a false hypothesis is true.' },
+          { cols: 4, check: true, answer: true, caption: 'Answer: the formula is a tautology — true in all 8 rows. This pattern is the hypothetical syllogism: if p → q and q → r both hold, then p → r must hold. The check in the previous step is the proof: every row that could have broken it was examined.' },
+        ],
+        answer: 'tautology',
+        verify() {
+          const direct = EX_TT_ENVS.every((e) => { const pq = !e.p || e.q, qr = !e.q || e.r, pr = !e.p || e.r; return !(pq && qr) || pr; });
+          const tree = parse('((p -> q) & (q -> r)) -> (p -> r)');
+          return direct && EX_TT_ENVS.every((e) => ev(tree, e));
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const shown = step.cols;
+          const head = EX_TT_VARS.map((v) => h('th', { html: `\\(${v}\\)` }))
+            .concat(EX_TT_COLS.map((c, ci) => h('th', { html: `\\(${c.tex}\\)`, class: ci < shown ? (ci === shown - 1 && !step.check ? 'cur' : '') : 'muted' })));
+          const rows = EX_TT_ENVS.map((e, ri) => h('tr', { class: step.check && EX_TT_DANGER.includes(ri) ? 'hit' : '' },
+            EX_TT_VARS.map((v) => h('td', tf(e[v]))),
+            EX_TT_COLS.map((c, ci) => (ci < shown ? h('td', { class: ci === shown - 1 && !step.check ? 'cur' : '' }, tf(c.f(e))) : h('td.muted', '·')))));
+          const table = h('table.tt', h('thead', h('tr', head)), h('tbody', rows));
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            table,
+            step.answer ? h('div.ex-answer', 'Answer: a tautology — T in all 8 rows') : null,
+            step.check && !step.answer ? h('p.small', { style: { textAlign: 'center' } }, 'Highlighted rows: the hypothesis is true, so these are the rows that had to be checked.') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: rewriting a negated conditional',
+        kind: 'example',
+        id: 'ex-negated-conditional',
+        problem: String.raw`<p>Rewrite \(\neg(p \to q)\) as a formula with no \(\to\) and no outer \(\neg\), naming the law used at each step, and prove that the result is equivalent to the original formula.</p>`,
+        steps: [
+          { lines: 1, table: 0, caption: 'Start with ¬(p → q) and the plan: turn the conditional into a disjunction first, because the implication law is the only law that removes a →. Each later law then has the shape it needs to apply.' },
+          { lines: 2, table: 0, caption: 'Apply the implication law, p → q ≡ ¬p ∨ q, inside the outer negation, so the formula becomes ¬(¬p ∨ q). The arrow is gone, but the outer ¬ still covers the whole disjunction, so one more law is needed to move it inside.' },
+          { lines: 3, table: 0, caption: 'Apply De Morgan\'s law, ¬(X ∨ Y) ≡ ¬X ∧ ¬Y: the ∨ flips to ∧ and each part is negated, giving ¬¬p ∧ ¬q. Pushing ¬ inside is what turns "not a conditional" into a positive claim about p and q.' },
+          { lines: 4, table: 0, caption: 'Apply double negation, ¬¬p ≡ p, to clean up the first part, and the formula becomes p ∧ ¬q. The rewrite is done — no → and no outer ¬ remain — but a chain of rewrites still has to be checked against the original.' },
+          { lines: 4, table: 1, caption: 'Check the one revealing row, p = T and q = F: the original gives ¬(T → F) = ¬F = T, and the rewrite gives T ∧ ¬F = T ∧ T = T. This row matters most because it is the only row where either formula is true, so agreement here carries the proof.' },
+          { lines: 4, table: 2, answer: true, caption: 'Answer: ¬(p → q) ≡ p ∧ ¬q, because the two columns agree in all 4 rows, reading T, F, F, F. In words, the only way to break the promise p → q is for p to be true and q false, and the table is the check that nothing else breaks it.' },
+        ],
+        answer: 'p ∧ ¬q',
+        verify(M) {
+          const byLaw = sameMeaning('~(p -> q)', 'p & ~q');
+          const original = parse('~(p -> q)');
+          const rewritten = parse('p & ~q');
+          const envs = assignments(['p', 'q']);
+          const byTrees = envs.every((e) => ev(original, e) === ev(rewritten, e));
+          const byHand = envs.every((e) => (!(!e.p || e.q)) === (e.p && !e.q));
+          return byLaw && byTrees && byHand;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const lineEls = EX_NC_LINES.slice(0, step.lines).map((ln, i) => {
+            const isNew = i === step.lines - 1;
+            return h('div', { class: isNew ? '' : 'muted', style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.2rem 1rem' } },
+              h('span', { html: `\\(${ln.tex}\\)`, style: { fontSize: step.table ? '1.02rem' : isNew ? '1.2rem' : '1.05rem', fontWeight: isNew ? '600' : '400' } }),
+              h('span.small.muted', { html: ln.law }));
+          });
+          let table = null;
+          if (step.table) {
+            const head = EX_NC_VARS.map((v) => h('th', { html: `\\(${v}\\)` }))
+              .concat(EX_NC_COLS.map((c) => h('th', { html: `\\(${c.tex}\\)`, class: step.table === 1 ? 'cur' : '' })));
+            const rows = EX_NC_ENVS.map((e, ri) => {
+              const revealing = ri === 0;
+              const shown = step.table === 2 || revealing;
+              return h('tr', { class: step.table === 1 && revealing ? 'hit' : '' },
+                EX_NC_VARS.map((v) => h('td', tf(e[v]))),
+                EX_NC_COLS.map((c) => (shown ? h('td', { class: step.table === 1 && revealing ? 'cur' : '' }, tf(c.f(e))) : h('td.muted', '·'))));
+            });
+            table = h('table.tt', h('thead', h('tr', head)), h('tbody', rows));
+          }
+          stage.append(h('div.stack', { style: { alignItems: 'stretch', gap: '0.4rem', width: 'min(38rem, 100%)' } },
+            ...lineEls,
+            step.lines === 1 ? h('p.small.muted', 'Laws we will use: the implication law, the De Morgan law, and double negation — in that order, because each law creates the shape the next one needs.') : null,
+            table ? h('div', { style: { display: 'flex', justifyContent: 'center' } }, table) : null,
+            step.table === 1 ? h('div.small', { html: String.raw`Revealing row: \(p = \mathrm{T}\) and \(q = \mathrm{F}\) give \(\neg(\mathrm{T} \to \mathrm{F}) = \neg\mathrm{F} = \mathrm{T}\) and \(\mathrm{T} \land \neg\mathrm{F} = \mathrm{T} \land \mathrm{T} = \mathrm{T}\). The other rows are still unchecked.` }) : null,
+            step.answer ? h('div.ex-answer', 'Answer: ¬(p → q) ≡ p ∧ ¬q · check: both columns agree in all 4 rows — T, F, F, F') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: logic',
@@ -4854,6 +5214,29 @@ DM.module({
 
   const INVARIANT_CODE = ['total, k = 0, 0', 'while k < n:', '    k += 1', '    total += k', '# invariant: total == 1 + 2 + ... + k'].map(DM.hlPy).join('\n');
   const RECURSION_CODE = ['def sum_to(n):', '    return 0 if n == 0 else sum_to(n - 1) + n'].map(DM.hlPy).join('\n');
+
+  // ---- worked example: the sum formula by induction, as proof lines plus the domino strip ----
+  const EX_IND_ROWS = [
+    { tag: 'The claim', html: String.raw`\(P(n):\ 1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every integer \(n \ge 1\). Induction needs two things: a <b>base case</b> and an <b>inductive step</b>.` },
+    { tag: 'Base case', html: String.raw`\(n = 1\): the left side is \(1\), and the right side is \(\dfrac{1 \cdot 2}{2} = 1\). The two sides agree, so \(P(1)\) is true.` },
+    { tag: 'Inductive hypothesis', html: String.raw`Assume \(P(k)\) is true for one fixed \(k \ge 1\): \(\;1 + 2 + \cdots + k = \dfrac{k(k+1)}{2}\).` },
+    { tag: 'The goal', html: String.raw`Show \(P(k+1)\): \(\;1 + 2 + \cdots + k + (k+1) = \dfrac{(k+1)(k+2)}{2}\).` },
+    { tag: 'Algebra', html: String.raw`\((1 + \cdots + k) + (k+1) = \dfrac{k(k+1)}{2} + (k+1)\) <span class="muted">[by the inductive hypothesis]</span>` },
+    { tag: '', html: String.raw`\(= \)<span class="hl">\((k+1)\)</span>\(\left(\dfrac{k}{2} + 1\right)\) <span class="muted">[factor out \(k+1\)]</span>` },
+    { tag: '', html: String.raw`\(= \dfrac{(k+1)(k+2)}{2}\) — exactly the goal, so \(P(k) \to P(k+1)\).` },
+    { tag: 'Conclusion', html: String.raw`By induction, \(P(n)\) is true for every positive integer \(n\). ∎` },
+  ];
+  const EX_IND_TOTAL = 6; // dominoes in the strip
+
+  // ---- worked example: sqrt(2) is irrational, as stacked deduction lines ----
+  const EX_SQRT_ROWS = [
+    { tag: 'The assumption', html: String.raw`Suppose, for contradiction, that \(\sqrt2 = \dfrac{a}{b}\) for integers \(a, b\) with \(b \ne 0\), in <b>lowest terms</b>: \(a\) and \(b\) share no common factor bigger than \(1\).` },
+    { tag: 'Square', html: String.raw`Squaring both sides and clearing the fraction: \(\;a^2 = 2b^2\). So \(a^2\) is <b>even</b>, because it is \(2\) times the integer \(b^2\).` },
+    { tag: 'Parity', html: String.raw`An odd number squared is odd: \((2m+1)^2 = 4m^2 + 4m + 1 = 2(2m^2 + 2m) + 1\). Since \(a^2\) is even, \(a\) itself is <b>even</b>.` },
+    { tag: 'Substitute', html: String.raw`Write \(a = 2c\). Then \((2c)^2 = 2b^2\), so \(4c^2 = 2b^2\), and dividing by \(2\): \(\;b^2 = 2c^2\). Now \(b^2\) is even too.` },
+    { tag: 'Contradiction', warn: true, html: String.raw`By the same parity argument, \(b\) is <b>even</b> too. So \(a\) and \(b\) share the factor \(2\), which contradicts lowest terms.` },
+    { tag: 'Conclusion', html: String.raw`The assumption was false, so no such fraction exists: \(\sqrt2\) is <b>irrational</b>. ∎` },
+  ];
 
   DM.module({
     id: 'proofs',
@@ -5584,6 +5967,90 @@ DM.module({
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: the sum formula by induction',
+        kind: 'example',
+        id: 'ex-induction-sum',
+        problem: String.raw`<p>Prove by mathematical induction that \(1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every positive integer \(n\).</p>`,
+        steps: [
+          { lines: 1, fallen: 0, caption: 'State the claim as P(n) and name the two things induction needs: a base case and an inductive step. In the domino picture from the induction lab, the base case tips the first domino, and the inductive step is why each falling domino knocks over the next one.' },
+          { lines: 2, fallen: 1, caption: 'The base case checks n = 1 directly: the left side is 1 and the right side is 1 · 2 / 2 = 1, so the two sides agree and P(1) is true. In the picture, the first domino has fallen.' },
+          { lines: 3, fallen: 2, caption: 'Next, the inductive hypothesis: assume P(k) is true for one fixed k ≥ 1, that is, 1 + ⋯ + k = k(k+1)/2. We do not prove this line; we assume it for a single k — domino k is falling — and use it to push the next domino over.' },
+          { lines: 4, fallen: 2, caption: 'Before doing any algebra, write out the goal for k + 1: 1 + ⋯ + k + (k+1) = (k+1)(k+2)/2. Writing the target first matters because it gives every manipulation that follows a destination to aim at.' },
+          { lines: 7, fallen: 3, caption: 'The algebra is the heart of the step: group the sum as (1 + ⋯ + k) + (k+1), replace the bracket with k(k+1)/2 by the inductive hypothesis, then factor out (k+1), highlighted in the middle line, to land exactly on the goal. Domino k has knocked over domino k + 1.' },
+          { lines: 8, fallen: 6, answer: true, caption: 'Answer: by induction, 1 + 2 + ⋯ + n = n(n+1)/2 for every positive integer n, and every domino is down. Spot check at n = 5: 1 + 2 + 3 + 4 + 5 = 15 and 5 · 6 / 2 = 15, so the formula agrees with a direct count.' },
+        ],
+        answer: 'n(n+1)/2',
+        verify(M) {
+          for (let n = 1; n <= 60; n++) {
+            let s = 0;
+            for (let i = 1; i <= n; i++) s += i;
+            if (s !== (n * (n + 1)) / 2) return false;
+          }
+          for (let k = 1; k <= 60; k++) if ((k * (k + 1)) / 2 + (k + 1) !== ((k + 1) * (k + 2)) / 2) return false;
+          return true;
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const doms = [];
+          doms.push(s('line', { x1: 8, y1: 48, x2: 352, y2: 48, stroke: 'var(--ink-3)', 'stroke-width': 2 }));
+          for (let i = 0; i < EX_IND_TOTAL; i++) {
+            const down = i < step.fallen;
+            doms.push(s('rect', { class: 'domino' + (down ? ' down' : ''), x: 26 + i * 54, y: 6, width: 15, height: 42, rx: 2, fill: down ? 'var(--accent)' : 'var(--sheet)', stroke: 'var(--accent)', 'stroke-width': 2 }));
+          }
+          const strip = s('svg', { viewBox: '0 0 360 56', class: 'pf-dom', role: 'img', 'aria-label': `${step.fallen} of ${EX_IND_TOTAL} dominoes fallen`, style: { width: '100%', maxWidth: '30rem', height: '3.1rem', flex: 'none' } }, doms);
+          const rows = EX_IND_ROWS.slice(0, step.lines).map((r, i) => h('div',
+            { style: { display: 'flex', gap: '0.6rem', width: '100%', padding: '0.28rem 0.55rem', border: '1px solid var(--rule)', borderRadius: 'var(--radius)', background: i === step.lines - 1 ? 'var(--accent-2)' : 'var(--sheet)', fontSize: '0.84rem', lineHeight: 1.4, textAlign: 'left' } },
+            h('span.tiny.mono.muted', { style: { flex: '0 0 7.6rem', paddingTop: '0.15rem' } }, r.tag.toUpperCase()),
+            h('span', { style: { flex: '1 1 auto', minWidth: 0 }, html: r.html })));
+          stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%', maxWidth: '46rem', alignItems: 'center' } },
+            strip,
+            h('div.stack', { style: { gap: '0.25rem', width: '100%' } }, rows),
+            step.answer ? h('div.ex-answer', { html: String.raw`Proved: \(1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every positive integer \(n\) · check at \(n = 5\): \(1+2+3+4+5 = 15\) and \(\dfrac{5 \cdot 6}{2} = 15\) ✓` }) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: the square root of 2 is irrational',
+        kind: 'example',
+        id: 'ex-sqrt2-contradiction',
+        problem: String.raw`<p>Prove that \(\sqrt2\) is irrational: there are no integers \(a\) and \(b\) with \(b \ne 0\) and \(\sqrt2 = a/b\).</p>`,
+        steps: [
+          { lines: 1, caption: 'For contradiction, suppose sqrt(2) = a/b for integers a and b, with the fraction in lowest terms, so a and b share no common factor bigger than 1. Naming the assumption precisely matters, because the contradiction at the end is aimed exactly at the words "lowest terms".' },
+          { lines: 2, caption: 'Square both sides and clear the fraction: a squared equals 2 times b squared. That one equation is the engine of the proof, because it says a squared is even — it is 2 times the integer b squared.' },
+          { lines: 3, caption: 'So a itself is even. The reason is parity: the square of an odd number is odd, since (2m + 1) squared expands to 4m squared plus 4m plus 1, so an even square cannot come from an odd number.' },
+          { lines: 4, caption: 'Since a is even, write a = 2c and substitute: (2c) squared = 2 b squared gives 4 c squared = 2 b squared, and dividing by 2 gives b squared = 2 c squared. The same evenness has now moved from a over to b.' },
+          { lines: 5, caption: 'By the same parity argument, b is even too. But then a and b share the factor 2, which directly contradicts the lowest-terms assumption the proof started with — that clash is the point of the whole argument.' },
+          { lines: 6, answer: true, caption: 'Answer: sqrt(2) is irrational — the assumption collapses. The logic is proof by contradiction: a lowest-terms fraction forced both a and b to be even forever, an infinite descent that no lowest-terms fraction can survive, and every step used only lowest terms and basic parity.' },
+        ],
+        answer: 'irrational',
+        verify(M) {
+          let noSolution = true;
+          for (let b = 1; b <= 300 && noSolution; b++) for (let a = 1; a <= 450; a++) if (a * a === 2 * b * b) { noSolution = false; break; }
+          let parity = true;
+          for (let m = 0; m <= 200; m++) {
+            if ((2 * m + 1) * (2 * m + 1) % 2 !== 1) parity = false;
+            if ((2 * m) * (2 * m) % 2 !== 0) parity = false;
+          }
+          return noSolution && parity;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = EX_SQRT_ROWS.slice(0, step.lines).map((r, i) => h('div',
+            { style: { display: 'flex', gap: '0.6rem', width: '100%', padding: '0.28rem 0.55rem', border: '1px solid ' + (r.warn && i === step.lines - 1 ? 'var(--false)' : 'var(--rule)'), borderRadius: 'var(--radius)', background: i === step.lines - 1 ? 'var(--accent-2)' : 'var(--sheet)', fontSize: '0.84rem', lineHeight: 1.4, textAlign: 'left' } },
+            h('span.tiny.mono.muted', { style: { flex: '0 0 7.6rem', paddingTop: '0.15rem' } }, r.tag.toUpperCase()),
+            h('span', { style: { flex: '1 1 auto', minWidth: 0 }, html: r.html })));
+          const clash = step.lines >= 5 ? h('div', { style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', width: '100%', background: 'var(--false-bg)', border: '1px solid var(--false)', borderRadius: 'var(--radius)', padding: '0.35rem 0.6rem', fontSize: '0.86rem' } },
+            h('span', { html: String.raw`\(a\) is <b>even</b>` }),
+            h('span', { html: String.raw`\(b\) is <b>even</b>` }),
+            h('b', '→ shared factor 2, contradicting lowest terms')) : null;
+          stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%', maxWidth: '46rem', alignItems: 'center' } },
+            h('div.stack', { style: { gap: '0.25rem', width: '100%' } }, rows),
+            clash,
+            step.answer ? h('div.ex-answer', { html: String.raw`Answer: \(\sqrt2\) is irrational — the check: \(a^2 = 2b^2\) forced \(a\) and \(b\) both even, contradicting lowest terms, so no such fraction exists ✓` }) : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: proofs',
@@ -5959,6 +6426,30 @@ DM.module({
   // ±∞ and NaN only arise when a custom term overflows double precision (i^i^i does by i = 5)
   const plainNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? 'undefined' : x > 0 ? '∞' : '−∞');
   const texNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? '\\text{undefined}' : x > 0 ? '\\infty' : '-\\infty');
+
+  // ---- worked example: Warshall's algorithm on R = {(1, 2), (2, 3), (3, 1), (3, 4)}, precomputed once ----
+  const EX_WAR_EDGES = [[0, 1], [1, 2], [2, 0], [2, 3]]; // the pairs of R, written 0-based
+  const EX_WAR_MATS = []; // EX_WAR_MATS[p] is the matrix after pass p (pass 0 is the starting matrix)
+  const EX_WAR_NEW = []; // EX_WAR_NEW[p] lists the pairs that pass p turned on
+  {
+    let cur = range(4).map((i) => range(4).map((j) => (EX_WAR_EDGES.some(([a, b]) => a === i && b === j) ? 1 : 0)));
+    EX_WAR_MATS.push(cur);
+    EX_WAR_NEW.push([]);
+    for (let k = 0; k < 4; k++) {
+      const next = cur.map((r) => r.slice());
+      const addedPairs = [];
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (!next[i][j] && cur[i][k] && cur[k][j]) { next[i][j] = 1; addedPairs.push([i, j]); }
+      EX_WAR_MATS.push(next);
+      EX_WAR_NEW.push(addedPairs);
+      cur = next;
+    }
+  }
+  const EX_WAR_ANSWER = EX_WAR_MATS[4];
+  const EX_WAR_PAIR = ([i, j]) => `(${i + 1}, ${j + 1})`;
+
+  // ---- worked example: the equivalence relation "3 divides a - b" on {0, 1, ..., 7} ----
+  const EX_EQ_SET = [0, 1, 2, 3, 4, 5, 6, 7];
+  const EX_EQ_CLASSES = [[0, 3, 6], [1, 4, 7], [2, 5]];
 
   DM.module({
     id: 'relations',
@@ -6817,6 +7308,132 @@ DM.module({
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked examples */
+      {
+        title: 'Worked example: transitive closure by Warshall\u2019s algorithm',
+        kind: 'example',
+        id: 'ex-warshall',
+        problem: String.raw`<p>Let \(R\) be the relation on \(\{1, 2, 3, 4\}\) with pairs \((1, 2), (2, 3), (3, 1)\) and \((3, 4)\). Use Warshall's algorithm — allowing paths through one intermediate vertex at a time — to find the transitive closure of \(R\).</p>`,
+        steps: [
+          { pass: 0, k: 0, caption: 'Start with the adjacency matrix of R: a 1 in row i, column j means the pair (i, j) is present. The rule for every pass is the same: when paths may pass through vertex k, cell (i, j) turns on whenever both (i, k) and (k, j) are already on.' },
+          { pass: 1, k: 1, caption: 'Pass k = 1 lets paths step through vertex 1. Only row 3 reaches 1, and from 1 the path continues to 2, so exactly one new pair appears: (3, 2), which records the two-step path 3 → 1 → 2 as a direct pair.' },
+          { pass: 2, k: 2, caption: 'Pass k = 2 lets paths step through vertex 2, which points to 3. Rows 1 and 3 both reach 2, so (1, 3) and (3, 3) turn on: the paths 1 → 2 → 3 and 3 → 2 → 3 become direct pairs of the closure.' },
+          { pass: 3, k: 3, caption: 'Pass k = 3 is the big one, because vertex 3 now points to 1, 2, 3 and 4. Every row that reaches 3 gains all of those targets, adding (1, 1), (1, 4), (2, 1), (2, 2) and (2, 4) in a single pass.' },
+          { pass: 4, k: 4, caption: 'Pass k = 4 changes no matrix value, and the picture shows why: column 4 has 1s, so paths can arrive at 4, but row 4 is all 0s. No path can leave 4 and continue onward, so this pass adds no new pairs.' },
+          { pass: 4, k: 0, answer: true, caption: 'Answer: the closure has rows of all 1s for sources 1, 2 and 3, and an all-0 row for source 4. Check: from 1 the path 1 → 2 → 3 → 4 reaches every vertex, the same holds starting from 2 or 3, and 4 has no outgoing pair, so it reaches nothing.' },
+        ],
+        answer: EX_WAR_ANSWER,
+        verify(M) {
+          // Independent check: a plain depth-first search over the original pairs, with no Warshall passes.
+          const adj = [[1], [2], [0, 3], []];
+          const reach = [0, 1, 2, 3].map((src) => {
+            const seen = new Set();
+            const stack = adj[src].slice();
+            while (stack.length) {
+              const v = stack.pop();
+              if (seen.has(v)) continue;
+              seen.add(v);
+              for (const w of adj[v]) if (!seen.has(w)) stack.push(w);
+            }
+            return [0, 1, 2, 3].map((j) => (seen.has(j) ? 1 : 0));
+          });
+          return JSON.stringify(reach) === JSON.stringify(EX_WAR_ANSWER);
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const mat = EX_WAR_MATS[step.pass];
+          const added = step.pass ? EX_WAR_NEW[step.pass] : [];
+          const isNew = (i, j) => added.some(([a, b]) => a === i && b === j);
+          const cell = (i, j) => {
+            const attrs = {};
+            if (isNew(i, j)) attrs.class = 'cur';
+            else if (step.k && (i === step.k - 1 || j === step.k - 1)) attrs.style = { background: 'var(--accent-2)' };
+            if (!mat[i][j]) attrs.style = { ...(attrs.style || {}), color: 'var(--ink-3)' };
+            return h('td', attrs, isNew(i, j) ? h('b', '1') : String(mat[i][j]));
+          };
+          const table = h('table.tt',
+            h('thead', h('tr', h('th', 'R'), ...range(4).map((j) => h('th', step.k === j + 1 ? { class: 'cur' } : null, String(j + 1))))),
+            h('tbody', ...range(4).map((i) => h('tr', h('th', step.k === i + 1 ? { class: 'cur' } : null, String(i + 1)), ...range(4).map((j) => cell(i, j))))));
+          const svg = digraph(ctx.s, {
+            n: 4, prefix: 'exwar', size: 230, labels: ['1', '2', '3', '4'], label: 'Digraph of the relation after this pass',
+            edge: (i, j) => (mat[i][j] ? { kind: step.answer ? 'acc' : isNew(i, j) ? 'good' : 'base' } : null),
+          });
+          svg.style.width = '13rem';
+          const status = step.answer ? null
+            : step.pass === 0 ? 'No intermediate vertex is allowed yet: only the 4 given pairs are on.'
+            : added.length ? `Pass k = ${step.k}: the new pairs ${added.map(EX_WAR_PAIR).join(', ')} turn on, drawn heavier in the digraph.`
+            : `Pass k = ${step.k}: no new pairs — nothing leaves vertex 4, so no path can continue through it.`;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem' } },
+            h('div.row', { style: { gap: '1.4rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' } },
+              h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+                table,
+                h('p.tiny.muted', { style: { maxWidth: '16rem', textAlign: 'center' } }, 'Row i, column j is 1 when i reaches j by a path whose middle vertices are all allowed so far. A bold 1 on a tinted cell was added by this pass; the tinted row and column belong to the active vertex k.')),
+              svg),
+            status ? h('p.small', { style: { textAlign: 'center' } }, status) : null,
+            step.answer ? h('div.ex-answer', 'Answer: transitive closure = [[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [0, 0, 0, 0]] — check: 1 → 2 → 3 → 4 reaches every vertex from 1, and vertex 4 reaches nothing.') : null));
+        },
+      },
+      {
+        title: 'Worked example: equivalence classes mod 3',
+        kind: 'example',
+        id: 'ex-equivalence-classes',
+        problem: String.raw`<p>On the set \(\{0, 1, 2, 3, 4, 5, 6, 7\}\), define \(a \sim b\) to mean that \(3\) divides \(a - b\). Show that \(\sim\) is an equivalence relation, and find all of its equivalence classes.</p>`,
+        steps: [
+          { phase: 'setup', caption: 'Setup: a ~ b means a and b leave the same remainder when divided by 3, because 3 divides a − b exactly when the two remainders match. Each element below is labeled with its remainder mod 3, and the work ahead is to test three properties: reflexive, symmetric and transitive.' },
+          { phase: 'reflexive', caption: 'Reflexive: for every element a, the difference a − a is 0, and 3 divides 0 because 0 = 3 · 0. So every element is related to itself, which is why each chip now carries its own loop and a check mark for the first property.' },
+          { phase: 'symmetric', caption: 'Symmetric: if 3 divides a − b, then it also divides b − a, because b − a is just −(a − b) and flipping the sign keeps divisibility. The highlighted pair checks this with numbers: 4 − 1 = 3 and 1 − 4 = −3, and 3 divides both differences.' },
+          { phase: 'transitive', caption: 'Transitive: if a − b = 3m and b − c = 3n, then adding the two equations gives a − c = 3(m + n), which is a multiple of 3 again. The highlighted triple checks this: 7 − 4 = 3 and 4 − 1 = 3, so 7 − 1 = 6, and 3 divides 6.' },
+          { phase: 'classes', caption: 'With all three properties confirmed, group the elements by their remainder mod 3, putting elements that share a remainder into one box. Elements in the same box differ by a multiple of 3, so they are related to each other, and the set splits into exactly three boxes.' },
+          { phase: 'answer', answer: true, caption: 'Answer: ~ is an equivalence relation, with classes {0, 3, 6}, {1, 4, 7} and {2, 5}. Check: the classes are disjoint, their union is all 8 elements of the set, and their sizes add up as 3 + 3 + 2 = 8, so nothing is missing and nothing is counted twice.' },
+        ],
+        answer: EX_EQ_CLASSES,
+        verify(M) {
+          // Independent check: the stated classes cover 0..7 exactly once, and for all 64 pairs,
+          // "3 divides a - b" (tested with the engine's mod) agrees with "same class".
+          const flat = EX_EQ_CLASSES.flat().slice().sort((x, y) => x - y);
+          if (JSON.stringify(flat) !== JSON.stringify(EX_EQ_SET)) return false;
+          for (let a = 0; a < 8; a++) for (let b = 0; b < 8; b++) {
+            const rel = M.mod(a - b, 3) === 0;
+            const same = EX_EQ_CLASSES.some((c) => c.includes(a) && c.includes(b));
+            if (rel !== same) return false;
+          }
+          return true;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const phase = step.phase;
+          const checked = { setup: 0, reflexive: 1, symmetric: 2, transitive: 3, classes: 3, answer: 3 }[phase];
+          const highlighted = phase === 'symmetric' ? [1, 4] : phase === 'transitive' ? [7, 4, 1] : [];
+          const chip = (a) => {
+            const hl = highlighted.includes(a);
+            return h('div', { style: { border: `2px solid ${hl ? 'var(--false)' : CLASS_COLORS[a % 3]}`, borderRadius: '0.4rem', padding: '0.3rem 0.55rem', textAlign: 'center', background: hl ? 'var(--mark)' : 'var(--sheet)', minWidth: '3.4rem' } },
+              h('div', { style: { fontWeight: 700, fontSize: '1.05rem' } }, phase === 'reflexive' ? `${a} ✓` : String(a)),
+              h('div.tiny.muted', `mod 3 = ${a % 3}`),
+              phase === 'reflexive' ? h('div.tiny', `${a} ~ ${a}`) : null);
+          };
+          const classBox = (cls) => h('div', { style: { border: `2px solid ${CLASS_COLORS[cls[0] % 3]}`, borderRadius: '0.5rem', padding: '0.45rem 0.8rem', textAlign: 'center', background: 'var(--sheet)' } },
+            h('div.small.muted', `[${cls[0]}] · remainder ${cls[0] % 3}`),
+            h('div', { style: { fontWeight: 700, fontSize: '1.15rem' } }, `{${cls.join(', ')}}`));
+          const grouped = phase === 'classes' || phase === 'answer';
+          const main = grouped
+            ? h('div.row', { style: { gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' } }, ...EX_EQ_CLASSES.map(classBox))
+            : h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '34rem' } }, ...EX_EQ_SET.map(chip));
+          const prop = (name, i) => h('span', { style: { border: '1px solid var(--rule)', borderRadius: '1rem', padding: '0.15rem 0.6rem', fontWeight: i < checked ? 700 : 400, background: i < checked ? 'var(--true-bg)' : 'var(--paper)' } }, `${i < checked ? '✓' : '?'} ${name}`);
+          const info = {
+            setup: 'Three properties to test: reflexive, symmetric and transitive. Passing all three is what makes ~ an equivalence relation.',
+            reflexive: 'For every a: a − a = 0 = 3 · 0, so 3 divides 0 and a ~ a. The first property holds for all 8 elements at once.',
+            symmetric: 'Highlighted check: 1 ~ 4 because 4 − 1 = 3. Reversed, 1 − 4 = −3, which is −(4 − 1), and 3 divides −3 as well, so 4 ~ 1.',
+            transitive: 'Highlighted check: 7 ~ 4 and 4 ~ 1, since 7 − 4 = 3 and 4 − 1 = 3. Adding the differences gives 7 − 1 = 6 = 3 + 3, so 7 ~ 1.',
+            classes: 'One box per remainder: remainder 0, remainder 1 and remainder 2. Every element of the set lands in exactly one box.',
+            answer: '',
+          }[phase];
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.55rem', maxWidth: '58rem' } },
+            main,
+            h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' } }, prop('Reflexive', 0), prop('Symmetric', 1), prop('Transitive', 2)),
+            info ? h('p.small', { style: { textAlign: 'center' } }, info) : null,
+            step.answer ? h('div.ex-answer', 'Answer: ~ is an equivalence relation with classes {0, 3, 6}, {1, 4, 7}, {2, 5} — check: the classes are disjoint, their union is all 8 elements, and 3 + 3 + 2 = 8.') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: functions, sequences and relations',
@@ -7125,6 +7742,18 @@ bsearch(s, i, j, key) {     // search s[i..j]
     }
     return st;
   }
+
+  // ---- worked-example data, computed once ----
+  const EX_BIN_LIST = [3, 7, 12, 19, 25, 31, 42, 56];
+  const EX_INS_INPUT = [5, 2, 4, 6, 1, 3];
+  const EX_INS_STATES = [
+    [5, 2, 4, 6, 1, 3],
+    [2, 5, 4, 6, 1, 3],
+    [2, 4, 5, 6, 1, 3],
+    [2, 4, 5, 6, 1, 3],
+    [1, 2, 4, 5, 6, 3],
+    [1, 2, 3, 4, 5, 6],
+  ];
 
   // ---- sorting, as lists of snapshots so the lab can step forward and back ----
   function insEvents(arr) {
@@ -7907,6 +8536,116 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: binary search for 31',
+        kind: 'example',
+        id: 'ex-binary-search',
+        problem: String.raw`<p>Use binary search to find 31 in the sorted list \([3, 7, 12, 19, 25, 31, 42, 56]\), showing \(lo\), \(hi\) and \(mid\) at every probe. Indices start at 0, and \(mid = \lfloor (lo + hi)/2 \rfloor\).</p>`,
+        steps: [
+          { probe: 0, lo: 0, hi: 7, mid: -1, out: -1, found: false, confirm: false, caption: 'Setup: the list [3, 7, 12, 19, 25, 31, 42, 56] is sorted and the target is 31, with lo = 0 and hi = 7 marking the whole range as still possible. Binary search needs a sorted list and works by ruling out half of what remains with each probe — that halving is where the speed comes from.' },
+          { probe: 1, lo: 0, hi: 7, mid: 3, out: 3, found: false, confirm: false, caption: 'First probe: mid = (0 + 7) // 2 = 3 and list[3] = 19, and since 19 < 31 the target, if present, is strictly to the right of mid. Cells 0 to 3 are ruled out — mid itself goes too, because we just compared it and it was too small — so lo becomes 4.' },
+          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: false, caption: 'Second probe: with lo = 4 and hi = 7, mid = (4 + 7) // 2 = 5 and list[5] = 31, which equals the target exactly. The search stops at once, because an equal probe is the success case and no smaller range needs to be checked.' },
+          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: true, caption: 'Confirm the hit before reporting it: index 5 lies inside the narrowed range from lo = 4 to hi = 7, and the value stored there is exactly 31. Checking the index and the value together guards against reporting a position produced by an arithmetic slip.' },
+          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: true, answer: true, caption: 'Answer: 31 is at index 5, found in only 2 probes where linear search could need up to 8. Check: the list really is sorted and list[5] = 31, and each probe at most halves the candidates, going from 8 candidates to 4 and then to the found cell.' },
+        ],
+        answer: 5,
+        verify(M) {
+          const a = [3, 7, 12, 19, 25, 31, 42, 56];
+          const sorted = a.every((x, i) => i === 0 || a[i - 1] < x);
+          let lo = 0, hi = a.length - 1, probes = 0, found = -1;
+          while (lo <= hi) {
+            const mid = Math.floor((lo + hi) / 2);
+            probes++;
+            if (a[mid] === 31) { found = mid; break; }
+            if (a[mid] < 31) lo = mid + 1; else hi = mid - 1;
+          }
+          return a.indexOf(31) === 5 && sorted && found === 5 && probes === 2 && a[5] === 31 && EX_BIN_LIST[5] === 31;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const status = step.probe === 0
+            ? 'Target 31 · lo = 0 · hi = 7 · all 8 values are still candidates'
+            : step.probe === 1
+              ? 'Probe 1: mid = 3 · list[3] = 19 < 31 · indices 0–3 ruled out · lo moves to 4'
+              : step.confirm
+                ? 'Probe 2: mid = 5 · list[5] = 31 = target · found — now confirm it'
+                : 'Probe 2: lo = 4 · hi = 7 · mid = 5 · list[5] = 31 = target · found';
+          const tagFor = (i) => {
+            if (step.found && i === step.mid) return 'mid · found ★';
+            if (i === step.mid) return 'mid';
+            if (i <= step.out) return 'ruled out';
+            if (i === step.lo) return 'lo';
+            if (i === step.hi) return 'hi';
+            return ' ';
+          };
+          const clsFor = (i) => (step.found && i === step.mid ? 'm5-cell found' : i === step.mid ? 'm5-cell cur' : i <= step.out ? 'm5-cell out' : 'm5-cell');
+          const cells = EX_BIN_LIST.map((v, i) => h('div', { class: clsFor(i), style: { flex: '1 1 0', minWidth: '2rem' } },
+            String(v), h('small', `index ${i}`), h('small', tagFor(i))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: 'min(46rem, 100%)' } },
+            h('div.small', h('b.mono', status)),
+            h('div', { style: { display: 'flex', gap: '0.35rem', width: '100%' } }, ...cells),
+            h('p.small.muted', step.probe === 0
+              ? 'The labels under the cells name the two ends of the range still in play: lo on the left and hi on the right.'
+              : step.probe === 1
+                ? 'Dimmed cells are ruled out: no later probe will look at indices 0 to 3 again.'
+                : 'Dimmed cells stay ruled out, and the starred cell is the probe that matched the target.'),
+            step.confirm && !step.answer ? h('p.small', 'Confirm: index 5 is between lo = 4 and hi = 7, and list[5] = 31 exactly ✓') : null,
+            step.answer ? h('div.ex-answer', 'Answer: 31 is at index 5 · check: the list is sorted, list[5] = 31, and the search took only 2 probes ✓') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: insertion sort, pass by pass',
+        kind: 'example',
+        id: 'ex-insertion-sort',
+        problem: String.raw`<p>Sort \([5, 2, 4, 6, 1, 3]\) with insertion sort, one pass per step, growing a sorted prefix from the left and sliding each new key into its place.</p>`,
+        steps: [
+          { pass: 0, keyPos: -1, sorted: 1, stays: false, caption: 'Setup: start with [5, 2, 4, 6, 1, 3], where the sorted prefix is just [5] because a single item is always in order by itself. Insertion sort grows that sorted prefix one key at a time, inserting each new key into its place — like sorting a hand of cards.' },
+          { pass: 1, keyPos: 0, sorted: 2, stays: false, caption: 'Pass 1 takes the key 2 from index 1: 2 is smaller than 5, so it slides left past 5 and lands at the front of the list. The list becomes [2, 5, 4, 6, 1, 3] and the sorted prefix grows to [2, 5].' },
+          { pass: 2, keyPos: 1, sorted: 3, stays: false, caption: 'Pass 2 takes the key 4: 4 is smaller than 5, so it moves left once, but it is not smaller than 2, so it stops right there. The list becomes [2, 4, 5, 6, 1, 3] and the sorted prefix grows to [2, 4, 5].' },
+          { pass: 3, keyPos: 3, sorted: 4, stays: true, caption: 'Pass 3 takes the key 6: 6 is not smaller than 5, the last item of the sorted prefix, so it does not move at all and stays at index 3. The list is unchanged, [2, 4, 5, 6, 1, 3], but the sorted prefix still grows to include that staying 6.' },
+          { pass: 4, keyPos: 0, sorted: 5, stays: false, caption: 'Pass 4 takes the key 1: it is smaller than 6, 5, 4 and 2 in turn, so it slides left past all four of them to the very front. The list becomes [1, 2, 4, 5, 6, 3] and only the last item is still outside the sorted prefix.' },
+          { pass: 5, keyPos: 2, sorted: 6, stays: false, caption: 'Pass 5 takes the key 3: it is smaller than 6, 5 and 4, so it slides left past those three, but it is not smaller than 2, so it stops at index 2. The list becomes [1, 2, 3, 4, 5, 6] and the sorted prefix now covers the whole list.' },
+          { pass: 5, keyPos: -1, sorted: 6, stays: false, answer: true, caption: 'Answer: the sorted list is [1, 2, 3, 4, 5, 6], in ascending order at every neighboring pair. Check: it is the same multiset as the input — both lists have 6 elements and both sum to 21, so nothing was lost, added or duplicated while sorting.' },
+        ],
+        answer: [1, 2, 3, 4, 5, 6],
+        verify(M) {
+          const input = [5, 2, 4, 6, 1, 3];
+          const ans = [1, 2, 3, 4, 5, 6];
+          const sorted = M.sortNum(input);
+          const same = sorted.length === ans.length && sorted.every((x, i) => x === ans[i]);
+          const nondec = ans.every((x, i) => i === 0 || ans[i - 1] <= x);
+          const sum = (arr) => arr.reduce((t, x) => t + x, 0);
+          return same && nondec && sum(ans) === 21 && sum(ans) === sum(input) && EX_INS_STATES[5].every((x, i) => x === ans[i]) && EX_INS_INPUT.every((x, i) => x === input[i]);
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const a = EX_INS_STATES[step.pass];
+          const status = step.answer
+            ? 'All 5 passes done · the sorted prefix covers the whole list'
+            : step.pass === 0
+              ? 'Input [5, 2, 4, 6, 1, 3] · sorted prefix: [5] · 5 passes to go'
+              : `Pass ${step.pass} of 5 · key = ${a[step.keyPos]} · sorted prefix: [${a.slice(0, step.sorted).join(', ')}]${step.stays ? ' · the key stays in place' : ''}`;
+          const cells = a.map((v, i) => {
+            const isKey = i === step.keyPos;
+            const inSorted = i < step.sorted;
+            const tag = isKey && step.stays ? 'key · stays' : isKey ? 'key' : inSorted ? 'sorted' : 'waiting';
+            const style = { flex: '1 1 0', minWidth: '2.4rem', ...(isKey ? { transform: 'translateY(-6px)' } : {}), ...(inSorted && !isKey ? { background: 'var(--accent-2)' } : {}) };
+            return h('div', { class: isKey ? 'm5-cell cur' : 'm5-cell', style },
+              String(v), h('small', `index ${i}`), h('small', tag));
+          });
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: 'min(40rem, 100%)' } },
+            h('div.small', h('b.mono', status)),
+            h('div', { style: { display: 'flex', gap: '0.35rem', width: '100%', paddingTop: '0.4rem' } }, ...cells),
+            h('p.small.muted', step.pass === 0
+              ? 'Cells tagged “sorted” form the prefix that is already in order; the raised cell in later steps is the key being inserted.'
+              : step.stays
+                ? 'Nothing moved this pass — the change is the marker: 6 joined the sorted prefix exactly where it already stood.'
+                : 'Cells tagged “sorted” form the prefix that is already in order, and the raised cell is the key that was just placed.'),
+            step.answer ? h('div.ex-answer', 'Answer: [1, 2, 3, 4, 5, 6] · check: 6 items summing to 21, exactly like the input, and every neighboring pair is in ascending order ✓') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: algorithms and their analysis',
@@ -8048,6 +8787,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
   const egcd = (a, b) => { let [r0, r1, s0, s1, t0, t1] = [a, b, 1, 0, 0, 1]; while (r1) { const q = Math.floor(r0 / r1); [r0, r1] = [r1, r0 - q * r1]; [s0, s1] = [s1, s0 - q * s1]; [t0, t1] = [t1, t0 - q * t1]; } return [r0, s0, t0]; };
   const inverse = (a, n) => { const [g, s] = egcd(mod(a, n), n); return g === 1 ? mod(s, n) : null; };
   const euclidRows = (a, b) => { const rows = []; while (b !== 0) { const q = Math.floor(a / b), r = a - q * b; rows.push({ a, b, q, r }); [a, b] = [b, r]; } return { rows, g: a }; };
+  const EX_GCD = euclidRows(252, 198); // the worked example below, computed once: 4 division rows, gcd 18
   const neg = (x) => String(x).replace('-', '−'); // typographic minus for plain text
   const par = (x) => (x < 0 ? `(${x})` : String(x)); // parenthesize negatives inside TeX
   const DIG = '0123456789ABCDEF';
@@ -9013,6 +9753,85 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: Euclid\u2019s algorithm for gcd(252, 198)',
+        kind: 'example',
+        id: 'ex-euclid-gcd',
+        problem: String.raw`<p>Use Euclid's algorithm to find \(\gcd(252, 198)\), showing every division.</p>`,
+        steps: [
+          { shown: 0, caption: 'The plan: replace the pair (a, b) by (b, the remainder when a is divided by b). The gcd survives every replacement, because any common divisor of a and b also divides that remainder — and the numbers shrink each time, so the process must stop.' },
+          { shown: 1, caption: '252 = 1 · 198 + 54. One copy of 198 fits into 252 and 54 is left over, so gcd(252, 198) = gcd(198, 54): the same question about smaller numbers.' },
+          { shown: 2, caption: '198 = 3 · 54 + 36. Three copies of 54 fit into 198, leaving 36, so gcd(198, 54) = gcd(54, 36). Each step keeps only the remainder, which is why the algorithm is fast.' },
+          { shown: 3, caption: '54 = 1 · 36 + 18. One copy of 36 fits, leaving 18, so gcd(54, 36) = gcd(36, 18). The remainder is now smaller than the number we will divide by next.' },
+          { shown: 4, caption: '36 = 2 · 18 + 0. This time 18 fits exactly and nothing is left over. A remainder of 0 is the stop signal: dividing further is impossible, and the last nonzero remainder is the answer.' },
+          { shown: 4, answer: true, caption: 'Answer: gcd(252, 198) = 18. Check: 252 = 18 · 14 and 198 = 18 · 11, so 18 divides both numbers — and 14 and 11 share no factor bigger than 1, so no number larger than 18 can divide both. That confirms 18 is the greatest common divisor.' },
+        ],
+        answer: 18,
+        verify(M) { return M.gcd(252, 198) === 18 && EX_GCD.g === 18 && 252 % 18 === 0 && 198 % 18 === 0 && M.gcd(14, 11) === 1; },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = EX_GCD.rows.slice(0, step.shown).map((r, i) => h('tr', { class: i === step.shown - 1 && !step.answer ? 'hit' : '' },
+            h('td', String(r.a)), h('td', String(r.q)), h('td', String(r.b)), h('td', String(r.r)),
+            h('td.l.mono', `${r.a} = ${r.q} · ${r.b} + ${r.r}`)));
+          const pair = step.shown === 0 ? 'gcd(252, 198) = ?' : step.answer ? 'gcd(252, 198) = 18' : `gcd(${EX_GCD.rows[step.shown - 1].b}, ${EX_GCD.rows[step.shown - 1].r})`;
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            h('div.big-math.mono', pair),
+            rows.length ? h('table.tt', h('thead', h('tr', h('th', 'a'), h('th', 'q'), h('th', 'b'), h('th', 'r'), h('th.l', 'division'))), h('tbody', rows)) : h('p.small.muted', 'No divisions yet — press Step to divide.'),
+            step.answer ? h('div.ex-answer', 'gcd(252, 198) = 18 · check: 18 · 14 = 252 and 18 · 11 = 198, with gcd(14, 11) = 1') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: the inverse of 7 modulo 26',
+        kind: 'example',
+        id: 'ex-mod-inverse',
+        problem: String.raw`<p>Find the modular inverse of \(7\) modulo \(26\) — the number \(x\) with \(7x \equiv 1 \pmod{26}\) — by running Euclid's algorithm forward and then back-substituting.</p>`,
+        steps: [
+          { lines: 0, phase: 'setup', caption: 'Setup: an inverse of 7 modulo 26 is a number x with 7x ≡ 1 (mod 26), and it can exist only because gcd(7, 26) = 1. The plan is to run Euclid forward to remainder 1, then work backward to write 1 as a combination of 26 and 7.' },
+          { lines: 3, phase: 'forward', caption: 'Forward pass: 26 = 3 · 7 + 5, then 7 = 1 · 5 + 2, then 5 = 2 · 2 + 1, so the three division lines are now on the page. We run Euclid only until remainder 1 appears, because 1 is exactly the number the backward pass has to express.' },
+          { lines: 4, phase: 'back', caption: 'Back-substitution starts by rearranging the last division, 5 = 2 · 2 + 1, into 1 = 5 − 2 · 2. Every backward step replaces a remainder by the expression the forward pass gave for it, so the value stays equal to 1 throughout.' },
+          { lines: 5, phase: 'back', caption: 'Replace the remainder 2 by 7 − 1 · 5, giving 1 = 5 − 2(7 − 5) = 3 · 5 − 2 · 7 after the terms in 5 are collected. The highlighted piece is the substitution itself, and now only the remainders 5 and 7 remain in the expression.' },
+          { lines: 6, phase: 'back', caption: 'Replace the remainder 5 by 26 − 3 · 7, giving 1 = 3(26 − 3 · 7) − 2 · 7 = 3 · 26 − 11 · 7. The highlighted piece is this second substitution, and now 1 is written using only the original numbers 26 and 7.' },
+          { lines: 7, phase: 'read', caption: 'Read off the inverse: modulo 26 the term 3 · 26 is 0, so −11 · 7 ≡ 1 (mod 26) and the coefficient of 7 is the inverse, still in negative form. Adding 26 turns −11 into the standard residue 15, because residues are named by a number from 0 to 25.' },
+          { lines: 7, phase: 'answer', answer: true, caption: 'Answer: 7⁻¹ ≡ 15 (mod 26). Check: 7 · 15 = 105 = 4 · 26 + 1, so 105 ≡ 1 (mod 26) and the inverse works, with no smaller positive candidate left to test because an inverse modulo n is unique when it exists.' },
+        ],
+        answer: 15,
+        verify(M) {
+          const [g, s, t] = egcd(7, 26);
+          const fwd = euclidRows(26, 7);
+          let count = 0, found = null;
+          for (let x = 1; x < 26; x++) if (M.mod(7 * x, 26) === 1) { count++; found = x; }
+          return M.mod(7 * 15, 26) === 1 && inverse(7, 26) === 15 && g === 1 && s * 7 + t * 26 === g && M.mod(s, 26) === 15 && fwd.g === 1 && fwd.rows.length === 4 && count === 1 && found === 15;
+        },
+        draw(stage, ctx, step, k) {
+          const { h } = ctx;
+          const fwd = euclidRows(26, 7).rows.slice(0, 3).map((r) => `${r.a} = ${r.q} · ${r.b} + ${r.r}`);
+          const all = [
+            { tag: 'Forward', parts: [[fwd[0], false]] },
+            { tag: 'Forward', parts: [[fwd[1], false]] },
+            { tag: 'Forward', parts: [[fwd[2], false]] },
+            { tag: 'Back', parts: [['1 = 5 − 2 · 2', false]] },
+            { tag: 'Back', parts: [['1 = 5 − 2', false], ['(7 − 5)', true], [' = 3 · 5 − 2 · 7', false]] },
+            { tag: 'Back', parts: [['1 = 3', false], ['(26 − 3 · 7)', true], [' − 2 · 7 = 3 · 26 − 11 · 7', false]] },
+            { tag: 'Read off', parts: [['−11 · 7 ≡ 1 (mod 26), and −11 + 26 = 15', false]] },
+          ];
+          const shown = all.slice(0, step.lines);
+          const lineEls = shown.map((ln, i) => {
+            const isNew = i === shown.length - 1 && !step.answer;
+            return h('div.mono', { style: { fontSize: '0.9rem', lineHeight: 1.35, padding: '0.14rem 0.5rem', borderRadius: '0.35rem', ...(isNew ? { background: 'var(--accent-2)', fontWeight: 700 } : {}) } },
+              h('span.tiny.muted', { style: { marginRight: '0.55rem' } }, ln.tag),
+              ...ln.parts.map(([txt, hl]) => (hl ? h('span.hl', txt) : txt)));
+          });
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem', maxWidth: '46rem', width: '100%' } },
+            h('div.big-math.mono', '7x ≡ 1 (mod 26)'),
+            step.lines === 0
+              ? h('div.small.muted', { style: { border: '1px dashed var(--rule)', borderRadius: 'var(--radius)', padding: '0.5rem 0.8rem', textAlign: 'center' } }, 'Forward work will appear here: divide 26 by 7, then keep dividing remainders until 1 appears.')
+              : h('div.stack', { style: { gap: '0.12rem', alignItems: 'stretch' } }, ...lineEls),
+            step.phase === 'read' || step.answer ? h('div.small', 'Modulo 26, the term 3 · 26 counts as 0, so only −11 · 7 remains.') : null,
+            step.answer ? h('div.ex-answer', '7⁻¹ ≡ 15 (mod 26) · check: 7 · 15 = 105 = 4 · 26 + 1, so 105 ≡ 1 (mod 26)') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: integers and number theory',
@@ -9188,6 +10007,22 @@ bsearch(s, i, j, key) {     // search s[i..j]
 
   // a small static Pascal triangle for the concept slide (rows 0..6)
   const miniTri = Array.from({ length: 7 }, (_, n) => `<div class="ct-trirow"><span class="ct-rl">${n}</span>${Array.from({ length: n + 1 }, (_, k) => `<span>${C(n, k)}</span>`).join('')}</div>`).join('');
+
+  // ---- worked example data: the ordered picks of 3 of {A, B, C, D}, and the committees they collapse to ----
+  const EX_MEMBERS = ['A', 'B', 'C', 'D'];
+  const EX_PERMS = perms(4, 3).map((ix) => ix.map((i) => EX_MEMBERS[i]).join('')); // all 24 ordered triples, in lexicographic order
+  const EX_GROUPS = combos(4, 3).map((ix) => { // the 4 committees, each with its 3! = 6 orders
+    const mem = ix.map((i) => EX_MEMBERS[i]);
+    return { set: `{${mem.join(', ')}}`, name: mem.join(''), orders: perms(3, 3).map((pp) => pp.map((j) => mem[j]).join('')) };
+  });
+  const EX_ABC_ORDERS = EX_GROUPS[0].orders; // ABC, ACB, BAC, BCA, CAB, CBA
+
+  // ---- worked example data: Pascal's triangle down to row 5, built by the addition rule ----
+  const EX_TRI = (() => {
+    const rows = [[1]];
+    for (let n = 1; n <= 5; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
+    return rows;
+  })();
 
   DM.module({
     id: 'counting',
@@ -9902,6 +10737,102 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: ordered picks collapse into committees',
+        kind: 'example',
+        id: 'ex-choose-collapse',
+        problem: String.raw`<p>A club has 4 members: A, B, C and D. How many different 3-person committees can the club form from these 4 members, that is, what is \(C(4, 3)\)?</p>`,
+        steps: [
+          { phase: 0, head: 'PICK 1 OF 3 · ORDERED PICKS, ON PURPOSE', note: 'First pick: 4 options — A, B, C or D.', caption: 'We count ordered picks on purpose first, even though a committee has no order. The first pick has 4 options, one for each member A, B, C and D, and the tree starts with those 4 branches.' },
+          { phase: 1, head: 'PICK 2 OF 3 · EACH BRANCH SPLITS INTO 3', note: 'After two picks: 4 × 3 = 12 partial picks.', caption: 'Each first pick splits into the 3 members still left, because nobody can be picked twice. The product rule multiplies the stages, so there are now 4 × 3 = 12 partial picks.' },
+          { phase: 2, head: 'PICK 3 OF 3 · ALL 24 LEAVES', note: 'Ordered triples: 4 × 3 × 2 = 24 = P(4, 3).', caption: 'Each partial pick splits once more into the 2 members still left, and the tree stops at full triples. The product rule gives 4 × 3 × 2 = 24 ordered picks, which is exactly P(4, 3).' },
+          { phase: 3, head: 'ONE COMMITTEE, SIX LEAVES', note: 'Highlighted: the 6 orders of {A, B, C}.', caption: 'Look at the highlighted leaves: ABC, ACB, BAC, BCA, CAB and CBA are six different leaves but one and the same committee. Every committee is counted exactly 3! = 6 times this way, once for each order of its 3 members.' },
+          { phase: 4, head: 'DIVIDE BY THE OVERCOUNT', note: '24 ordered picks ÷ 6 orders per committee = 4 committees.', caption: 'Since every committee was counted the same number of times, dividing undoes the overcount fairly. There are 24 / 6 = 4 committees, and the leaves now sit in 4 groups, one group per committee.' },
+          { phase: 5, head: 'THE 4 COMMITTEES', note: 'Each committee listed once, with no order inside a committee.', caption: 'Answer: C(4, 3) = 4, and the committees are ABC, ABD, ACD and BCD. Check with the formula: 4! / (3! · 1!) = 24 / 6 = 4, which matches the explicit list of exactly 4 committees.', answer: true },
+        ],
+        answer: 4,
+        verify(M) {
+          let count = 0; const seen = [];
+          const mem = ['A', 'B', 'C', 'D'];
+          for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) for (let k = j + 1; k < 4; k++) { count++; seen.push(mem[i] + mem[j] + mem[k]); }
+          return M.C(4, 3) === 4 && count === 4 && seen.join(' ') === 'ABC ABD ACD BCD' && (4 * 3 * 2) / M.fact(3) === 4 && EX_PERMS.length === 24 && EX_GROUPS.length === 4;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const chip = (txt, mode) => h('span.mono', { style: { display: 'inline-block', fontSize: mode === 'big' ? '1rem' : mode === 'tiny' ? '0.72rem' : '0.82rem', fontWeight: mode === 'hot' || mode === 'big' ? 700 : 400, border: mode === 'hot' ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: mode === 'tiny' ? '0.02rem 0.28rem' : '0.08rem 0.42rem', background: mode === 'hot' ? 'var(--mark)' : 'var(--sheet)', opacity: mode === 'dim' ? 0.5 : 1 } }, txt);
+          const noteLine = h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, step.note);
+          const head = h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, step.head);
+          let body = null;
+          if (step.phase === 0) {
+            body = h('div.stack', { style: { alignItems: 'center', gap: '0.5rem' } },
+              h('div.big-math', 'Club {A, B, C, D}'),
+              h('div.small.muted', 'Pick a first member for the tree (the order will be removed later):'),
+              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_MEMBERS.map((m) => chip(m, 'big'))),
+              h('div.small', '4 branches leave the root, one per member.'));
+          } else if (step.phase === 1) {
+            body = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' } },
+              EX_MEMBERS.map((first) => h('div', { style: { border: '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--sheet)', textAlign: 'center' } },
+                h('div.tiny.mono.muted', `first pick ${first}, then`),
+                h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', marginTop: '0.25rem' } }, EX_MEMBERS.filter((x) => x !== first).map((second) => chip(first + second, ''))))));
+          } else if (step.phase === 2 || step.phase === 3) {
+            const hot = new Set(EX_ABC_ORDERS);
+            body = h('div.stack', { style: { gap: '0.3rem', alignItems: 'center' } },
+              EX_MEMBERS.map((first) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } },
+                h('span.tiny.mono.muted', { style: { width: '1.2rem', textAlign: 'right' } }, first),
+                EX_PERMS.filter((p) => p[0] === first).map((p) => chip(p, step.phase === 3 ? (hot.has(p) ? 'hot' : 'dim') : '')))),
+              step.phase === 3 ? h('div.small', { style: { textAlign: 'center' } }, 'ABC, ACB, BAC, BCA, CAB, CBA — six leaves, one committee: {A, B, C}.') : h('div.small', '24 leaves, and every leaf is one ordered triple.'));
+          } else if (step.phase === 4) {
+            body = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' } },
+              EX_GROUPS.map((g) => h('div', { style: { border: '2px solid var(--accent)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--accent-2)', textAlign: 'center', maxWidth: '14rem' } },
+                h('div.mono', { style: { fontWeight: 700 } }, g.set),
+                h('div.row', { style: { gap: '0.25rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.25rem' } }, g.orders.map((o) => chip(o, 'tiny'))))));
+          } else {
+            body = h('div.stack', { style: { alignItems: 'center', gap: '0.5rem' } },
+              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_GROUPS.map((g) => chip(g.set, 'big'))),
+              h('div.small', { style: { textAlign: 'center' } }, 'Formula: C(4, 3) = 4! / (3! · 1!) = 24 / 6 = 4.'),
+              h('div.ex-answer', 'Answer: C(4, 3) = 4 committees — ABC, ABD, ACD, BCD. Check: 4! / (3! · 1!) = 4 and the explicit list has exactly 4 entries.'));
+          }
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } }, head, body, noteLine));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: building Pascal\u2019s triangle to find C(5, 2)',
+        kind: 'example',
+        id: 'ex-pascal-build',
+        problem: String.raw`<p>Build Pascal's triangle down to row 5, one row at a time. Then use the finished triangle to find \(C(5, 2)\), the number of ways to choose 2 books from a set of 5 books.</p>`,
+        steps: [
+          { rows: 2, focus: [], parents: [], note: 'Rows 0 and 1 in place: 1 / 1 1. Edges are always 1.', caption: 'Rows 0 and 1 are already in place: a single 1, then 1 and 1. Every later entry is the sum of the two entries above it, and the edges stay 1 because there is exactly one way to choose all of a set or none of it.' },
+          { rows: 3, focus: [[2, 1]], parents: [[1, 0], [1, 1]], note: 'Row 2: the middle entry is 2 = 1 + 1, from its two parents in row 1.', caption: 'Row 2 appears as 1, 2, 1, and its middle entry is the first one that must be computed. It comes from its two parents in row 1: 2 = 1 + 1, while the two edge entries are copied down as 1.' },
+          { rows: 4, focus: [[3, 1]], parents: [[2, 0], [2, 1]], note: 'Row 3: the marked entry is 3 = 1 + 2, from the parents 1 and 2 in row 2.', caption: 'Row 3 appears as 1, 3, 3, 1, built by adding neighboring pairs from row 2. The marked entry shows the pattern clearly: 3 = 1 + 2, the sum of the entry above-left and the entry above-right.' },
+          { rows: 5, focus: [[4, 2]], parents: [[3, 1], [3, 2]], note: 'Row 4: the middle entry is 6 = 3 + 3, and it is C(4, 2).', caption: 'Row 4 appears as 1, 4, 6, 4, 1, and its middle entry is worth remembering. It is 6 = 3 + 3 from the two 3s above it, and it is C(4, 2), the count for choosing 2 of 4.' },
+          { rows: 6, focus: [[5, 2]], parents: [[4, 1], [4, 2]], note: 'Row 5: C(5, 2) is the third entry, 10 = 4 + 6 from its parents in row 4.', caption: 'Row 5 appears as 1, 5, 10, 10, 5, 1, completing the triangle we need. The marked third entry is C(5, 2), and it comes from its parents 4 and 6 in row 4: 10 = 4 + 6.' },
+          { rows: 6, focus: [[5, 2], [5, 3]], parents: [[4, 1], [4, 2]], note: 'Row 5 sums to 1 + 5 + 10 + 10 + 5 + 1 = 32 = 2^5, one subset count per entry.', caption: 'Answer: C(5, 2) = 10, so there are 10 ways to choose 2 books from 5. Check with factorials: 5! / (2! · 3!) = 120 / 12 = 10, and symmetry gives the same 10 at C(5, 3), the mirrored entry in row 5.', answer: true },
+        ],
+        answer: 10,
+        verify(M) {
+          const rows = [[1]];
+          for (let n = 1; n <= 5; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
+          return M.C(5, 2) === 10 && 120 / (2 * 6) === 10 && M.fact(5) / (M.fact(2) * M.fact(3)) === 10 && rows[5].join(',') === '1,5,10,10,5,1' && rows[5].reduce((a, b) => a + b, 0) === 32 && M.C(5, 3) === 10 && EX_TRI[5].join(',') === '1,5,10,10,5,1';
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const has = (list, n, k) => list.some(([a, b]) => a === n && b === k);
+          const tri = EX_TRI.slice(0, step.rows).map((row, n) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' } },
+            h('span.tiny.mono.muted', { style: { width: '3rem', textAlign: 'right' } }, `row ${n}`),
+            row.map((v, k) => {
+              const foc = has(step.focus, n, k), par = has(step.parents, n, k), isNew = n === step.rows - 1 && !step.answer;
+              return h('span.mono', { style: { display: 'inline-block', minWidth: '2.1rem', textAlign: 'center', fontSize: '0.95rem', fontWeight: foc || par || isNew ? 700 : 400, border: foc ? '2px solid var(--ink)' : par ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: '0.1rem 0.2rem', background: foc ? 'var(--mark)' : par ? 'var(--accent-2)' : 'var(--sheet)', boxShadow: par ? '0 0 0 2px var(--accent)' : 'none' } }, String(v));
+            }),
+            h('span.tiny.mono.muted', { style: { width: '3rem' } }, n === step.rows - 1 && step.rows > 2 ? 'new' : '')));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, 'PASCAL\u2019S TRIANGLE · EACH ENTRY = SUM OF THE TWO ABOVE IT'),
+            h('div.stack', { style: { gap: '0.25rem', alignItems: 'center' } }, tri),
+            h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, step.note),
+            step.answer ? h('div.ex-answer', 'Answer: C(5, 2) = 10 ways to choose 2 books from 5. Check: 5! / (2! · 3!) = 120 / 12 = 10, and C(5, 3) = 10 is the same 10 mirrored in row 5.') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: counting and the Binomial Theorem',
@@ -10117,6 +11048,20 @@ bsearch(s, i, j, key) {     // search s[i..j]
   const fibs = [0, 1];
   while (fibs.length < 60) fibs.push(fibs[fibs.length - 1] + fibs[fibs.length - 2]);
   const pow2s = (x) => ({ 0: '1', 0.5: '√n', 1: 'n', 1.5: 'n√n', 2: 'n²', 3: 'n³', 4: 'n⁴' })[x];
+
+  // ---- worked-example data, computed once in module scope ----
+  // Optimal 3-disk Hanoi moves as [disk, from peg, to peg] with pegs A = 0, B = 1, C = 2.
+  const EX_HANOI_MOVES = [[1, 0, 2], [2, 0, 1], [1, 2, 1], [3, 0, 2], [1, 1, 0], [2, 1, 2], [1, 0, 2]];
+  // The 8 states of that solution: peg contents (bottom disk first) before the first move and after each move.
+  const EX_HANOI_STATES = (() => {
+    const pegs = [[3, 2, 1], [], []];
+    const states = [pegs.map((p) => [...p])];
+    for (const [, from, to] of EX_HANOI_MOVES) { pegs[to].push(pegs[from].pop()); states.push(pegs.map((p) => [...p])); }
+    return states;
+  })();
+  // First terms of a(n) = 2a(n-1) + 1 with a0 = 0, iterated once here: 0, 1, 3, 7, 15.
+  const EX_REC_TERMS = [0];
+  for (let i = 1; i <= 4; i++) EX_REC_TERMS.push(2 * EX_REC_TERMS[i - 1] + 1);
 
   // Compare the entered decimal values exactly before using floating-point roots.
   // An epsilon would erase deliberately small nonzero contributions as well as noise.
@@ -11055,6 +12000,115 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: Tower of Hanoi in 7 moves',
+        kind: 'example',
+        id: 'ex-hanoi-moves',
+        problem: String.raw`<p>The Tower of Hanoi starts with 3 disks on peg A, largest at the bottom, and no disk may ever rest on a smaller one. List and picture every move of the fastest solution that transfers the whole tower to peg C, and count the moves.</p>`,
+        steps: [
+          { mv: 0, caption: 'All three disks start on peg A, largest at the bottom, and the goal is the same tower on peg C. To free the largest disk, the two smaller disks above it must first become one tower on the spare peg B.' },
+          { mv: 1, caption: 'Move 1: disk 1 goes from A to C, because the smallest disk is uncovered first and can land on any peg. Parking it on C begins the subproblem of moving the top two disks onto B.' },
+          { mv: 2, caption: 'Move 2: disk 2 goes from A to B, now that disk 1 has uncovered it and B is still empty. This starts the two-disk tower on B, which is where those disks must wait while disk 3 moves.' },
+          { mv: 3, caption: 'Move 3: disk 1 goes from C to B, landing on the larger disk 2, so the move is legal. The two smaller disks now form one tower on B, exactly what freeing the largest disk required.' },
+          { mv: 4, caption: 'Move 4: disk 3 goes from A to C, and the largest disk can finally move because both smaller disks are stacked on B and C is empty. This single move is the +1 between the two smaller towers in the recurrence.' },
+          { mv: 5, caption: 'Move 5: disk 1 goes from B to A, because it covers disk 2 and must move out of the way first. The two-disk tower now has to be rebuilt on peg C, on top of the largest disk.' },
+          { mv: 6, caption: 'Move 6: disk 2 goes from B to C, landing on the larger disk 3, so the move is legal. Only disk 1 is still out of place, sitting alone on A and ready for the final move.' },
+          { mv: 7, caption: 'Move 7: disk 1 goes from A to C, landing on disk 2 to complete the tower in size order. All seven moves followed one pattern: clear the disk below, move it, then rebuild the smaller tower on top.' },
+          { mv: 7, answer: true, caption: 'Answer: the tower takes 7 moves, checked by the recurrence T(3) = 2·T(2) + 1 = 2·(2·T(1) + 1) + 1 = 7, which is also 2^3 − 1. Every disk ended in size order on peg C, and no disk ever rested on a smaller one during the sequence.' },
+        ],
+        answer: 7,
+        verify(M) {
+          const moves = [];
+          function gen(n, from, to, via) {
+            if (n === 0) return;
+            gen(n - 1, from, via, to);
+            moves.push([n, from, to]);
+            gen(n - 1, via, to, from);
+          }
+          gen(3, 0, 2, 1);
+          const pegs = [[3, 2, 1], [], []];
+          let legal = moves.length === 7;
+          for (const [disk, from, to] of moves) {
+            const top = pegs[to][pegs[to].length - 1];
+            if (pegs[from][pegs[from].length - 1] !== disk || (top !== undefined && top < disk)) legal = false;
+            pegs[to].push(pegs[from].pop());
+          }
+          let T = 0;
+          for (let n = 1; n <= 3; n++) T = 2 * T + 1;
+          return legal && pegs[2].join(',') === '3,2,1' && pegs[0].length === 0 && pegs[1].length === 0 && 2 ** 3 - 1 === 7 && T === 7;
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const NAME = ['A', 'B', 'C'];
+          const PX = [110, 320, 530], BASE = 210, DH = 28;
+          const COLOR = ['--num', '--fnc', '--accent'];
+          const state = EX_HANOI_STATES[step.mv];
+          const lastMove = step.mv > 0 ? EX_HANOI_MOVES[step.mv - 1] : null;
+          const movedDisk = lastMove ? lastMove[0] : 0;
+          const kids = [
+            s('rect', { x: 20, y: BASE, width: 600, height: 10, rx: 4, fill: 'var(--ink-3)' }),
+            ...PX.map((x) => s('rect', { x: x - 3, y: 62, width: 6, height: BASE - 62, rx: 3, fill: 'var(--ink-3)' })),
+            ...PX.map((x, p) => s('text', { x, y: BASE + 30, 'text-anchor': 'middle', 'font-size': 16, 'font-weight': 700, fill: 'var(--ink-2)', text: 'Peg ' + NAME[p] })),
+          ];
+          state.forEach((stack, p) => stack.forEach((disk, i) => {
+            const w = 40 + disk * 38;
+            const y = BASE - (i + 1) * DH;
+            const isMoved = disk === movedDisk;
+            kids.push(s('rect', { x: PX[p] - w / 2, y, width: w, height: DH - 3, rx: 8, fill: `var(${COLOR[disk - 1]})`, stroke: isMoved ? 'var(--ink)' : 'none', 'stroke-width': isMoved ? 3.5 : 0 }));
+            kids.push(s('text', { x: PX[p], y: y + DH / 2 + 1, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': isMoved ? 800 : 700, fill: 'var(--accent-ink)', text: String(disk) }));
+          }));
+          if (lastMove) kids.push(s('text', { x: PX[lastMove[2]], y: 40, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: 'var(--ink)', text: `disk ${movedDisk} just moved here` }));
+          const svg = s('svg', { viewBox: '0 0 640 248', role: 'img', 'aria-label': 'Three pegs A, B and C with three disks', style: 'width:min(40rem,100%);height:auto' }, ...kids);
+          const soFar = step.mv === 0 ? 'Moves so far: none yet' : 'Moves so far: ' + EX_HANOI_MOVES.slice(0, step.mv).map(([d, f, t], i) => `${i + 1}. disk ${d} ${NAME[f]}→${NAME[t]}`).join(' · ');
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.35rem' } },
+            svg,
+            h('p.small', { style: { margin: 0, textAlign: 'center' } }, step.mv === 0 ? 'Start: after move 0 of 7 — the tower sits on peg A and the goal is peg C' : `After move ${step.mv} of 7: disk ${movedDisk} moved ${NAME[lastMove[1]]} → ${NAME[lastMove[2]]}`),
+            h('p.small.mono.muted', { style: { margin: 0, textAlign: 'center' } }, soFar),
+            step.answer ? h('div.ex-answer', 'Answer: 7 moves = 2^3 − 1 · check: T(3) = 2·T(2) + 1 = 7, and the tower stands in size order on peg C') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: iterating a recurrence to a closed form',
+        kind: 'example',
+        id: 'ex-recurrence-iteration',
+        problem: String.raw`<p>A sequence starts with \(a_0 = 0\) and follows \(a_n = 2a_{n-1} + 1\) for \(n \ge 1\). Compute the first terms by iteration, guess a closed form for \(a_n\), and prove the guess by induction.</p>`,
+        steps: [
+          { rows: 0, phase: 0, caption: 'Setup: the starting value is a0 = 0 and every later term follows a(n) = 2·a(n−1) + 1, so iteration means just applying the rule repeatedly. The extra a(n) + 1 column is there because these numbers look like one less than something familiar.' },
+          { rows: 3, phase: 0, caption: 'Two terms appear: a1 = 2·0 + 1 = 1 and a2 = 2·1 + 1 = 3, filling the table down from the starting value. Each term needs only the previous one, which is what makes iteration cheap.' },
+          { rows: 5, phase: 0, caption: 'Two more terms appear: a3 = 2·3 + 1 = 7 and a4 = 2·7 + 1 = 15, completing the first five terms. The a(n) + 1 column now reads 1, 2, 4, 8, 16 — pure powers of 2.' },
+          { rows: 5, phase: 1, caption: 'The pattern suggests the guess a(n) + 1 = 2^n, so a(n) = 2^n − 1 for every n. A pattern in five terms is a conjecture, not a proof, and induction is the right tool because the claim covers all n while the recurrence links each n to the one before.' },
+          { rows: 5, phase: 2, caption: 'Induction checks the guess: the base case a0 = 2^0 − 1 = 0 matches the starting value outright. If a(k) = 2^k − 1 holds for some k, then a(k+1) = 2(2^k − 1) + 1 = 2^(k+1) − 1, so the formula reproduces itself through the recurrence.' },
+          { rows: 5, phase: 2, answer: true, caption: 'Answer: a(n) = 2^n − 1, and the spot check a4 = 2^4 − 1 = 15 matches the iterated table exactly. This is the same count as the Hanoi moves with a shift of index, since the three-disk tower takes T(3) = 7 = a3 moves.' },
+        ],
+        answer: '2^n − 1',
+        verify(M) {
+          const terms = [0];
+          for (let n = 1; n <= 20; n++) terms.push(2 * terms[n - 1] + 1);
+          const matchesClosedForm = terms.every((x, n) => x === 2 ** n - 1);
+          const firstFive = [0, 1, 3, 7, 15].every((x, n) => terms[n] === x);
+          return matchesClosedForm && firstFive;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = EX_REC_TERMS.slice(0, step.rows).map((x, n) => h('tr', { class: n === step.rows - 1 && step.phase === 0 ? 'hit' : '' },
+            h('td', String(n)), h('td', String(x)), h('td', String(x + 1))));
+          const table = h('table.tt', { style: { width: 'min(22rem, 100%)' } },
+            h('thead', h('tr', h('th', { html: '\\(n\\)' }), h('th', { html: '\\(a_n\\)' }), h('th', { html: '\\(a_n + 1\\)' }))),
+            h('tbody', rows.length ? rows : h('tr', h('td.muted', '·'), h('td.muted', '·'), h('td.muted', '·'))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } },
+            h('div.big-math', { html: String.raw`\(a_0 = 0, \qquad a_n = 2a_{n-1} + 1\)`, style: { fontSize: '1.05rem' } }),
+            table,
+            step.rows === 0 ? h('p.small.muted', { style: { margin: 0 } }, 'No terms computed yet — the table fills in as the rule is applied.') : null,
+            step.phase >= 1 ? h('div.big-math', { html: String.raw`Guess: \(a_n + 1 = 2^n\), so \(a_n = 2^n - 1\)`, style: { fontSize: '1.05rem' } }) : null,
+            step.phase >= 2 ? h('div.stack', { style: { gap: '0.15rem', alignItems: 'center', fontSize: '0.92rem' } },
+              h('div', { html: String.raw`Base case: \(a_0 = 2^0 - 1 = 0\) ✓` }),
+              h('div', { html: String.raw`Assume \(a_k = 2^k - 1\) for some \(k \ge 0\).` }),
+              h('div', { html: String.raw`Then \(a_{k+1} = 2a_k + 1 = 2(2^k - 1) + 1 = 2^{k+1} - 1\).` })) : null,
+            step.answer ? h('div.ex-answer', 'Answer: a(n) = 2^n − 1 · check: a4 = 2^4 − 1 = 15 matches the table, and T(3) = 7 = a3') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: recurrence relations',
@@ -11330,6 +12384,49 @@ bsearch(s, i, j, key) {     // search s[i..j]
     }
     return col;
   }
+
+  /* ---------- worked-example data: BFS layers and Dijkstra snapshots, precomputed ---------- */
+  const EX_BFS_VERTS = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const EX_BFS_POS = { A: [60, 105], B: [175, 40], C: [175, 170], D: [295, 105], E: [415, 170], F: [415, 40] };
+  const EX_BFS_EDGES = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']];
+  const EX_BFS_ANSWER = { order: ['A', 'B', 'C', 'D', 'E', 'F'], dist: { A: 0, B: 1, C: 1, D: 2, E: 2, F: 3 } };
+  const EX_BFS_SNAP = (() => {
+    const adj = Object.fromEntries(EX_BFS_VERTS.map((v) => [v, []]));
+    EX_BFS_EDGES.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
+    EX_BFS_VERTS.forEach((v) => adj[v].sort());
+    const dist = { A: 0 }, parent = {}, order = [], q = ['A'];
+    const snaps = [{ queue: ['A'], order: [], discovered: ['A'], parent: {}, current: null }];
+    while (q.length) {
+      const u = q.shift(); order.push(u);
+      for (const w of adj[u]) if (!(w in dist)) { dist[w] = dist[u] + 1; parent[w] = u; q.push(w); }
+      snaps.push({ queue: [...q], order: [...order], discovered: Object.keys(dist), parent: { ...parent }, current: u });
+    }
+    return snaps;
+  })();
+  const EX_DIJ_VERTS = ['A', 'B', 'C', 'D', 'E'];
+  const EX_DIJ_POS = { A: [55, 115], B: [185, 40], C: [185, 190], D: [325, 115], E: [465, 190] };
+  const EX_DIJ_EDGES = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
+  const EX_DIJ_ANSWER = { A: 0, B: 3, C: 2, D: 8, E: 10 };
+  const EX_DIJ_SNAP = (() => {
+    const adj = Object.fromEntries(EX_DIJ_VERTS.map((v) => [v, []]));
+    EX_DIJ_EDGES.forEach(([a, b, w]) => { adj[a].push([b, w]); adj[b].push([a, w]); });
+    EX_DIJ_VERTS.forEach((v) => adj[v].sort((x, y) => x[0].localeCompare(y[0])));
+    const dist = Object.fromEntries(EX_DIJ_VERTS.map((v) => [v, v === 'A' ? 0 : Infinity]));
+    const prev = {}, settled = [];
+    const snaps = [{ dist: { ...dist }, prev: {}, settled: [], improved: [], current: null }];
+    for (;;) {
+      const cand = EX_DIJ_VERTS.filter((v) => !settled.includes(v) && dist[v] < Infinity).sort((a, b) => dist[a] - dist[b] || a.localeCompare(b));
+      if (!cand.length) break;
+      const u = cand[0]; settled.push(u);
+      const improved = [];
+      for (const [w, wt] of adj[u]) {
+        if (settled.includes(w)) continue;
+        if (dist[u] + wt < dist[w]) { improved.push([w, dist[w], dist[u] + wt]); dist[w] = dist[u] + wt; prev[w] = u; }
+      }
+      snaps.push({ dist: { ...dist }, prev: { ...prev }, settled: [...settled], improved, current: u });
+    }
+    return snaps;
+  })();
 
   DM.module({
     id: 'graphs',
@@ -12401,6 +13498,142 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: breadth-first search order and layers',
+        kind: 'example',
+        id: 'ex-bfs-order',
+        problem: '<p>Run breadth-first search from vertex A in the graph with vertices A, B, C, D, E, F and edges A-B, A-C, B-D, C-D, C-E, D-F and E-F, visiting neighbors in alphabetical order. Give the visit order and the distance (layer) of each vertex from A.</p>',
+        steps: [
+          { visited: 0, caption: 'Start with the graph and the queue holding only A, marked as the source at layer 0. Nothing is visited yet, because BFS visits a vertex only when it reaches the front of the queue.' },
+          { visited: 1, caption: 'Visit A and move its undiscovered neighbors B and C to the back of the queue at layer 1. A is finished first because the queue is first in, first out, so nearer vertices are always processed before farther ones.' },
+          { visited: 2, caption: 'Visit B, the front of the queue, and enqueue its only undiscovered neighbor D at layer 2; A and C are already known. D gets layer 2 because BFS first reaches it along a shortest path, A-B-D, while layer-1 C is still waiting.' },
+          { visited: 3, caption: 'Visit C and enqueue E at layer 2, while D is already waiting in the queue and so is not added a second time. C is processed before D because every layer-1 vertex leaves the queue before any layer-2 vertex.' },
+          { visited: 4, caption: 'Visit D and enqueue F at layer 3, its first discovery, reached along the path A-B-D. F cannot sit closer than layer 3, because both of its neighbors are at layer 2 and BFS discovers vertices in order of distance.' },
+          { visited: 5, caption: 'Visit E and enqueue nothing new: both of its neighbors, C and F, have already been discovered. The queue still holds F, so the search continues until the last layer-2 vertex is done and F reaches the front.' },
+          { visited: 6, caption: 'Visit F, the last vertex in the queue, and the queue empties, which ends the search. F sits at layer 3 because it was discovered from a layer-2 vertex, and the queue order guarantees no shorter route to it exists.' },
+          { visited: 6, answer: true, caption: 'Answer: the visit order is A, B, C, D, E, F, with distances A 0, B 1, C 1, D 2, E 2 and F 3. Check: every edge joins layers differing by at most 1 — A-B is 0 to 1 and D-F is 2 to 3 — and F at layer 3 also matches the path A-C-E-F of length 3.' },
+        ],
+        answer: EX_BFS_ANSWER,
+        verify(M) {
+          const edges = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']];
+          const verts = ['A', 'B', 'C', 'D', 'E', 'F'];
+          const adj = Object.fromEntries(verts.map((v) => [v, []]));
+          edges.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
+          verts.forEach((v) => adj[v].sort());
+          const dist = { A: 0 }, order = [], q = ['A'];
+          while (q.length) { const u = q.shift(); order.push(u); for (const w of adj[u]) if (!(w in dist)) { dist[w] = dist[u] + 1; q.push(w); } }
+          const sameOrder = JSON.stringify(order) === JSON.stringify(EX_BFS_ANSWER.order);
+          const sameDist = verts.every((v) => dist[v] === EX_BFS_ANSWER.dist[v]);
+          const layersOk = edges.every(([a, b]) => Math.abs(EX_BFS_ANSWER.dist[a] - EX_BFS_ANSWER.dist[b]) <= 1);
+          return sameOrder && sameDist && layersOk;
+        },
+        draw(stage, ctx, step) {
+          const { h, s, rc } = ctx;
+          const snap = EX_BFS_SNAP[step.visited];
+          const visited = new Set(snap.order);
+          const discovered = new Set(snap.discovered);
+          const kids = [];
+          for (const [a, b] of EX_BFS_EDGES) {
+            const tree = snap.parent[b] === a || snap.parent[a] === b;
+            kids.push(s('line', { x1: EX_BFS_POS[a][0], y1: EX_BFS_POS[a][1], x2: EX_BFS_POS[b][0], y2: EX_BFS_POS[b][1], stroke: tree ? 'var(--accent)' : 'var(--rule)', 'stroke-width': tree ? 4.5 : 2.2, 'stroke-linecap': 'round' }));
+          }
+          for (const v of EX_BFS_VERTS) {
+            const [x, y] = EX_BFS_POS[v];
+            const isV = visited.has(v), isQ = discovered.has(v) && !isV, cur = snap.current === v && !step.answer;
+            kids.push(s('g', {},
+              cur || (step.visited === 0 && v === 'A') ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+              s('circle', { cx: x, cy: y, r: 20, fill: isV ? 'var(--accent)' : isQ ? 'var(--warn-bg)' : 'var(--sheet)', 'fill-opacity': isV ? 0.3 : 1, stroke: isV ? 'var(--accent)' : isQ ? 'var(--warn)' : 'var(--ink-3)', 'stroke-width': isV || isQ ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: v }),
+              isV ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: 'var(--ink-2)', text: `layer ${EX_BFS_ANSWER.dist[v]}` }) : null,
+              cur ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--ink)', text: '▼ current' }) : null,
+              step.visited === 0 && v === 'A' ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--accent)', text: '▼ source' }) : null));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 235', role: 'img', 'aria-label': 'Graph for breadth-first search from A, with visited vertices filled and the queue shown below', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const queue = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'QUEUE'),
+            h('div.gr-box', h('span.end', 'front →'), snap.queue.length ? snap.queue.map((v) => h('span.cell', v)) : h('span.small.muted', 'empty'), h('span.end', '← back')));
+          const orderStrip = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'VISIT ORDER'),
+            h('div.gr-order', snap.order.length ? snap.order.map((v, i) => h('span', h('b', String(i + 1)), v)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing visited yet')));
+          const table = step.answer ? h('table.tt',
+            h('thead', h('tr', h('th', 'vertex'), EX_BFS_VERTS.map((v) => h('th', v)))),
+            h('tbody', h('tr', h('td', 'distance'), EX_BFS_VERTS.map((v) => h('td', String(EX_BFS_ANSWER.dist[v])))))) : null;
+          const banner = step.answer ? h('div.ex-answer', 'Answer: visit order A → B → C → D → E → F · distances A 0, B 1, C 1, D 2, E 2, F 3 · check: every edge joins layers at most 1 apart (A-B: 0-1, D-F: 2-3), and F = 3 matches the path A-C-E-F ✓') : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, queue, orderStrip, table, banner));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: Dijkstra shortest distances from A',
+        kind: 'example',
+        id: 'ex-dijkstra',
+        problem: '<p>Find the shortest distances from A in the weighted graph with edges A-B 4, A-C 2, C-B 1, B-D 5, C-D 8, C-E 10 and D-E 2. Show the tentative distance of every vertex after each vertex is settled, and give the shortest path to E.</p>',
+        steps: [
+          { settled: 0, caption: 'Setup: A starts at distance 0 and every other vertex is infinity, meaning no route to it is known yet. Dijkstra settles the closest unsettled vertex next, because with all weights positive no alternative route could reach that vertex more cheaply.' },
+          { settled: 1, caption: 'Settle A at 0, the smallest tentative label, and relax its edges: B gets 4 and C gets 2. These labels are only tentative, not final, because a shorter route to either vertex could still show up through the other one.' },
+          { settled: 2, caption: 'Settle C at 2, the smallest tentative label, and relax its edges: B improves from 4 to 3 via C, while D appears at 10 and E at 12. The improvement to B is exactly why a label is never finalized until its vertex is the minimum unsettled one.' },
+          { settled: 3, caption: 'Settle B at 3 and relax its edge to D: D improves from 10 to 8 via B, beating the route through C. B has no edge to E in this graph, so E keeps its tentative label of 12 for now.' },
+          { settled: 4, caption: 'Settle D at 8 and relax its edge to E: E improves from 12 to 10 via D. Every other neighbor of D is already settled, so this is the last improvement the algorithm will make.' },
+          { settled: 5, caption: 'Settle E at 10, the only vertex left, and there is nothing left to relax because all of its neighbors are settled. The settled order A, C, B, D, E increases in distance, which is exactly the pattern Dijkstra guarantees.' },
+          { settled: 5, answer: true, caption: 'Answer: the shortest distances from A are A 0, B 3, C 2, D 8 and E 10. Check: the path A-C-B-D-E sums to 2 + 1 + 5 + 2 = 10, matching the distance of E, and D via C would cost 2 + 8 = 10, more than 8, so the route through B really is better.' },
+        ],
+        answer: EX_DIJ_ANSWER,
+        verify(M) {
+          const edges = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
+          const verts = ['A', 'B', 'C', 'D', 'E'];
+          const dist = Object.fromEntries(verts.map((v) => [v, v === 'A' ? 0 : Infinity]));
+          for (let i = 0; i < verts.length - 1; i++) {
+            for (const [a, b, w] of edges) {
+              if (dist[a] + w < dist[b]) dist[b] = dist[a] + w;
+              if (dist[b] + w < dist[a]) dist[a] = dist[b] + w;
+            }
+          }
+          const wOf = (a, b) => edges.find(([x, y]) => (x === a && y === b) || (x === b && y === a))[2];
+          const pathSum = wOf('A', 'C') + wOf('C', 'B') + wOf('B', 'D') + wOf('D', 'E');
+          return verts.every((v) => dist[v] === EX_DIJ_ANSWER[v]) && pathSum === 10 && pathSum === EX_DIJ_ANSWER.E;
+        },
+        draw(stage, ctx, step) {
+          const { h, s, rc } = ctx;
+          const snap = EX_DIJ_SNAP[step.settled];
+          const settled = new Set(snap.settled);
+          const improved = new Map(snap.improved.map(([v, o, n]) => [v, [o, n]]));
+          const fmtD = (d) => (d === Infinity ? '∞' : String(d));
+          const kids = [];
+          for (const [a, b, w] of EX_DIJ_EDGES) {
+            const tree = snap.prev[b] === a || snap.prev[a] === b;
+            const mx = (EX_DIJ_POS[a][0] + EX_DIJ_POS[b][0]) / 2, my = (EX_DIJ_POS[a][1] + EX_DIJ_POS[b][1]) / 2;
+            kids.push(s('line', { x1: EX_DIJ_POS[a][0], y1: EX_DIJ_POS[a][1], x2: EX_DIJ_POS[b][0], y2: EX_DIJ_POS[b][1], stroke: tree ? 'var(--accent)' : 'var(--ink-3)', 'stroke-width': tree ? 4 : 1.8, 'stroke-linecap': 'round' }));
+            kids.push(s('circle', { cx: mx, cy: my, r: 10.5, fill: 'var(--sheet)', stroke: 'var(--rule)', 'stroke-width': 1.2 }));
+            kids.push(s('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 700, fill: 'var(--ink)', text: String(w) }));
+          }
+          for (const v of EX_DIJ_VERTS) {
+            const [x, y] = EX_DIJ_POS[v];
+            const isF = settled.has(v), front = !isF && snap.dist[v] < Infinity, cur = snap.current === v && !step.answer, imp = improved.has(v);
+            kids.push(s('g', {},
+              cur ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+              s('circle', { cx: x, cy: y, r: 20, fill: isF ? 'var(--accent)' : front ? 'var(--warn-bg)' : 'var(--sheet)', stroke: isF ? 'var(--accent)' : front ? 'var(--warn)' : 'var(--ink-3)', 'stroke-width': isF || front ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: isF ? 'var(--accent-ink)' : 'var(--ink)', text: v }),
+              isF ? s('text', { x: x + 25, y: y - 15, 'font-size': 13, 'font-weight': 700, fill: 'var(--true)', text: '✓' }) : null,
+              cur ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--ink)', text: '▼ settled now' }) : null,
+              s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 700, class: imp ? 'ex-improved' : null, fill: imp ? 'var(--warn)' : isF ? 'var(--accent)' : 'var(--ink-2)', text: imp ? `${fmtD(snap.dist[v])} ↓` : fmtD(snap.dist[v]) })));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 250', role: 'img', 'aria-label': 'Weighted graph for Dijkstra from A, with the current distance under each vertex', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const note = snap.improved.length
+            ? h('p.small', { html: `Improved on this step: ${snap.improved.map(([v, o, n]) => `<b>${v}</b> ${fmtD(o)} → ${n}`).join(', ')}` })
+            : step.settled > 0 && !step.answer ? h('p.small.muted', 'No label improved on this step.') : null;
+          const orderStrip = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'SETTLED ORDER'),
+            h('div.gr-order', snap.settled.length ? snap.settled.map((v, i) => h('span', h('b', String(i + 1)), `${v}:${snap.dist[v]}`)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing settled yet')));
+          const table = step.answer ? h('table.tt',
+            h('thead', h('tr', h('th', 'vertex'), EX_DIJ_VERTS.map((v) => h('th', v)))),
+            h('tbody', h('tr', h('td', 'distance'), EX_DIJ_VERTS.map((v) => h('td', String(EX_DIJ_ANSWER[v])))))) : null;
+          const banner = step.answer ? h('div.ex-answer', 'Answer: distances from A — A 0, B 3, C 2, D 8, E 10 · shortest path to E: A-C-B-D-E = 2 + 1 + 5 + 2 = 10 · check: D via C would be 2 + 8 = 10 > 8, so the route through B is better ✓') : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, note, orderStrip, table, banner));
+        },
+      },
       /* ---------------------------------------------------------------- 16 */
       {
         title: 'Practice: graphs',
@@ -13069,6 +14302,36 @@ bsearch(s, i, j, key) {     // search s[i..j]
     return `<svg viewBox="40 6 510 166" role="img" aria-label="Decision tree that sorts three items with at most three comparisons" style="width:100%;height:auto;max-height:8.2rem;margin-top:0.35rem">${g}</svg>`;
   }
   const EXAMPLE_EXPR = parseExpr('(3 + 4) * (5 - 2)');
+
+  /* ---------------- worked example data: BST insertion ---------------- */
+  // Fixed final positions for the tree built from 50, 30, 70, 20, 40, 60, 80 (balanced for this order).
+  const EX_BST_KEYS = [50, 30, 70, 20, 40, 60, 80];
+  const EX_BST_POS = { 50: [320, 42], 30: [160, 112], 70: [480, 112], 20: [80, 182], 40: [240, 182], 60: [400, 182], 80: [560, 182] };
+  const EX_BST_PARENT = { 50: null, 30: 50, 70: 50, 20: 30, 40: 30, 60: 70, 80: 70 };
+  // the comparison path each key follows, root first, ending at the new key itself
+  const EX_BST_PATH = { 50: [50], 30: [50, 30], 70: [50, 70], 20: [50, 30, 20], 40: [50, 30, 40], 60: [50, 70, 60], 80: [50, 70, 80] };
+  const EX_BST_INORDER = [20, 30, 40, 50, 60, 70, 80];
+
+  /* ---------------- worked example data: Huffman coding ---------------- */
+  const EX_HUFF_FREQ = [['A', 45], ['B', 13], ['C', 12], ['D', 16], ['E', 9], ['F', 5]];
+  const EX_HUFF_SORTED = [['F', 5], ['E', 9], ['C', 12], ['B', 13], ['D', 16], ['A', 45]];
+  // Final layout: leaves share the bottom row, internal nodes sit above the pair they merged.
+  // Left edge = 0, right edge = 1, so the codewords below are read off these positions.
+  const EX_HUFF_NODES = [
+    { id: 'C', label: 'C', sub: '12', x: 80, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'B', label: 'B', sub: '13', x: 160, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'F', label: 'F', sub: '5', x: 260, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'E', label: 'E', sub: '9', x: 340, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'D', label: 'D', sub: '16', x: 440, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'A', label: 'A', sub: '45', x: 570, y: 225, r: 20, leaf: true, created: 0 },
+    { id: 'n25', label: '25', x: 120, y: 168, r: 17, created: 2, left: 'C', right: 'B' },
+    { id: 'n14', label: '14', x: 300, y: 168, r: 17, created: 1, left: 'F', right: 'E' },
+    { id: 'n30', label: '30', x: 370, y: 120, r: 17, created: 3, left: 'n14', right: 'D' },
+    { id: 'n55', label: '55', x: 245, y: 76, r: 17, created: 4, left: 'n25', right: 'n30' },
+    { id: 'n100', label: '100', x: 408, y: 32, r: 18, created: 5, left: 'n55', right: 'A' },
+  ];
+  const EX_HUFF_CODES = { A: '1', B: '001', C: '000', D: '011', E: '0101', F: '0100' };
+  const EX_HUFF_ANSWER = { lengths: { A: 1, B: 3, C: 3, D: 3, E: 4, F: 4 }, wpl: 224 };
 
   /* ---------------- lab data ---------------- */
   const ANAT = [['a', 'b'], ['a', 'c'], ['a', 'd'], ['b', 'e'], ['b', 'f'], ['c', 'g'], ['d', 'h'], ['d', 'i'], ['d', 'j'], ['f', 'k'], ['f', 'l'], ['h', 'm']];
@@ -14289,6 +15552,142 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: building a binary search tree by insertion',
+        kind: 'example',
+        id: 'ex-bst-insert',
+        problem: String.raw`<p>Insert the keys \(50, 30, 70, 20, 40, 60, 80\), in that order, into an empty binary search tree. Draw the tree after each insertion, then give its inorder traversal.</p>`,
+        steps: [
+          { inserted: 0, note: 'The empty tree · insert order: 50, 30, 70, 20, 40, 60, 80', caption: 'Start with an empty tree and the binary search tree rule: at every node, smaller keys go to the left subtree and larger keys go to the right subtree. That single rule decides every placement, because each insertion just follows the comparisons down from the root.' },
+          { inserted: 1, note: 'Inserted 50 — it becomes the root', caption: 'Insert 50 into the empty tree: there is nothing to compare it against, so it simply becomes the root. Every later key is measured against 50 first, which is why the first key shapes the whole tree.' },
+          { inserted: 2, note: 'Inserted 30 — left child of 50', caption: 'Insert 30: 30 < 50, so go left from the root, and the left child of 50 is empty, so 30 lands there. Being smaller than the root is exactly what places it in the left subtree.' },
+          { inserted: 3, note: 'Inserted 70 — right child of 50', caption: 'Insert 70: 70 > 50, so go right from the root, and the right child of 50 is empty, so 70 lands there. The root now has both children, and its two subtrees will grow independently from here.' },
+          { inserted: 4, note: 'Inserted 20 — left child of 30', caption: 'Insert 20: 20 < 50, go left; 20 < 30, go left again; the left child of 30 is empty, so 20 lands there. It is the smallest key of all, and it ends up tucked at the far left of the tree.' },
+          { inserted: 5, note: 'Inserted 40 — right child of 30', caption: 'Insert 40: 40 < 50, go left; 40 > 30, go right; the right child of 30 is empty, so 40 lands there. In value 40 sits between 30 and 50, and the tree places it between them in position as well.' },
+          { inserted: 6, note: 'Inserted 60 — left child of 70', caption: 'Insert 60: 60 > 50, go right; 60 < 70, go left; the left child of 70 is empty, so 60 lands there. The right subtree is now growing into a mirror of the left one, with 60 as its smaller leaf.' },
+          { inserted: 7, note: 'Inserted 80 — right child of 70', caption: 'Insert 80: 80 > 50, go right; 80 > 70, go right again; the right child of 70 is empty, so 80 lands there. All seven keys are in, and for this insertion order the tree came out perfectly balanced.' },
+          { inserted: 7, note: 'The finished tree — all 7 keys placed', answer: true, caption: 'Answer: an inorder traversal of any binary search tree visits keys in sorted order, and ours comes out perfectly sorted — 20, 30, 40, 50, 60, 70, 80 — which cross-checks every placement. The finished tree has 50 at the root, 30 and 70 below it, and the other four keys as leaves.' },
+        ],
+        answer: EX_BST_INORDER,
+        verify(M) {
+          const keys = [50, 30, 70, 20, 40, 60, 80];
+          const ins = (node, k) => { if (!node) return { k, l: null, r: null }; if (k < node.k) node.l = ins(node.l, k); else node.r = ins(node.r, k); return node; };
+          let root = null;
+          for (const k of keys) root = ins(root, k);
+          const inorder = [];
+          (function walk(n) { if (!n) return; walk(n.l); inorder.push(n.k); walk(n.r); })(root);
+          const bstOk = (function check(n, lo, hi) { return !n || (n.k > lo && n.k < hi && check(n.l, lo, n.k) && check(n.r, n.k, hi)); })(root, -Infinity, Infinity);
+          return bstOk && inorder.join(',') === EX_BST_INORDER.join(',') && M.sortNum(keys).join(',') === inorder.join(',');
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const placed = EX_BST_KEYS.slice(0, step.inserted);
+          const current = step.answer || step.inserted === 0 ? null : EX_BST_KEYS[step.inserted - 1];
+          const path = current ? EX_BST_PATH[current] : [];
+          const onPath = (a, b) => { const i = path.indexOf(a); return i >= 0 && path[i + 1] === b; };
+          let g = '';
+          if (step.inserted === 0) {
+            const [x, y] = EX_BST_POS[50];
+            g += `<circle cx="${x}" cy="${y}" r="22" fill="none" stroke="var(--ink-3)" stroke-width="1.6" stroke-dasharray="5 4"/><text x="${x}" y="${y + 46}" text-anchor="middle" font-size="13" fill="var(--ink-3)">empty: the first key inserted becomes the root</text>`;
+          }
+          for (const k of placed) {
+            const p = EX_BST_PARENT[k];
+            if (p == null) continue;
+            const [x1, y1] = EX_BST_POS[p], [x2, y2] = EX_BST_POS[k];
+            const hot = onPath(p, k);
+            g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hot ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${hot ? 3.6 : 1.6}"/>`;
+          }
+          for (const k of placed) {
+            const [x, y] = EX_BST_POS[k];
+            const isNew = k === current;
+            if (isNew) g += `<circle cx="${x}" cy="${y}" r="27" fill="none" stroke="var(--kw)" stroke-width="2" stroke-dasharray="4 3"/><text x="${x}" y="${y - 36}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--kw)">new</text>`;
+            g += `<circle cx="${x}" cy="${y}" r="20" fill="${isNew ? 'var(--mark)' : 'var(--sheet)'}" stroke="${isNew ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${isNew ? 3 : 1.6}"/><text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="${isNew ? 'var(--mark-ink)' : 'var(--ink)'}">${k}</text>`;
+          }
+          const svg = `<svg class="tr-svg" viewBox="0 0 640 232" role="img" aria-label="Binary search tree being built by insertion" style="width:100%;height:auto;display:block">${g}</svg>`;
+          const chips = EX_BST_KEYS.map((k, i) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.82rem', fontWeight: i === step.inserted - 1 && !step.answer ? 700 : 400, border: i === step.inserted - 1 && !step.answer ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: '0.08rem 0.42rem', background: i < step.inserted ? (i === step.inserted - 1 && !step.answer ? 'var(--mark)' : 'var(--accent-2)') : 'var(--sheet)', opacity: i < step.inserted ? 1 : 0.55 } }, String(k)));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, step.note),
+            h('div', { style: { width: 'min(40rem, 100%)' }, html: svg }),
+            h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } }, h('span.tiny.mono.muted', 'insert order:'), chips),
+            step.answer ? h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_BST_INORDER.map((k) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.85rem', fontWeight: 700, border: '1px solid var(--true)', borderRadius: '0.3rem', padding: '0.08rem 0.42rem', background: 'var(--true-bg)' } }, String(k)))) : null,
+            step.answer ? h('div.ex-answer', 'Answer: the finished tree — inorder traversal 20, 30, 40, 50, 60, 70, 80 · check: the traversal is perfectly sorted, exactly as an inorder walk of a binary search tree must be ✓') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: building a Huffman code',
+        kind: 'example',
+        id: 'ex-huffman',
+        problem: String.raw`<p>Build a Huffman code for the symbols and frequencies \(A{:}45,\ B{:}13,\ C{:}12,\ D{:}16,\ E{:}9,\ F{:}5\) (out of 100). Give each symbol's codeword and the expected code length in bits per symbol.</p>`,
+        steps: [
+          { merges: 0, forest: [5, 9, 12, 13, 16, 45], note: 'Six leaves, sorted by frequency: F 5, E 9, C 12, B 13, D 16, A 45', caption: 'Setup: write the six symbols as leaves sorted by frequency, lightest first: F 5, E 9, C 12, B 13, D 16, A 45. The Huffman rule is to repeatedly merge the two lightest trees, because the rarest symbols should travel the deepest and merging them first keeps them deep.' },
+          { merges: 1, forest: [12, 13, 14, 16, 45], note: 'Merge 1: F (5) + E (9) = 14 · forest weights now 12, 13, 14, 16, 45', caption: 'Merge F (5) and E (9), the two lightest trees, into a new tree of weight 14, drawn with F on the left and E on the right. The two rarest symbols now sit one level deeper than before, which is exactly where rare symbols belong in a good code.' },
+          { merges: 2, forest: [14, 16, 25, 45], note: 'Merge 2: C (12) + B (13) = 25 · forest weights now 14, 16, 25, 45', caption: 'Merge C (12) and B (13), now the two lightest separate trees, into a tree of weight 25, with C on the left and B on the right. The forest shrinks to four trees, and C and B each gain a level of depth.' },
+          { merges: 3, forest: [25, 30, 45], note: 'Merge 3: 14 + D (16) = 30 · forest weights now 25, 30, 45', caption: 'Merge the 14 tree and D (16), the two lightest trees left, into a tree of weight 30, keeping the 14 tree on the left and D on the right. F and E sink one level deeper still, while D gains its first level of depth.' },
+          { merges: 4, forest: [45, 55], note: 'Merge 4: 25 + 30 = 55 · forest weights now 45, 55', caption: 'Merge the 25 tree and the 30 tree, the two lightest trees remaining, into a tree of weight 55, with 25 on the left and 30 on the right. Every symbol except A is now in a single tree, and all of them gain one more level of depth.' },
+          { merges: 5, forest: [100], note: 'Merge 5: 55 + A (45) = 100 · the tree is complete, left edge = 0, right edge = 1', caption: 'Merge the 55 tree and A (45) into the root of weight 100, with the 55 tree on the left and A on the right, and label every left edge 0 and every right edge 1. A joins last and highest, so the most frequent symbol gets the shortest path down from the root.' },
+          { merges: 5, forest: [100], note: 'The finished Huffman tree: codewords read off the root-to-leaf paths', answer: true, caption: 'Answer: reading each root-to-leaf path gives A = 1, B = 001, C = 000, D = 011, E = 0101 and F = 0100, with expected length (45·1 + 12·3 + 13·3 + 16·3 + 9·4 + 5·4) / 100 = 224 / 100 = 2.24 bits per symbol. Check: the code is prefix-free because every symbol is a leaf, and the weighted path length 224 equals the sum of the merge weights 14 + 25 + 30 + 55 + 100 = 224.' },
+        ],
+        answer: EX_HUFF_ANSWER,
+        verify(M) {
+          const freq = { A: 45, B: 13, C: 12, D: 16, E: 9, F: 5 };
+          let forest = Object.entries(freq).map(([sym, w]) => ({ w, depths: { [sym]: 0 } }));
+          let cost = 0;
+          while (forest.length > 1) {
+            forest.sort((a, b) => a.w - b.w);
+            const a = forest.shift(), b = forest.shift();
+            cost += a.w + b.w;
+            const depths = {};
+            for (const src of [a, b]) for (const [sym, d] of Object.entries(src.depths)) depths[sym] = d + 1;
+            forest.push({ w: a.w + b.w, depths });
+          }
+          const derived = forest[0].depths;
+          const wpl = Object.entries(freq).reduce((sum, [sym, f]) => sum + f * derived[sym], 0);
+          const kraft = Object.values(derived).reduce((sum, len) => sum + 2 ** (-len), 0);
+          const same = Object.keys(freq).every((sym) => derived[sym] === EX_HUFF_ANSWER.lengths[sym]);
+          return same && cost === 224 && wpl === 224 && EX_HUFF_ANSWER.wpl === 224 && Math.abs(kraft - 1) < 1e-12;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const byId = {};
+          for (const n of EX_HUFF_NODES) byId[n.id] = n;
+          let g = '';
+          if (step.merges === 0) {
+            g += `<text x="320" y="34" text-anchor="middle" font-size="13" fill="var(--ink-3)">six leaves, sorted by frequency, lightest first — the lightest two merge first</text>`;
+            EX_HUFF_SORTED.forEach(([sym, f], i) => {
+              const x = 70 + i * 100, y = 118;
+              g += `<circle cx="${x}" cy="${y}" r="22" fill="var(--sheet)" stroke="var(--ink-3)" stroke-width="1.6"/><text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="600" fill="var(--ink)">${sym}</text><text x="${x}" y="${y + 38}" text-anchor="middle" font-size="12.5" fill="var(--ink-2)">${f} of 100</text>`;
+              if (i < EX_HUFF_SORTED.length - 1) g += `<text x="${x + 50}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="14" fill="var(--ink-3)">≤</text>`;
+            });
+          } else {
+            for (const n of EX_HUFF_NODES) {
+              if (n.leaf || n.created > step.merges) continue;
+              const hot = n.created === step.merges && !step.answer;
+              for (const [side, cid] of [['left', n.left], ['right', n.right]]) {
+                const c = byId[cid];
+                g += `<line x1="${n.x}" y1="${n.y}" x2="${c.x}" y2="${c.y}" stroke="${hot ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${hot ? 3.4 : 1.6}"/>`;
+                if (step.merges === 5) g += `<text x="${(n.x + c.x) / 2 + (side === 'left' ? -9 : 9)}" y="${(n.y + c.y) / 2}" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="700" fill="${side === 'left' ? 'var(--fnc)' : 'var(--num)'}">${side === 'left' ? '0' : '1'}</text>`;
+              }
+            }
+            for (const n of EX_HUFF_NODES) {
+              if (!n.leaf && n.created > step.merges) continue;
+              const isNew = !n.leaf && n.created === step.merges && !step.answer;
+              if (isNew) g += `<text x="${n.x}" y="${n.y - n.r - 8}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--kw)">new</text>`;
+              g += `<circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${isNew ? 'var(--mark)' : 'var(--sheet)'}" stroke="${isNew ? 'var(--accent)' : 'var(--ink-3)'}" stroke-width="${isNew ? 3 : 1.6}"/><text x="${n.x}" y="${n.y}" text-anchor="middle" dominant-baseline="central" font-size="13.5" font-weight="600" fill="${isNew ? 'var(--mark-ink)' : 'var(--ink)'}">${n.label}</text>`;
+              if (n.leaf) g += `<text x="${n.x}" y="${n.y + n.r + 13}" text-anchor="middle" font-size="12" fill="var(--ink-2)">${n.sub}</text>`;
+            }
+          }
+          const svg = `<svg class="tr-svg" viewBox="0 0 640 ${step.merges === 0 ? 176 : 262}" role="img" aria-label="Huffman trees being merged bottom-up" style="width:100%;height:auto;display:block">${g}</svg>`;
+          const forestChips = step.forest.map((w) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.82rem', border: '1px solid var(--rule)', borderRadius: '0.3rem', padding: '0.08rem 0.42rem', background: 'var(--sheet)' } }, String(w)));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, step.note),
+            h('div', { style: { width: 'min(40rem, 100%)' }, html: svg }),
+            h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } }, h('span.tiny.mono.muted', 'forest weights:'), forestChips),
+            step.answer ? h('div.row', { style: { gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_HUFF_FREQ.map(([sym, f]) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.82rem', border: '1px solid var(--accent)', borderRadius: '0.3rem', padding: '0.1rem 0.45rem', background: 'var(--accent-2)' } }, `${sym} = ${EX_HUFF_CODES[sym]} (${EX_HUFF_ANSWER.lengths[sym]} bits)`))) : null,
+            step.answer ? h('div.ex-answer', 'Answer: expected length 2.24 bits per symbol — weighted path length 224 · check: 14 + 25 + 30 + 55 + 100 = 224, and the code is prefix-free because every symbol sits at a leaf ✓') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 17 */
       {
         title: 'Practice: trees',
@@ -14706,6 +16105,57 @@ bsearch(s, i, j, key) {     // search s[i..j]
       { u: 'd', v: 'b', text: '5/6', kind: 'flow' }, { u: 'b', v: 't', text: '9/10', kind: 'flow' }, { u: 'd', v: 't', text: '10/10', kind: 'sat' },
     ],
   });
+
+  /* ---------- worked examples: one shared network, layout, edge list and flow snapshots ---------- */
+  const EX_NET_POS = { s: [60, 120], a: [210, 50], b: [210, 190], t: [440, 120] };
+  const EX_NET_EDGES = [
+    { key: 'sa', u: 's', v: 'a', c: 10 }, { key: 'sb', u: 's', v: 'b', c: 8 }, { key: 'ab', u: 'a', v: 'b', c: 3 },
+    { key: 'at', u: 'a', v: 't', c: 6 }, { key: 'bt', u: 'b', v: 't', c: 12 },
+  ];
+  const EX_NET_FLOWS = [
+    { sa: 0, sb: 0, ab: 0, at: 0, bt: 0 },
+    { sa: 6, sb: 0, ab: 0, at: 6, bt: 0 },
+    { sa: 6, sb: 8, ab: 0, at: 6, bt: 8 },
+    { sa: 9, sb: 8, ab: 3, at: 6, bt: 11 },
+  ];
+  // SVG elements for one snapshot of the shared network; o is pure step data:
+  // { flows, label: 'flow' | 'residual', path: [edge keys], cut: [edge keys], reachable: [vertices], shade, tagReach }
+  function exNetKids(s, o) {
+    const kids = [];
+    const flows = o.flows || {};
+    const path = o.path || [], cut = o.cut || [], reach = o.reachable || [];
+    if (o.shade) kids.push(s('ellipse', { cx: 135, cy: 85, rx: 128, ry: 60, transform: 'rotate(-25 135 85)', fill: 'var(--accent-2)', opacity: 0.55, stroke: 'var(--accent)', 'stroke-width': 2, 'stroke-dasharray': '8 5' }));
+    for (const e of EX_NET_EDGES) {
+      const f = flows[e.key] || 0;
+      const sat = f === e.c && f > 0;
+      const isCut = cut.includes(e.key), isPath = path.includes(e.key);
+      let col, w, dash;
+      if (isCut) { col = 'var(--false)'; w = 4.2; dash = '7 5'; }
+      else if (isPath) [col, w, dash] = EDGE.hot;
+      else if (o.label === 'residual' && e.c - f === 0) [col, w, dash] = EDGE.ignore;
+      else if (sat) [col, w, dash] = EDGE.sat;
+      else if (f > 0) [col, w, dash] = EDGE.flow;
+      else[col, w, dash] = EDGE.base;
+      const g = geom(EX_NET_POS[e.u], EX_NET_POS[e.v], 20, 20, 0);
+      const head = 5 + w * 1.35;
+      const bx = g.x2 - g.ux * head, by = g.y2 - g.uy * head, hw = head * 0.55;
+      kids.push(s('line', { x1: r1(g.x1), y1: r1(g.y1), x2: r1(bx), y2: r1(by), stroke: col, 'stroke-width': w, fill: 'none', 'stroke-linecap': dash ? 'butt' : 'round', ...(dash ? { 'stroke-dasharray': dash } : {}) }));
+      kids.push(s('polygon', { points: `${r1(g.x2)},${r1(g.y2)} ${r1(bx + g.nx * hw)},${r1(by + g.ny * hw)} ${r1(bx - g.nx * hw)},${r1(by - g.ny * hw)}`, fill: col }));
+      const text = o.label === 'residual' ? `fwd ${e.c - f} · back ${f}` : `${f}/${e.c}${sat ? ' full' : ''}${isCut ? ' ✕' : ''}`;
+      const fs = 13, bw = text.length * fs * 0.6 + 10, bh = fs + 7;
+      const [bg, bd, ink] = LAB[isCut ? 'cut' : isPath ? 'hot' : 'plain'];
+      kids.push(s('rect', { x: r1(g.mx - bw / 2), y: r1(g.my - bh / 2), width: r1(bw), height: bh, rx: 4, fill: bg, stroke: bd, 'stroke-width': isPath || isCut ? 2 : 1 }));
+      kids.push(s('text', { x: r1(g.mx), y: r1(g.my + 1), 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': fs, fill: ink, text }));
+    }
+    for (const [n, p] of Object.entries(EX_NET_POS)) {
+      const [fill, stroke, ink] = NODE[reach.includes(n) ? 'S' : 'plain'];
+      const term = n === 's' || n === 't';
+      kids.push(s('circle', { cx: p[0], cy: p[1], r: 20, fill, stroke, 'stroke-width': term ? 2.6 : 1.8 }));
+      kids.push(s('text', { x: p[0], y: p[1] + 1, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 16, 'font-weight': term ? 700 : 600, fill: ink, text: n }));
+      if (o.tagReach) kids.push(s('text', { x: p[0], y: p[1] + 40, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: reach.includes(n) ? 'var(--accent)' : 'var(--ink-3)', text: reach.includes(n) ? 'reachable' : 'not reached' }));
+    }
+    return kids;
+  }
 
   /* ---------- practice helpers: random five-vertex networks on a fixed layout ---------- */
   const TPL = { s: [30, 95], a: [140, 30], b: [140, 160], c: [252, 95], t: [352, 95] };
@@ -15578,6 +17028,91 @@ bsearch(s, i, j, key) {     // search s[i..j]
           },
         ],
       },
+      /* ---------------------------------------------------------------- worked example 1 */
+      {
+        title: 'Worked example: maximum flow by augmenting paths',
+        kind: 'example',
+        id: 'ex-maxflow',
+        problem: String.raw`<p>Find the maximum flow from \(s\) to \(t\) by the Ford–Fulkerson method, one augmenting path at a time, in the network with capacities \(s \to a = 10\), \(s \to b = 8\), \(a \to b = 3\), \(a \to t = 6\) and \(b \to t = 12\).</p>`,
+        steps: [
+          { flows: EX_NET_FLOWS[0], label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'All flows 0 · labels read flow / capacity · flow value |f| = 0', caption: 'Setup: every flow starts at 0, and a flow must respect each capacity and keep flow in equal to flow out at a and at b. We improve the flow one augmenting path at a time, always looking for spare room in the residual network.' },
+          { flows: EX_NET_FLOWS[1], label: 'flow', path: ['sa', 'at'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → a → t · bottleneck min(10, 6) = 6 · push 6 · |f| = 6', caption: 'Augment along s → a → t, whose bottleneck is min(10, 6) = 6, so we push 6 units along both edges. The total flow value rises to 6, and a → t is now saturated at 6/6 because its capacity is completely used.' },
+          { flows: EX_NET_FLOWS[2], label: 'flow', path: ['sb', 'bt'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → b → t · bottleneck min(8, 12) = 8 · push 8 · |f| = 14', caption: 'Augment along s → b → t, whose bottleneck is min(8, 12) = 8, so we push 8 more units through b. The total flow value rises to 14, and s → b is now saturated at 8/8, leaving b → t with 4 units of room.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: ['sa', 'ab', 'bt'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → a → b → t · bottleneck min(4, 3, 4) = 3 · push 3 · |f| = 17', caption: 'Augment along s → a → b → t, whose bottleneck is min(4, 3, 4) = 3, set by the untouched edge a → b. Pushing 3 makes s → a read 9/10 and a → b saturated at 3/3, while b → t rises to 11/12 and the total reaches 17.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: [], reachable: ['s', 'a'], shade: true, tagReach: true, status: 'Residual reachability: s and a are reachable · b and t are not · no augmenting path remains', caption: 'No augmenting path remains, because in the residual network s can still reach a through 1 unit of forward room on s → a, but every forward edge out of a is saturated and s → b is full. The reachable set {s, a} therefore splits the network into a cut, and counting that cut in the answer step will prove that 17 cannot be beaten.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Maximum flow = 17 · cut ({s, a} | {b, t}) capacity = 8 + 3 + 6 = 17', answer: true, caption: 'Answer: the maximum flow is 17, and conservation checks out at a (in 9, out 6 + 3 = 9) and at b (in 8 + 3 = 11, out 11), with every capacity respected. The cut ({s, a} | {b, t}) has capacity 8 + 3 + 6 = 17, so a flow and a cut with equal values certify each other by the max-flow min-cut theorem and 17 is provably maximal.' },
+        ],
+        answer: 17,
+        verify(M) {
+          const cap = { s: { a: 10, b: 8 }, a: { b: 3, t: 6 }, b: { t: 12 }, t: {} };
+          const res = {};
+          for (const u of Object.keys(cap)) { res[u] = res[u] || {}; for (const [v, c] of Object.entries(cap[u])) { res[u][v] = c; res[v] = res[v] || {}; if (!(u in res[v])) res[v][u] = 0; } }
+          let total = 0;
+          for (;;) {
+            const parent = { s: null };
+            const queue = ['s'];
+            while (queue.length) {
+              const u = queue.shift();
+              for (const [v, room] of Object.entries(res[u])) if (room > 0 && !(v in parent)) { parent[v] = u; queue.push(v); }
+            }
+            if (!('t' in parent)) break;
+            let push = Infinity;
+            for (let v = 't'; v !== 's'; v = parent[v]) push = Math.min(push, res[parent[v]][v]);
+            for (let v = 't'; v !== 's'; v = parent[v]) { res[parent[v]][v] -= push; res[v][parent[v]] += push; }
+            total += push;
+          }
+          const f = { sa: 9, sb: 8, ab: 3, at: 6, bt: 11 };
+          const caps = { sa: 10, sb: 8, ab: 3, at: 6, bt: 12 };
+          const withinCaps = Object.keys(caps).every((k) => f[k] >= 0 && f[k] <= caps[k]);
+          const consA = f.sa === f.ab + f.at;
+          const consB = f.sb + f.ab === f.bt;
+          const value = f.sa + f.sb;
+          return total === 17 && withinCaps && consA && consB && value === 17;
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            svg,
+            step.answer ? h('div.ex-answer', 'Maximum flow = 17 · check: conservation holds at a (in 9, out 9) and at b (in 11, out 11), and the cut ({s, a} | {b, t}) has capacity 8 + 3 + 6 = 17') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: a minimum cut from the residual network',
+        kind: 'example',
+        id: 'ex-mincut',
+        problem: String.raw`<p>For the same network — capacities \(s \to a = 10\), \(s \to b = 8\), \(a \to b = 3\), \(a \to t = 6\) and \(b \to t = 12\) — whose maximum flow is 17, from the previous example, find a minimum \(s\)-\(t\) cut by reading the final residual network.</p>`,
+        steps: [
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'Final flow · s → a 9/10 · s → b 8/8 · a → b 3/3 · a → t 6/6 · b → t 11/12 · |f| = 17', caption: 'Setup: start from the final flow of the previous example, which has value 17, and build its residual network to see what can still move. The method is to mark every vertex reachable from s in that residual network, because those vertices will form the source side of the cut.' },
+          { flows: EX_NET_FLOWS[3], label: 'residual', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'Residual room · forward = capacity − flow · backward = flow · dashed edges have 0 forward room', caption: 'Compute the residual room on every edge: forward room is capacity minus flow, and backward room is the flow that could be canceled. The forward rooms are s → a 1, s → b 0, a → b 0, a → t 0 and b → t 1, and the three edges with 0 forward room are drawn dashed because nothing more can pass that way.' },
+          { flows: EX_NET_FLOWS[3], label: 'residual', path: [], cut: [], reachable: ['s', 'a'], shade: true, tagReach: true, status: 'Reachability walk: s → a only · reachable set = {s, a}', caption: 'Walk the residual network from s: the only usable residual edge out of s leads to a, since s → a still has 1 unit of forward room. From a every forward residual edge has 0 room, so the walk stops and the reachable set is exactly {s, a}.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Cut edges: s → b (8) · a → b (3) · a → t (6) · total 8 + 3 + 6 = 17', caption: 'The cut edges are the original edges that run from the reachable side {s, a} to the other side {b, t}: s → b, a → b and a → t, drawn dashed with an X. Adding only their capacities gives 8 + 3 + 6 = 17, and edges that point back into {s, a} are never counted.' },
+          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Minimum cut capacity = 17 · all four cuts: {s} 18 · {s, a} 17 · {s, b} 22 · {s, a, b} 18', answer: true, caption: 'Answer: the minimum cut capacity is 17, because every s-t path must cross one of the cut edges — it starts with s → a or s → b, and from a it must take a → b or a → t. Checking all four cuts gives {s}: 18, {s, a}: 17, {s, b}: 22 and {s, a, b}: 18, and 17 also equals the maximum flow, exactly as the max-flow min-cut theorem promises.' },
+        ],
+        answer: 17,
+        verify(M) {
+          const cap = [['s', 'a', 10], ['s', 'b', 8], ['a', 'b', 3], ['a', 't', 6], ['b', 't', 12]];
+          const mids = ['a', 'b'];
+          let count = 0, best = Infinity, bestSet = '';
+          for (let mask = 0; mask < 4; mask++) {
+            const S = new Set(['s', ...mids.filter((_, i) => mask & (1 << i))]);
+            count++;
+            const sum = cap.filter(([u, v]) => S.has(u) && !S.has(v)).reduce((acc, e) => acc + e[2], 0);
+            if (sum < best) { best = sum; bestSet = [...S].sort().join(','); }
+          }
+          return count === 4 && best === 17 && bestSet === 'a,s';
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            svg,
+            step.answer ? h('div.ex-answer', 'Minimum cut capacity = 17 · check: cut ({s, a} | {b, t}) = 8 + 3 + 6 = 17, which equals the maximum flow') : null));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         title: 'Practice: network flows',
@@ -16143,6 +17678,21 @@ bsearch(s, i, j, key) {     // search s[i..j]
     for (const i of sorted) { const last = runs[runs.length - 1]; if (last && last[1] === i - 1) last[1] = i; else runs.push([i, i]); }
     return runs;
   }
+
+  /* ---------------- worked examples ---------------- */
+  // ex-kmap: f(a, b, c) = Σm(0, 2, 4, 5, 6); rows are a, columns are bc in Gray order
+  const EX_KMAP_ONES = [0, 2, 4, 5, 6];
+  const EX_KMAP_QUAD = [0, 2, 4, 6];
+  const EX_KMAP_PAIR = [4, 5];
+  const EX_KMAP_CELL = (r, c) => (r << 2) | GRAY[c]; // minterm index 4a + 2b + c for row a = r, column bc = GRAY[c]
+
+  // ex-adder-eval: 1011 + 0110, one entry per bit position, bit 0 (rightmost) first
+  const EX_ADD_COLS = [
+    { i: 0, a: 1, b: 0, cin: 0, sum: 1, cout: 0 },
+    { i: 1, a: 1, b: 1, cin: 0, sum: 0, cout: 1 },
+    { i: 2, a: 0, b: 1, cin: 1, sum: 0, cout: 1 },
+    { i: 3, a: 1, b: 0, cin: 1, sum: 0, cout: 1 },
+  ];
 
   DM.module({
     id: 'boolean',
@@ -17067,6 +18617,119 @@ bsearch(s, i, j, key) {     // search s[i..j]
       },
       /* ---------------------------------------------------------------- 14 */
       {
+        title: 'Worked example: minimizing with a Karnaugh map',
+        kind: 'example',
+        id: 'ex-kmap',
+        problem: String.raw`<p>A function \(f(a, b, c)\) is 1 exactly for the minterms \(m_0, m_2, m_4, m_5, m_6\) — that is, \((a, b, c)\) is one of \(000, 010, 100, 101, 110\). Use a Karnaugh map to find a minimal sum of products for \(f\).</p>`,
+        steps: [
+          { groups: 0, plotted: false, caption: 'The map has one row for each value of a and one column for each value of bc, listed in Gray order 00, 01, 11, 10. Gray order matters because neighboring cells then differ in exactly one variable, even across the wrap-around edges, and that is what lets neighboring 1s merge into bigger groups.' },
+          { groups: 0, plotted: true, caption: 'Now transfer the truth table into the map: a 1 goes in each of the five minterm cells m0, m2, m4, m5 and m6, and a 0 goes everywhere else. Nothing about the function changes here; only its layout changes, from a list of rows into a picture where patterns become visible.' },
+          { groups: 1, plotted: true, caption: 'Circle the four cells m0, m2, m4 and m6 as one quad, shown with the dashed outline. The group wraps around the left and right edges of the map, which is allowed because those edges are neighbors in Gray order, and in all four cells c stays 0 while a and b change, so the quad gives the single literal c′.' },
+          { groups: 2, plotted: true, caption: 'Next circle the pair m4 and m5, shown with the solid outline; m4 already belongs to the quad, and overlap is allowed. Across the pair a = 1 and b = 0 stay constant while c changes, so c drops out of this term and the pair gives ab′.' },
+          { groups: 2, plotted: true, expr: true, caption: 'Read the two groups off as a sum of products: f = c′ + ab′. Every 1 on the map is covered and each group is as large as it can possibly be, which is exactly what minimal means here: two terms and three literals instead of five full minterms.' },
+          { groups: 2, plotted: true, expr: true, check: true, answer: true, caption: 'Answer: f = c′ + ab′. The check is in the strip below the map: evaluating c′ + ab′ on all eight inputs gives 1 exactly on rows 000, 010, 100, 101 and 110, which is precisely the minterm list {0, 2, 4, 5, 6} we started with.' },
+        ],
+        answer: "c′ + ab′",
+        verify() {
+          const fromSet = (m) => (EX_KMAP_ONES.includes(m) ? 1 : 0);
+          const fromExpr = (m) => { const a = m >> 2, b = (m >> 1) & 1, c = m & 1; return (!c || (a && !b)) ? 1 : 0; };
+          const allRows = range(8).every((m) => fromSet(m) === fromExpr(m));
+          const quadOk = EX_KMAP_QUAD.every((m) => (m & 1) === 0 && EX_KMAP_ONES.includes(m));
+          const pairOk = EX_KMAP_PAIR.every((m) => (m >> 2) === 1 && ((m >> 1) & 1) === 0 && EX_KMAP_ONES.includes(m));
+          return allRows && quadOk && pairOk;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const inQuad = (m) => step.groups >= 1 && EX_KMAP_QUAD.includes(m);
+          const inPair = (m) => step.groups >= 2 && EX_KMAP_PAIR.includes(m);
+          const cell = (r, c) => {
+            const m = EX_KMAP_CELL(r, c);
+            const v = EX_KMAP_ONES.includes(m) ? 1 : 0;
+            const st = {};
+            if (inQuad(m)) { st.border = '3px dashed var(--accent)'; st.background = 'var(--accent-2)'; }
+            if (inPair(m)) { st.border = '3px solid var(--true)'; st.background = 'var(--true-bg)'; if (inQuad(m)) st.boxShadow = 'inset 0 0 0 3px var(--accent)'; }
+            const cls = [inQuad(m) ? 'grp1' : '', inPair(m) ? 'grp2' : ''].join(' ').trim();
+            return h('td', { class: cls, style: st },
+              h('div', { style: { fontSize: '0.62rem', color: 'var(--ink-3)' } }, `m${m}`),
+              h('div', { style: { fontSize: '1.1rem', fontWeight: step.plotted && v ? 700 : 400 } }, step.plotted ? String(v) : '·'));
+          };
+          const table = h('table.tt',
+            h('thead', h('tr', h('th', 'a \\ bc'), GRAY.map((g) => h('th', g.toString(2).padStart(2, '0'))))),
+            h('tbody', [0, 1].map((r) => h('tr', h('th', String(r)), GRAY.map((_, c) => cell(r, c))))));
+          const checkStrip = step.check ? h('table.tt.bl-sm',
+            h('thead', h('tr', h('th.l', 'abc'), range(8).map((m) => h('th', m.toString(2).padStart(3, '0'))))),
+            h('tbody',
+              h('tr', h('th.l', 'f (minterms)'), range(8).map((m) => h('td', String(EX_KMAP_ONES.includes(m) ? 1 : 0)))),
+              h('tr', h('th.l', "c′ + ab′"), range(8).map((m) => { const a = m >> 2, b = (m >> 1) & 1, c = m & 1; return h('td', String((!c || (a && !b)) ? 1 : 0)); })))) : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            table,
+            h('p.small.mono', 'f(a, b, c) = Σm(0, 2, 4, 5, 6)'),
+            step.groups >= 1 ? h('p.small', 'Dashed outline (grp1): the quad m0, m2, m4, m6 wraps around the left and right edges — c = 0 in every cell, giving c′.') : null,
+            step.groups >= 2 ? h('p.small', 'Solid outline (grp2): the pair m4, m5 — a = 1 and b = 0 in both cells, giving ab′.') : null,
+            step.expr ? h('div.big-math', { html: String.raw`\(f = c' + ab'\)` }) : null,
+            checkStrip,
+            step.answer ? h('div.ex-answer', "Answer: f = c′ + ab′ — check: c′ + ab′ is 1 exactly on {0, 2, 4, 5, 6}, matching the given minterms") : null));
+        },
+      },
+      /* ---------------------------------------------------------------- 15 */
+      {
+        title: 'Worked example: evaluating a ripple-carry adder',
+        kind: 'example',
+        id: 'ex-adder-eval',
+        problem: String.raw`<p>The ripple-carry adder of this module adds \(1011_2\) (eleven) and \(0110_2\) (six). Evaluate it bit by bit from the least significant bit, tracking every carry, the way the circuit does.</p>`,
+        steps: [
+          { bits: 0, caption: 'Line the two numbers up in columns, 1011 over 0110, with an empty carry row above them. A ripple-carry adder is just a chain of full adders, and each column must wait for the carry from its right neighbor, so the work has to go from right to left, starting at bit 0.' },
+          { bits: 1, caption: 'Bit 0: the full adder receives a0 = 1, b0 = 0 and the starting carry c0 = 0, a total of one 1. The sum bit is the parity of the three inputs, so s0 = 1, and the carry-out is 1 only when at least two inputs are 1, so c1 = 0.' },
+          { bits: 2, caption: 'Bit 1: a1 = 1, b1 = 1 and c1 = 0 give two 1s, an even count. The parity rule makes s1 = 0, and because at least two inputs are 1 the majority rule sends a carry out, so c2 = 1, passed on to the next column.' },
+          { bits: 3, caption: 'Bit 2: a2 = 0, b2 = 1 and the incoming carry c2 = 1 also give two 1s. So s2 = 0 by parity and c3 = 1 by majority, and that carry ripples one more column to the left.' },
+          { bits: 4, caption: 'Bit 3: a3 = 1, b3 = 0 and c3 = 1 give two 1s for the third time in a row. The sum bit is s3 = 0 and the carry-out is c4 = 1, but now there is no next full adder to receive that carry.' },
+          { bits: 5, caption: 'The leftover carry c4 = 1 becomes a fifth sum bit, s4 = 1, sitting to the left of s3. The full result now reads 10001, and dropping that final carry would have lost the most valuable bit of the answer.' },
+          { bits: 5, answer: true, caption: 'Answer: 1011 + 0110 = 10001, which is 17 in decimal. The check agrees two ways: eleven plus six is seventeen, and every sum bit above was the parity of its three inputs while every carry was their majority, recomputed column by column.' },
+        ],
+        answer: '10001',
+        verify() {
+          const sumOk = (0b1011 + 0b0110) === 17 && parseInt('10001', 2) === 17;
+          let carry = 0, bits = '';
+          for (let i = 0; i < 4; i++) {
+            const a = (0b1011 >> i) & 1, b = (0b0110 >> i) & 1;
+            bits = String(a ^ b ^ carry) + bits;
+            carry = (a + b + carry) >= 2 ? 1 : 0;
+          }
+          bits = String(carry) + bits;
+          const chainOk = EX_ADD_COLS.every((c, i) => c.cin === (i === 0 ? 0 : EX_ADD_COLS[i - 1].cout));
+          const colsOk = EX_ADD_COLS.every((c, i) => {
+            const a = (0b1011 >> i) & 1, b = (0b0110 >> i) & 1;
+            return c.a === a && c.b === b && c.sum === (a ^ b ^ c.cin) && c.cout === ((a + b + c.cin) >= 2 ? 1 : 0);
+          });
+          return sumOk && bits === '10001' && chainOk && colsOk;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const POS = [4, 3, 2, 1, 0]; // display order, most significant column first
+          const active = step.bits >= 1 && step.bits <= 4 ? step.bits - 1 : step.bits === 5 ? 4 : -1;
+          const cur = (i) => (i === active ? 'cur' : '');
+          const carryIn = (i) => (i === 4 ? EX_ADD_COLS[3].cout : EX_ADD_COLS[i].cin);
+          const carryShown = (i) => (i === 4 ? step.bits >= 5 : i <= step.bits);
+          const row = (label, fn) => h('tr', h('th.l', label), POS.map((i) => h('td', { class: cur(i) }, fn(i))));
+          const table = h('table.tt',
+            h('thead', h('tr', h('th', ''), POS.map((i) => h('th', { class: cur(i) }, `bit ${i}`)))),
+            h('tbody',
+              row('carry in', (i) => (carryShown(i) ? String(carryIn(i)) : '·')),
+              row('a = 1011', (i) => (i === 4 ? '—' : String(EX_ADD_COLS[i].a))),
+              row('b = 0110', (i) => (i === 4 ? '—' : String(EX_ADD_COLS[i].b))),
+              row('sum', (i) => (i === 4 ? (step.bits >= 5 ? '1' : '·') : i < step.bits ? String(EX_ADD_COLS[i].sum) : '·'))));
+          const col = step.bits >= 1 && step.bits <= 4 ? EX_ADD_COLS[step.bits - 1] : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            table,
+            step.bits === 0 ? h('p.small', 'Columns are numbered from bit 0 at the right. c0 = 0: no carry enters the first column.') : null,
+            col ? h('p.small.mono', `bit ${col.i}: ${col.a} + ${col.b} + ${col.cin} = ${col.cout}${col.sum} in binary — write s${col.i} = ${col.sum}, carry c${col.i + 1} = ${col.cout} to the next column`) : null,
+            step.bits === 5 && !step.answer ? h('p.small.mono', 'c4 = 1 becomes s4 = 1: the result is 10001') : null,
+            step.answer ? h('p.small', 'Check: 1011 is 11 and 0110 is 6, and 11 + 6 = 17, which is 10001 in binary.') : null,
+            step.answer ? h('div.ex-answer', 'Answer: 1011 + 0110 = 10001 (17) — check: 11 + 6 = 17, and each sum bit was the parity of its three inputs') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- 16 */
+      {
         title: 'Practice: Boolean algebra and circuits',
         kind: 'practice',
         html: String.raw`<p class="muted small">Type expressions with <code>'</code> for NOT and <code>+</code> for OR, and write AND by putting letters side by side, for example <code>xy + x'z</code>. Any equally small correct answer is accepted.</p>`,
@@ -17223,6 +18886,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
   // probability that at least two of n people share a birthday (365 equally likely days)
   const shareProb = (n) => { let q = 1; for (let i = 0; i < n; i++) q *= (365 - i) / 365; return 1 - q; };
   const yoursProb = (n) => 1 - (364 / 365) ** Math.max(0, n - 1);
+  // ---- worked example data: the 16 outcome strings of 4 coin flips, built H-first so the tree order is fixed ----
+  const EX_BIN_LEAVES = (() => { let cur = ['']; for (let f = 0; f < 4; f++) { const nxt = []; for (const p of cur) { nxt.push(p + 'H'); nxt.push(p + 'T'); } cur = nxt; } return cur; })();
+  const EX_BIN_HEADS = (leaf) => leaf.split('').filter((c) => c === 'H').length;
 
   DM.module({
     id: 'probability',
@@ -18066,6 +19732,117 @@ bsearch(s, i, j, key) {     // search s[i..j]
             good: 'hand = random.sample(deck, k=5)   # 5 different cards\nrolls = random.choices(range(1, 7), k=5)\n# repeats are fine for dice',
           },
         ],
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: Bayes with 1,000 dots',
+        kind: 'example',
+        id: 'ex-bayes-dots',
+        problem: String.raw`<p>A condition affects 2% of a population. A test catches 95% of the people who have it (its sensitivity) and wrongly flags 5% of the people who do not (its false-positive rate). Out of 1,000 people, your test comes back positive. What is the probability that you actually have the condition? Count it with all 1,000 people drawn as dots.</p>`,
+        steps: [
+          { phase: 0, note: 'Setup: 1,000 people · 2% have the condition · sensitivity 95% · false-positive rate 5%', caption: 'Counting people first and turning counts into a probability at the end keeps the base rate visible, which is the whole point of this method. All 1,000 dots start neutral, because no group has been marked yet.' },
+          { phase: 1, note: 'Have the condition: 20 people · Do not have it: 980 people', caption: 'Mark the people who have the condition: 2% of 1,000 is 20 people. This small group is the base rate, and forgetting how small it is causes the usual far-too-high guess.' },
+          { phase: 2, note: 'Sick and test positive: 19 · Sick but missed: 1 · Positive so far: 19', caption: 'Apply the 95% sensitivity to the 20 sick people: 19 test positive and 1 is missed. The dark ring and plus sign mark a positive result, so the test outcome never rests on color alone.' },
+          { phase: 3, note: 'Healthy but test positive (false positives): 49 · Total positive: 19 + 49 = 68', caption: 'Now mark the healthy group: 5% sounds small, but 5% of 980 is 49 false positives. That is more than twice the entire group of 20 people who have the condition.' },
+          { phase: 4, note: 'Inside the 68 positive results: 19 are true cases and 49 are false positives', caption: 'Dim everyone who tested negative and focus on the 68 positive results only. A positive result puts you inside this group of 68, so the relevant question is now 19 out of 68.' },
+          { phase: 5, note: 'Inside the 68 positive results: 19 are true cases and 49 are false positives', answer: true, caption: 'Check by Bayes\' rule with exact fractions: (95/100 × 2/100) / (95/100 × 2/100 + 5/100 × 98/100) = 190/680 = 19/68. The dot count and the formula agree, so a positive result means about a 28% chance.' },
+        ],
+        answer: '19/68',
+        verify(M) {
+          const sick = (1000 * 2) / 100;
+          const tp = (sick * 95) / 100;
+          const healthy = 1000 - sick;
+          const fp = (healthy * 5) / 100;
+          const f = M.frac(95 * 2, 95 * 2 + 5 * 98);
+          return sick === 20 && tp === 19 && healthy === 980 && fp === 49 && tp + fp === 68
+            && f.n === 19 && f.d === 68 && String(f) === '19/68' && String(M.frac(tp, tp + fp)) === '19/68';
+        },
+        draw(stage, ctx, step) {
+          const { h, s } = ctx;
+          const phase = step.phase;
+          const circles = [];
+          const pluses = [];
+          for (let i = 0; i < 1000; i++) {
+            const sick = i < 20;
+            const pos = sick ? i < 19 : i >= 20 && i < 69;
+            let fill = 'var(--rule)', stroke = 'none', sw = 0, op = 1;
+            if (phase >= 1 && sick) fill = 'var(--false)';
+            if (phase >= 2 && sick && !pos) { fill = 'var(--sheet)'; stroke = 'var(--false)'; sw = 1.6; }
+            if (phase >= 3 && !sick && pos) fill = 'var(--warn)';
+            if (phase >= 2 && pos) { stroke = 'var(--ink)'; sw = 1.3; }
+            if (phase >= 4 && !pos) op = 0.13;
+            const cx = 15 + (i % 40) * 25, cy = 14 + Math.floor(i / 40) * 11.7;
+            circles.push(s('circle', { cx, cy, r: 4.8, fill, stroke, 'stroke-width': sw, opacity: op }));
+            if (phase >= 2 && pos) pluses.push(s('text', { x: cx, y: cy + 2.4, 'text-anchor': 'middle', 'font-size': 7, 'font-weight': 700, fill: sick ? 'var(--sheet)' : 'var(--ink)', opacity: op, text: '+' }));
+          }
+          const svg = s('svg', { viewBox: '0 0 1000 300', class: 'pb-svg', role: 'img', 'aria-label': '1,000 dots, one per person, marked by condition and test result', style: 'max-height:13.5rem' }, ...circles, ...pluses);
+          const legendKids = [h('span', h('i', { style: { background: 'var(--rule)' } }), phase === 0 ? '1,000 people, no groups marked yet' : 'Healthy, test negative')];
+          if (phase >= 1) legendKids.push(h('span', h('i', { style: { background: 'var(--false)' } }), 'Has the condition (20)'));
+          if (phase >= 2) legendKids.push(h('span', 'Ring and + : tests positive'), h('span', h('i', { style: { background: 'var(--sheet)', borderColor: 'var(--false)' } }), 'Sick but missed (1)'));
+          if (phase >= 3) legendKids.push(h('span', h('i', { style: { background: 'var(--warn)' } }), 'Healthy, tests positive: false positive (49)'));
+          if (phase >= 4) legendKids.push(h('span', 'Dimmed: tested negative (932), out of the question now'));
+          stage.append(h('div.stack', { style: { gap: '0.35rem', width: '100%' } },
+            h('div.pb-legend', legendKids),
+            svg,
+            h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
+            step.answer ? h('div.ex-answer', 'P(sick | positive) = 19/68, about 28% · check: 19 true positives out of 68 positive results (19 + 49 = 68), and Bayes\' rule gives 190/680 = 19/68') : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: exactly 2 heads in 4 flips, by tree',
+        kind: 'example',
+        id: 'ex-binomial-tree',
+        problem: String.raw`<p>A fair coin is flipped 4 times. What is the probability of exactly 2 heads? Build the full outcome tree: list every outcome string, collect the ones with exactly 2 heads, and count.</p>`,
+        steps: [
+          { depth: 1, note: 'After 1 flip: 2 prefixes · after 4 flips there will be 2 × 2 × 2 × 2 = 16 outcome strings', caption: 'Each flip doubles the number of outcomes, so after 4 flips there are 2^4 = 16 equally likely outcome strings. The tree starts at the root and makes its first split into H and T.' },
+          { depth: 2, note: 'Level 2: 4 prefixes — HH, HT, TH, TT', caption: 'Level 2 is complete with 4 prefixes: HH, HT, TH, and TT. The tree keeps outcomes that feel similar, HT and TH, separate, and that distinction is exactly what counting needs.' },
+          { depth: 3, note: 'Level 3: 8 prefixes, each one flip away from a finished outcome string', caption: 'Level 3 doubles the prefixes again to 8, because each level-2 prefix branches into one ending in H and one ending in T. Nothing has merged, so every prefix still stands for distinct flip sequences.' },
+          { depth: 4, note: 'Level 4: all 16 outcome strings, each labeled with its head count', caption: 'Level 4 completes the tree with all 16 outcome strings as leaves, and each leaf is labeled with its head count. The same head count can come from several different leaves, which is why the next step collects them.' },
+          { depth: 4, collect: true, note: 'Exactly 2 heads: 6 leaves — HHTT, HTHT, HTTH, THHT, THTH, TTHH', caption: 'Collect the leaves with exactly 2 heads: HHTT, HTHT, HTTH, THHT, THTH, and TTHH. There are C(4, 2) = 6 ways to choose which 2 of the 4 flips are heads, and the tree shows all 6 of them.' },
+          { depth: 4, collect: true, note: 'Head-count distribution: 0 heads: 1 · 1 head: 4 · 2 heads: 6 · 3 heads: 4 · 4 heads: 1 · total 16', answer: true, caption: 'Check: the full distribution from the tree is 1, 4, 6, 4, 1 for 0 to 4 heads, which sums to 16 leaves. The formula C(4, 2) / 2^4 = 6/16 = 3/8 agrees with the leaf count exactly.' },
+        ],
+        answer: '3/8',
+        verify(M) {
+          const dist = [0, 0, 0, 0, 0];
+          let count2 = 0;
+          for (let mask = 0; mask < 16; mask++) {
+            let ones = 0;
+            for (let b = 0; b < 4; b++) if (mask & (1 << b)) ones++;
+            dist[ones]++;
+            if (ones === 2) count2++;
+          }
+          const f = M.frac(6, 16);
+          return count2 === 6 && dist.join(',') === '1,4,6,4,1' && dist.reduce((a, b) => a + b, 0) === 16
+            && M.C(4, 2) === 6 && f.n === 3 && f.d === 8 && String(f) === '3/8' && EX_BIN_LEAVES.length === 16
+            && EX_BIN_LEAVES.filter((leaf) => EX_BIN_HEADS(leaf) === 2).length === 6;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const rows = [h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'flex-start' } },
+            h('div.tiny.mono.muted', { style: { minWidth: '3.6rem', paddingTop: '0.25rem' } }, 'Start'),
+            h('div.pb-chips', h('span', 'no flips yet')))];
+          for (let L = 1; L <= step.depth; L++) {
+            const prefs = [...new Set(EX_BIN_LEAVES.map((leaf) => leaf.slice(0, L)))];
+            const chips = prefs.map((p) => {
+              if (L < 4) return h('span', p);
+              const heads = EX_BIN_HEADS(p);
+              const label = `${p} · ${heads} head${heads === 1 ? '' : 's'}`;
+              if (step.collect && heads === 2) return h('span.hit', `✓ ${label}`);
+              if (step.collect) return h('span', { style: { opacity: '0.45' } }, label);
+              return h('span', label);
+            });
+            rows.push(h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'flex-start' } },
+              h('div.tiny.mono.muted', { style: { minWidth: '3.6rem', paddingTop: '0.25rem' } }, `Flip ${L}`),
+              h('div.pb-chips', chips)));
+          }
+          stage.append(h('div.stack', { style: { gap: '0.45rem', width: '100%' } },
+            rows,
+            h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
+            step.answer ? h('div.pb-chips', { style: { justifyContent: 'center' } },
+              h('span', '0 heads: 1'), h('span', '1 head: 4'), h('span.hit', '✓ 2 heads: 6'), h('span', '3 heads: 4'), h('span', '4 heads: 1'), h('span', 'total: 16')) : null,
+            step.answer ? h('div.ex-answer', 'P(exactly 2 heads) = 6/16 = 3/8 · check: C(4, 2) = 6 favorable leaves out of 2^4 = 16, and the distribution 1, 4, 6, 4, 1 sums to 16') : null));
+        },
       },
       /* ---------------------------------------------------------------- 14 */
       {
@@ -19300,6 +21077,59 @@ bsearch(s, i, j, key) {     // search s[i..j]
             if (e.key === 'ArrowUp') { show((cur + PIPE.length - 1) % PIPE.length); return true; }
             return false;
           };
+        },
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: designing the duplicate sign-up check',
+        kind: 'example',
+        id: 'ex-duplicate-signups',
+        problem: String.raw`<p>A sign-up service expects up to \(10^6\) registered e-mail addresses. Every new sign-up must be rejected if its address has registered before, and accepted otherwise. Take this problem through the design loop — model, specify, analyze the cost, then verify and measure — and decide how to store the addresses.</p>`,
+        steps: [
+          { phase: -1, caption: 'Setup: the service must reject a sign-up exactly when its address has registered before, at a scale of up to a million addresses. Run it through the design loop before coding, because each phase produces one artifact and coding first would bury the decisions inside the code.' },
+          { phase: 0, caption: 'Model: the only question is "has this address been seen?", so the accepted addresses form a set and the only operation is membership. A set is the honest model because order does not matter and repeats are exactly what must be rejected, not stored twice.' },
+          { phase: 1, caption: 'Specify: the contract says the set never holds an address twice, and a sign-up is rejected exactly when its address is already in the set; otherwise the address is added and the sign-up is accepted. Writing that invariant down turns the requirement into something code and tests can both be checked against.' },
+          { phase: 2, caption: String.raw`Analyze: count the cost before choosing storage, because scanning a list costs \(O(n)\) per sign-up and about \(n^2/2 = 5 \times 10^{11}\) comparisons in total for \(n = 10^6\), while a hash set answers membership in \(O(1)\) average time, about \(10^6\) steps in total. The count, not taste, is what eliminates the list.` },
+          { phase: 3, caption: 'Verify and measure: induction on the number of sign-ups proves the invariant — it holds after 0 sign-ups, and each step adds an address only when it is absent — and testing against a nested-loop oracle on 1,000 random lists backs the proof. A simulation of a million sign-ups taking about 0.4 seconds then confirms the cost model; an hour would send us back to the count.' },
+          { phase: 3, answer: true, caption: String.raw`Answer: store the addresses in a hash set, because membership is the only operation the model needs and the invariant is exactly the requirement. The check closes the loop: about \(5 \times 10^{11}\) list comparisons against about \(10^6\) hash steps is roughly half a million times less work, and correctness and cost were both verified before any code shipped.` },
+        ],
+        answer: 'hash set',
+        verify(M) {
+          const n = 1e6;
+          const listComparisons = (n * (n - 1)) / 2;
+          const hashSteps = n;
+          return listComparisons === 499999500000 && listComparisons > 1e11 && Math.abs(listComparisons / 5e11 - 1) < 0.01 && hashSteps === 1e6 && listComparisons / hashSteps > 1e5;
+        },
+        draw(stage, ctx, step) {
+          const { h } = ctx;
+          const phases = [
+            { name: '1 · Model', empty: 'the structure goes here', body: 'A set of addresses. The only operation is membership: is this address in the set? Order does not matter, and repeats are what get rejected.' },
+            { name: '2 · Specify', empty: 'the contract goes here', body: 'Invariant: the set never holds an address twice. Rule: if the address is in the set, reject the sign-up; otherwise add the address and accept.' },
+            { name: '3 · Analyze: count the cost', empty: 'the cost figures go here', body: 'List scan: about n\u00B2/2 = 5 \u00D7 10\u00B9\u00B9 comparisons for n = 10\u2076. Hash set: O(1) average lookup, about 10\u2076 steps in total.' },
+            { name: '4 · Verify and measure', empty: 'the checks go here', body: 'Correctness by induction on sign-ups; testing against a nested-loop oracle on 1,000 random lists; a million simulated sign-ups in about 0.4 s confirm the estimate.' },
+          ];
+          const cards = phases.map((p, j) => {
+            const filled = step.phase >= j;
+            const current = step.phase === j && !step.answer;
+            return h('div', {
+              style: {
+                flex: '1 1 12rem', minWidth: '0', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius)',
+                background: 'var(--paper)',
+                border: current ? '2px solid var(--accent)' : filled ? '1px solid var(--true)' : '1px dashed var(--rule)',
+              },
+            },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem' } },
+                h('b', { style: { fontSize: '0.92rem' } }, p.name),
+                h('span.tiny.mono', { style: { color: current ? 'var(--accent)' : filled ? 'var(--true)' : 'var(--ink-3)', fontWeight: '700', textTransform: 'uppercase' } }, current ? 'current' : filled ? 'done' : 'waiting')),
+              filled
+                ? h('p.small', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, p.body)
+                : h('p.small.muted', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, 'Empty slot \u2014 ' + p.empty + '.'));
+          });
+          stage.append(h('div.stack', { style: { alignItems: 'stretch', gap: '0.55rem', width: 'min(62rem, 100%)' } },
+            h('div', { style: { padding: '0.45rem 0.7rem', border: '1px solid var(--rule)', borderLeft: '3px solid var(--accent)', borderRadius: 'var(--radius)', background: 'var(--paper)', fontSize: '0.92rem', lineHeight: '1.45' } },
+              h('b', 'The problem: '), 'reject a new sign-up exactly when its e-mail address has registered before. Scale: up to 10\u2076 registered addresses. Four phases, four artifacts \u2014 no code until the last card is filled.'),
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem' } }, cards),
+            step.answer ? h('div.ex-answer', 'Decision: store the addresses in a hash set \u00B7 check: 5 \u00D7 10\u00B9\u00B9 list comparisons vs about 10\u2076 hash steps \u2014 roughly 500,000 times less work, with the invariant proved by induction') : null));
         },
       },
       /* ---------------------------------------------------------------- 12 */

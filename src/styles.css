@@ -280,6 +280,8 @@ table.tt th, table.tt td { border: 1px solid var(--rule); padding: 0.22rem 0.6re
 table.tt th { font-family: var(--font-mono); font-weight: 600; background: var(--paper); color: var(--ink-2); }
 table.tt td.l, table.tt th.l { text-align: left; }
 table.tt tr.hit td { background: var(--mark); color: var(--mark-ink); }
+table.tt td.cur, table.tt th.cur { background: var(--mark); color: var(--mark-ink); font-weight: 600; }
+table.tt td.muted, table.tt th.muted { color: var(--ink-3); }
 table.data { border-collapse: collapse; font-size: 0.88rem; width: 100%; background: var(--sheet); }
 table.data th, table.data td { border-bottom: 1px solid var(--rule); padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }
 table.data th { font-size: 0.72rem; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
@@ -422,6 +424,30 @@ li.on .tok-kw, li.on .tok-str, li.on .tok-num, li.on .tok-fn, li.on .tok-bi, li.
 .qz-dots button.cur { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .qz-dots button.right { background: var(--true-bg); color: var(--true); border-color: var(--true); }
 .qz-dots button.wrong { background: var(--false-bg); color: var(--false); border-color: var(--false); }
+
+/* ---------- worked examples ---------- */
+.kind-tag.example { border-color: var(--fnc); color: var(--fnc); }
+.ex-problem { border: 1px solid var(--rule); border-left: 3px solid var(--fnc); border-radius: var(--radius); background: var(--sheet); padding: 0.55rem 0.85rem; font-size: 0.98rem; line-height: 1.5; }
+.ex-problem-tag { display: block; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--fnc); margin-bottom: 0.2rem; }
+.ex-player { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.ex-stage { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.6rem 0.8rem; box-shadow: var(--shadow); overflow: hidden; }
+.ex-stage.ex-done { border-color: var(--true); border-width: 2px; }
+.ex-stage svg { max-width: 100%; max-height: 100%; height: auto; }
+.ex-stage .ex-answer { background: var(--true-bg); border: 1px solid var(--true); border-radius: var(--radius); padding: 0.45rem 0.8rem; font-weight: 600; text-align: center; }
+.ex-stage .ex-check { color: var(--true); font-weight: 600; }
+.ex-caption { flex: none; min-height: 3.2em; font-size: 0.95rem; line-height: 1.5; background: var(--accent-2); border-radius: var(--radius); padding: 0.5rem 0.8rem; }
+.ex-ctl { flex: none; display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+.ex-scrub { flex: 1 1 9rem; min-width: 6rem; display: flex; align-items: center; }
+.ex-count { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-2); white-space: nowrap; }
+.ex-keys { flex: none; }
+.ex-try { flex: none; }
+.ex-board { font-size: 0.84rem; line-height: 1.5; }
+.ex-board .ex-answer-line { font-weight: 600; }
+.print-page .ex-final { flex: none; max-height: 15rem; }
+.print-page .ex-board { column-count: 2; column-gap: 1.4rem; }
+@media (max-width: 760px) {
+  .ex-caption { min-height: 0; }
+}
 
 /* ---------- dialogs + popover ---------- */
 dialog { border: 1px solid var(--rule); border-radius: 0.8rem; background: var(--sheet); color: var(--ink); padding: 0; box-shadow: 0 30px 80px -20px oklch(10% 0.03 165 / 0.55); width: min(46rem, calc(100vw - 2rem)); max-height: min(85vh, 44rem); }
