@@ -845,7 +845,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">precondition</span> must be true <i>before</i> a function runs (the caller's promise). A <span class="term">postcondition</span> is guaranteed <i>after</i> it returns (the function's promise). An <span class="term">invariant</span> stays true throughout, for example at the start of every loop pass. Together they form the function's <span class="term">contract</span>.</div>
+              <div class="def">A <span class="term">precondition</span> must be true <i>before</i> a function runs (the caller's promise). A <span class="term">postcondition</span> is guaranteed <i>after</i> it returns (the function's promise). An <span class="term">invariant</span> stays true throughout, for example at the start of every loop pass. Together they form the function's <span class="term">contract</span>.<div class="eg"><code>max_of(xs)</code>: precondition "<code>xs</code> is not empty", postcondition "returns the max", invariant "<code>best</code> is the max so far".</div></div>
               <div class="thm">A <span class="term">Hoare triple</span> \(\{P\}\ S\ \{Q\}\) says: if \(P\) is true before statement \(S\) runs, and \(S\) finishes, then \(Q\) is true afterwards. Triples chain like links: if \(S_1\) takes \(P\) to \(Q\) and \(S_2\) takes \(Q\) to \(R\), then running them in order takes \(P\) to \(R\), so you can reason about a long program one statement at a time. A loop invariant is a condition the loop body takes back to itself.
                 \[\{x \ge 0\}\quad y = x + 1\quad \{y \ge 1\}\]</div>
               <table class="tt" style="width:100%">
@@ -1019,7 +1019,7 @@
           <div class="split">
             <div class="stack">
               <p class="lead">Two numbers decide whether a design survives real data: the size of the search space and the chance of a collision. You can compute both before writing any code.</p>
-              <div class="def">The <span class="term">search space</span> is the set of all candidates an algorithm might examine. Counting gives its size: \(k\) independent choices with \(m\) options each give \(m^k\) candidates, the orderings of \(n\) items number \(n!\), and the subsets number \(2^n\).</div>
+              <div class="def">The <span class="term">search space</span> is the set of all candidates an algorithm might examine. Counting gives its size: \(k\) independent choices with \(m\) options each give \(m^k\) candidates, the orderings of \(n\) items number \(n!\), and the subsets number \(2^n\).<div class="eg">A 3-digit lock has \(10^3 = 1000\) codes, 4 guests can line up in \(4! = 24\) orders, and 5 toppings make \(2^5 = 32\) possible pizzas.</div></div>
               <div class="ex">An 8-character password over 62 symbols (a-z, A-Z, 0-9) has \(62^8 \approx 2.2 \times 10^{14}\) possibilities. A GPU rig testing \(10^{10}\) per second tries them all in about 6 hours. At 12 characters there are \(62^{12} \approx 3.2 \times 10^{21}\): about 10,000 years.</div>
               <div class="warn">"One in a million per pair" is not rare overall. Ten thousand items form \(\binom{10000}{2} \approx 5 \times 10^7\) pairs, so expect about 50 matching pairs.</div>
             </div>

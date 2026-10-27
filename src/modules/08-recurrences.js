@@ -307,7 +307,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">recurrence relation</span> for a <span class="term">sequence</span> \(a_0, a_1, a_2, \dots\) is a rule that gives each term \(a_n\) in terms of earlier terms. The <span class="term" data-term="initial condition">initial conditions</span> state the first term or terms outright. A rule plus enough initial conditions defines exactly one sequence.</div>
+              <div class="def">A <span class="term">recurrence relation</span> for a <span class="term">sequence</span> \(a_0, a_1, a_2, \dots\) is a rule that gives each term \(a_n\) in terms of earlier terms. The <span class="term" data-term="initial condition">initial conditions</span> state the first term or terms outright. A rule plus enough initial conditions defines exactly one sequence.<div class="eg">The rule \(a_n = a_{n-1} + 3\) with initial condition \(a_0 = 2\) gives the sequence \(2, 5, 8, 11, \dots\)</div></div>
               <div class="ex">You deposit $1000 at 5% interest per year. Let \(A_n\) be the balance after \(n\) years. Each year adds 5% of the previous balance:
                 \[A_n = 1.05\,A_{n-1} \quad (n \ge 1), \qquad A_0 = 1000.\]
                 The rule says how to take one step. The initial condition says where to start.</div>
@@ -611,7 +611,7 @@
             <div class="stack">
               <div class="def">A <span class="term">linear homogeneous recurrence</span> of <span class="term">order</span> 2 with constant coefficients has the form
                 \[a_n = c_1 a_{n-1} + c_2 a_{n-2}, \qquad c_2 \neq 0.\]
-                <i>Linear</i>: earlier terms are only multiplied by constants. <i>Homogeneous</i>: no extra term such as \(+1\). <i>Order 2</i>: it looks back two steps.</div>
+                <i>Linear</i>: earlier terms are only multiplied by constants. <i>Homogeneous</i>: no extra term such as \(+1\). <i>Order 2</i>: it looks back two steps.<div class="eg">\(a_n = 2a_{n-1} + 3a_{n-2}\) fits, with \(c_1 = 2\) and \(c_2 = 3\). \(a_n = a_{n-1} + a_{n-2} + 1\) does not, because of the \(+1\).</div></div>
               <p><b>The key idea.</b> Guess a solution of the form \(a_n = r^n\). Substituting gives \(r^n = c_1 r^{n-1} + c_2 r^{n-2}\). Dividing by \(r^{n-2}\) leaves the <span class="term">characteristic equation</span></p>
               <p class="big-math">\(r^2 - c_1 r - c_2 = 0.\)</p>
               <p class="small">Each root \(r\) gives a solution \(r^n\), and any sum of multiples of solutions is again a solution.</p>

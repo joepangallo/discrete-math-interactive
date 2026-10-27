@@ -716,7 +716,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">proof</span> is a chain of statements. Each one is a hypothesis, an <span class="term">axiom</span>, a definition, an earlier result, or follows from earlier statements by a rule of logic. The last statement is the claim being proved.</div>
+              <div class="def">A <span class="term">proof</span> is a chain of statements. Each one is a hypothesis, an <span class="term">axiom</span>, a definition, an earlier result, or follows from earlier statements by a rule of logic. The last statement is the claim being proved.<div class="eg">Claim: 10 is even. (1) \(10 = 2 \cdot 5\), by arithmetic. (2) 5 is an integer, so by the definition of even (\(n = 2k\)), 10 is even. ∎</div></div>
               <table class="data small">
                 <tbody>
                   <tr><td><b>Axiom</b></td><td>Accepted without proof, such as: the sum and the product of two integers are integers.</td></tr>
@@ -746,7 +746,7 @@
       {
         title: 'Lab: rules of inference and fallacies',
         kind: 'lab',
-        html: String.raw`<div class="def" style="padding:0.4rem 0.8rem">An argument is <span class="term" data-term="valid argument">valid</span> when its conclusion is true in <i>every</i> row where all its premises are true. A <span class="term">rule of inference</span> is a small valid argument you may use as one step of a proof. Pick a rule: rows with every premise true are shaded, and a red row is a counterexample.</div>`,
+        html: String.raw`<div class="def" style="padding:0.4rem 0.8rem">An argument is <span class="term" data-term="valid argument">valid</span> when its conclusion is true in <i>every</i> row where all its premises are true. A <span class="term">rule of inference</span> is a small valid argument you may use as one step of a proof. Pick a rule: rows with every premise true are shaded, and a red row is a counterexample.<div class="eg">"If it is Monday, I have class. It is Monday. So I have class." is valid, and its pattern is the rule called modus ponens.</div></div>`,
         render(body, ctx) {
           const { h } = ctx;
           let ri = 0;
@@ -927,7 +927,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In a <span class="term">proof by cases</span>, split the situation into cases that together cover every possibility, and prove the claim in each one. It rests on the law \((p_1 \lor p_2) \to q \equiv (p_1 \to q) \land (p_2 \to q)\).</div>
+              <div class="def">In a <span class="term">proof by cases</span>, split the situation into cases that together cover every possibility, and prove the claim in each one. It rests on the law \((p_1 \lor p_2) \to q \equiv (p_1 \to q) \land (p_2 \to q)\).<div class="eg">Claim: \(\max(a, b) \ge a\). Case \(a \ge b\): the max is \(a\) itself. Case \(a \lt b\): the max is \(b\), which exceeds \(a\). Every pair lands in one case.</div></div>
               <div class="ex"><b>Claim.</b> For every integer \(n\), \(n^2 + n\) is even.<br>
                 <b>Case 1:</b> \(n\) is even, \(n = 2k\). Then \(n^2 + n = 4k^2 + 2k = 2(2k^2 + k)\), which is even.<br>
                 <b>Case 2:</b> \(n\) is odd, \(n = 2k + 1\). Then \(n^2 + n = (2k+1)(2k+2) = 2(2k+1)(k+1)\), which is even.<br>
@@ -935,7 +935,7 @@
               <div class="tip">The cases must be exhaustive. Forgetting one, such as \(n = 0\) or negative numbers, is like an <code>if/elif</code> chain with a missing branch.</div>
             </div>
             <div class="stack">
-              <div class="def" data-label="Existence and disproof">To prove \(\exists x\ P(x)\), show a witness: "there is a prime above 100" is proved by 101. To disprove \(\forall x\ P(x)\), one <span class="term">counterexample</span> suffices, because \(\neg\forall x\ P(x) \equiv \exists x\ \neg P(x)\). "Every prime is odd" fails at 2.</div>
+              <div class="def" data-label="Existence and disproof">To prove \(\exists x\ P(x)\), show one witness. To disprove \(\forall x\ P(x)\), one <span class="term">counterexample</span> suffices, because \(\neg\forall x\ P(x) \equiv \exists x\ \neg P(x)\).<div class="eg">"There is a prime above 100" is proved by the witness 101. "Every prime is odd" is disproved by the counterexample 2.</div></div>
               <div class="warn">Examples never prove a universal claim. \(n^2 + n + 41\) is prime for \(n = 0, 1, \dots, 39\), forty cases in a row, and then \(n = 40\) gives \(1681 = 41^2\). The next lab lets you hunt for failures like this one.</div>
               <div class="why">A failing test case is a counterexample to the claim "this function is correct". One is enough to prove there is a bug. A thousand passing tests are still only examples.</div>
             </div>
@@ -1168,12 +1168,12 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In <span class="term">strong induction</span>, the inductive step may assume <i>all</i> of \(P(n_0), P(n_0 + 1), \dots, P(k)\) to prove \(P(k+1)\). Use it when \(k + 1\) breaks into smaller pieces that are not simply \(k\).</div>
+              <div class="def">In <span class="term">strong induction</span>, the inductive step may assume <i>all</i> of \(P(n_0), P(n_0 + 1), \dots, P(k)\) to prove \(P(k+1)\). Use it when \(k + 1\) breaks into smaller pieces that are not simply \(k\).<div class="eg">For \(P(6)\) you may assume \(P(2)\) through \(P(5)\) at once. Since \(6 = 2 \cdot 3\), a step about factors uses \(P(2)\) and \(P(3)\), not just \(P(5)\).</div></div>
               <div class="ex"><b>Claim.</b> Every integer \(n \ge 2\) is a product of primes.<br>
                 <b>Base case:</b> 2 is prime.<br>
                 <b>Step:</b> take \(k + 1\). If it is prime, we are done. Otherwise \(k + 1 = ab\) with \(2 \le a, b \le k\). By the strong hypothesis, \(a\) and \(b\) are products of primes, so their product \(k + 1\) is too. ∎<br>
-                Ordinary induction would only give us \(P(k)\), which says nothing about \(a\) and \(b\).</div>
-              <div class="def" data-label="Well-ordering principle">The <span class="term">well-ordering principle</span>: every nonempty set of nonnegative integers has a smallest element. It is equivalent to induction. It powers "smallest counterexample" proofs: if a claim failed, take the smallest failure and show a smaller one exists, a contradiction.</div>
+                Ordinary induction gives only \(P(k)\): no help with \(a\) and \(b\).</div>
+              <div class="def" data-label="Well-ordering principle">The <span class="term">well-ordering principle</span>: every nonempty set of nonnegative integers has a smallest element. It is equivalent to induction and powers "smallest counterexample" proofs: take the smallest failure and find a smaller one, a contradiction.<div class="eg">\(\{9, 4, 15\}\) has smallest element 4. The positive real numbers have none: below any \(x \gt 0\) sits \(x/2\).</div></div>
             </div>
             <div class="card stack pf-postage" style="gap:0.45rem"></div>
           </div>`,
@@ -1221,7 +1221,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">loop invariant</span> is a statement about a loop's variables that is true before the loop starts and stays true after every iteration. It is induction in disguise, with the iteration count as \(n\).</div>
+              <div class="def">A <span class="term">loop invariant</span> is a statement about a loop's variables that is true before the loop starts and stays true after every iteration. It is induction in disguise, with the iteration count as \(n\).<div class="eg">From <code>c = 0</code>, passes of <code>c += 2</code> give 0, 2, 4, 6. "<code>c</code> is even" holds before the loop and after every pass, so it is an invariant.</div></div>
               <pre class="pf-code">${INVARIANT_CODE}</pre>
               <table class="data small">
                 <thead><tr><th>Check</th><th>For this loop</th><th>Induction</th></tr></thead>
@@ -1233,7 +1233,7 @@
               </table>
             </div>
             <div class="stack">
-              <div class="def" data-label="Correctness">An algorithm is correct when every valid input produces the right output. The proof has two parts: <b>partial correctness</b> (if it stops, the answer is right, which the invariant gives) and <b>termination</b> (it does stop). For termination, find a quantity that drops each pass and can never go below 0. Here it is \(n - k\).</div>
+              <div class="def" data-label="Correctness">An algorithm is correct when every valid input produces the right output. The proof has two parts: <b>partial correctness</b> (if it stops, the answer is right, which the invariant gives) and <b>termination</b> (it does stop). For termination, find a quantity that drops each pass and can never go below 0. Here it is \(n - k\).<div class="eg">For <code>while n &gt; 0: n -= 1</code> on a whole number <code>n</code>: if it stops, <code>n == 0</code> (partial correctness), and it does stop, since <code>n</code> drops by 1 each pass and cannot go below 0.</div></div>
               <div class="ex" data-label="Recursion is induction too"><pre class="pf-code" style="margin:0.15rem 0 0.35rem">${RECURSION_CODE}</pre>The base case of the recursion is the base case of the proof. If <code>sum_to(k)</code> is right, then <code>sum_to(k + 1)</code> adds \(k + 1\) to it and is right as well.</div>
               <div class="ai">Formal verification tools prove properties of trained neural networks, such as "changing any pixel by at most 1% never changes this classification", for every input in a region. Testing samples a handful of inputs; a proof covers all infinitely many.</div>
             </div>

@@ -850,7 +850,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">tree</span> is a connected graph with no cycles. A graph with no cycles that may fall apart into several pieces is a <span class="term">forest</span>: each piece is a tree.</div>
+              <div class="def">A <span class="term">tree</span> is a connected graph with no cycles. A graph with no cycles that may fall apart into several pieces is a <span class="term">forest</span>: each piece is a tree.<div class="eg">The path a–b–c is a tree; the triangle a–b–c–a is not, since it has a cycle. Delete edge b–c from the path and you get a forest: a–b and the lone vertex \(c\).</div></div>
               <div class="thm">For a graph \(T\) with \(n\) vertices, these four statements are equivalent (each one implies the others):
                 <ol style="margin-top:0.3rem">
                   <li>\(T\) is connected and has no cycles.</li>
@@ -971,7 +971,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">Two trees are <b>isomorphic</b> (<span class="term">tree isomorphism</span>) when one can be relabeled into the other: a one-to-one correspondence between their vertices such that two vertices are adjacent in the first tree exactly when their partners are adjacent in the second. Isomorphic trees are one tree drawn twice. For <b>rooted</b> trees the correspondence must also send root to root, and therefore children to children.</div>
+              <div class="def">Two trees are <b>isomorphic</b> (<span class="term">tree isomorphism</span>) when one can be relabeled into the other: a one-to-one correspondence between their vertices under which two vertices are adjacent exactly when their partners are. Isomorphic trees are one tree drawn twice. For <b>rooted</b> trees it must also send root to root, and so children to children.<div class="eg">Edges a–b, b–c, c–d and p–r, r–s, s–q give isomorphic trees: sending \(a, b, c, d\) to \(p, r, s, q\) keeps every edge.</div></div>
               <div class="thm">Isomorphic trees agree on every property that ignores the names: the number of vertices and edges, the <span class="term">degree sequence</span>, the length of the longest path, and the height when each is hung from its <span class="term" data-term="center of a tree">center</span>. So a single mismatch proves two trees different. Agreement proves nothing: the two trees on the right share all of these numbers and are still different.</div>
               <div class="ex">A path of three vertices hung from its middle vertex has height 1; hung from an end it has height 2. As plain trees the two drawings are isomorphic. As rooted trees they are not, because the roots are vertices of different degree.</div>
             </div>
@@ -983,8 +983,8 @@
                 </div>
                 <p class="small" style="margin-top:0.3rem">Both have 6 vertices, 5 edges, the same degree sequence, a longest path of 4 edges and height 2 from the center. Yet on the left the degree-3 vertex touches two vertices of degree 2, on the right only one, and no relabeling can change that.</p>
               </div>
-              <div class="def" data-label="Canonical name">A <span class="term">canonical name</span> is a string that depends only on the shape. Name a leaf <code>()</code>, and name every other vertex by writing its children's names in sorted order inside one pair of parentheses. Two rooted trees are isomorphic exactly when their roots get the same name. For unrooted trees, first hang each tree from its center (strip all the leaves, repeat, and the last one or two vertices standing are the center), then compare the names.</div>
-              <div class="ai">Canonical forms turn "same structure?" into string equality. Chemical databases match molecules that way, compilers find duplicated code by naming syntax trees, and query engines recognize repeated sub-expressions by their canonical form.</div>
+              <div class="def" data-label="Canonical name">A <span class="term">canonical name</span> is a string that depends only on the shape. Name a leaf <code>()</code>; name any other vertex by its children's names, sorted, inside one pair of parentheses. Two rooted trees are isomorphic exactly when their roots get the same name. Hang an unrooted tree from its center first: strip all leaves repeatedly until one or two vertices remain.<div class="eg">A root with two leaf children is <code>(()())</code>. Give either leaf a child and the root becomes <code>(()(()))</code>.</div></div>
+              <div class="ai">Canonical forms turn "same structure?" into string equality. Chemical databases use them to match molecules; compilers and query engines, to find repeated code and sub-expressions.</div>
             </div>
           </div>`,
       },
@@ -1091,8 +1091,8 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">spanning tree</span> of a connected graph \(G\) is a subgraph that contains <b>every</b> vertex of \(G\) and is a tree. It keeps \(n - 1\) edges: just enough to connect everything, with no redundant loops. Every connected graph has one, because you can delete edges on cycles until no cycle is left.</div>
-              <div class="def" data-label="Definition">In a weighted graph every edge carries a number, such as a cost or a distance. A <span class="term">minimal spanning tree</span> (MST) is a spanning tree \(T\) whose total weight \(w(T)\) is as small as possible.</div>
+              <div class="def">A <span class="term">spanning tree</span> of a connected graph \(G\) is a subgraph that contains <b>every</b> vertex of \(G\) and is a tree. It keeps \(n - 1\) edges: just enough to connect everything, with no redundant loops. Every connected graph has one, because you can delete edges on cycles until no cycle is left.<div class="eg">Drop any one edge of the square a–b–c–d–a and the path that is left is a spanning tree: all 4 vertices, 3 edges.</div></div>
+              <div class="def" data-label="Definition">In a weighted graph every edge carries a number, such as a cost or a distance. A <span class="term">minimal spanning tree</span> (MST) is a spanning tree \(T\) whose total weight \(w(T)\) is as small as possible.<div class="eg">Triangle a–b–c with weights a–b 1, b–c 2, c–a 3: its three spanning trees weigh 3, 4 and 5, so the MST is a–b plus b–c.</div></div>
               <div class="thm">The cut property. Split the vertices into any two groups. The lightest edge between the two groups belongs to some minimal spanning tree. Kruskal and Prim only ever add such an edge, which is why a greedy choice never needs to be undone.</div>
             </div>
             <div class="stack">
@@ -1269,13 +1269,13 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">binary tree</span> is a rooted tree in which every vertex has at most two children, each labeled <b>left child</b> or <b>right child</b>. In a <span class="term">full binary tree</span> every internal vertex has exactly two children.</div>
+              <div class="def">A <span class="term">binary tree</span> is a rooted tree in which every vertex has at most two children, each labeled <b>left child</b> or <b>right child</b>. In a <span class="term">full binary tree</span> every internal vertex has exactly two children.<div class="eg">A root with only a left child is a binary tree, but not full. Add a right child and it is full: 1 internal vertex, 2 leaves.</div></div>
               <div class="thm">A full binary tree with \(i\) internal vertices has \(i + 1\) leaves and \(2i + 1\) vertices.<br>A binary tree of <span class="term">height</span> \(h\) has at most \(2^h\) leaves, so a binary tree with \(t\) leaves has \(h \ge \lceil \log_2 t \rceil\).</div>
               <p class="small">Why \(2^h\)? Level 0 holds one vertex, and each level can at most double the one above: 1, 2, 4, 8, …. After \(h\) levels there is room for \(2^h\) leaves.</p>
               <div class="ai">Databases index millions of rows with B-trees, balanced search trees with many children per vertex. Nearest-neighbor search in machine learning libraries uses k-d trees, which split on one coordinate per level, much like a BST.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">binary search tree</span> (BST) holds a key in each vertex. For every vertex \(v\), all keys in its left subtree are smaller than \(v\)'s key and all keys in its right subtree are larger.</div>
+              <div class="def">A <span class="term">binary search tree</span> (BST) holds a key in each vertex. For every vertex \(v\), all keys in its left subtree are smaller than \(v\)'s key and all keys in its right subtree are larger.<div class="eg">Root 5 with left child 3 and right child 8 is a BST: \(3 < 5 < 8\).</div></div>
               <p class="small"><b>Search</b> starts at the root. Equal means found, smaller means go left, larger means go right, and falling off the tree means the key is absent. <b>Insert</b> searches, then attaches the new key where the search fell off. Both cost at most \(h + 1\) comparisons.</p>
               <div class="warn">Insertion order shapes the tree. Inserting 1, 2, 3, …, \(n\) in order builds a path of height \(n - 1\), so a search may compare against every key. Shuffled input usually stays close to balanced. Self-balancing trees (AVL, red-black) rotate after inserts to keep \(h\) near \(\log_2 n\).</div>
               <div class="card split" style="padding:0.45rem 0.6rem;gap:0.6rem">
@@ -1435,7 +1435,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">traversal</span> visits every vertex of a tree exactly once, in a fixed order. Writing \(T_L\) and \(T_R\) for the left and right subtrees, the depth-first orders are recursive:</div>
+              <div class="def">A <span class="term">traversal</span> visits every vertex of a tree exactly once, in a fixed order. Writing \(T_L\) and \(T_R\) for the left and right subtrees, the depth-first orders in the table are recursive.<div class="eg">Root \(r\) with left child \(a\) and right child \(b\): preorder \(r, a, b\); inorder \(a, r, b\); postorder \(a, b, r\).</div></div>
               <table class="tt tr-ex-row" style="width:100%">
                 <thead><tr><th class="l">Order</th><th class="l">Rule</th><th class="l">On the tree below</th></tr></thead>
                 <tbody>
@@ -1448,7 +1448,7 @@
               <div class="tr-concept-fig" style="height:10.5rem">${binSVG(EXAMPLE_EXPR, { label: exLabel, dx: 44, dy: 50, r: 16, pad: 20, aria: 'Expression tree for (3 + 4) × (5 − 2)' })}</div>
             </div>
             <div class="stack">
-              <div class="def">An <span class="term">expression tree</span> stores a formula. Leaves hold numbers, and each internal vertex holds an operator applied to its two subtrees.</div>
+              <div class="def">An <span class="term">expression tree</span> stores a formula. Leaves hold numbers, and each internal vertex holds an operator applied to its two subtrees.<div class="eg">For \(2 \times (1 + 3)\), the root × has leaf 2 on its left and, on its right, a + vertex with leaves 1 and 3.</div></div>
               <p class="small">The three depth-first orders give three notations. Preorder gives <b>prefix</b> (Polish) notation. Inorder gives the usual <b>infix</b>, which needs parentheses to keep its meaning: \((3 + 4) \times (5 - 2)\). Postorder gives <b>postfix</b> (reverse Polish), which never needs parentheses.</p>
               <div class="ex">Evaluate postfix with a stack: push each number; at an operator, pop two values (the first pop is the right operand), apply it, and push the result.<br><span class="mono small">3 4 + → 7 &nbsp;·&nbsp; 7 5 2 − → 7 3 &nbsp;·&nbsp; 7 3 × → 21</span></div>
               <div class="ai">Python turns your source code into an abstract syntax tree before running it (see the <code>ast</code> module). Deep-learning frameworks record each computation as a graph and run backpropagation over it in reverse, children before parents.</div>

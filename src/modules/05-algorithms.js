@@ -458,7 +458,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An <span class="term">algorithm</span> is a finite sequence of precise instructions for solving a problem. Every algorithm has seven properties:</div>
+              <div class="def">An <span class="term">algorithm</span> is a finite sequence of precise instructions for solving a problem. Every algorithm has the seven properties below.<div class="eg">Smaller of \(a\) and \(b\): if \(a \lt b\) return \(a\), otherwise return \(b\). It is precise, stops after one comparison, and works for any pair.</div></div>
               <table class="tt" style="width:100%">
                 <tbody class="small">
                   <tr><td class="l"><b>Input</b></td><td class="l">It receives data (possibly none).</td></tr>
@@ -742,7 +742,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
           <div class="split-wide">
             <div class="stack">
               <p>Seconds depend on the machine, the language and what else is running. Analysis therefore counts a <span class="term">basic operation</span>, usually a comparison, as a function of the <span class="term">input size</span> \(n\).</p>
-              <div class="def">The <span class="term">worst case</span> \(W(n)\) is the most operations over all inputs of size \(n\); the <span class="term">best case</span> \(B(n)\) is the fewest. The <span class="term">average case</span> \(A(n)\) is the expected count when inputs follow a stated probability distribution.</div>
+              <div class="def">The <span class="term">worst case</span> \(W(n)\) is the most operations over all inputs of size \(n\); the <span class="term">best case</span> \(B(n)\) is the fewest. The <span class="term">average case</span> \(A(n)\) is the expected count when inputs follow a stated probability distribution.<div class="eg">Searching 3 unsorted cards for a name: 1 look if it is on top (best), 3 if it is at the bottom (worst), \((1 + 2 + 3)/3 = 2\) on average if every spot is equally likely.</div></div>
               <table class="tt" style="width:100%">
                 <thead><tr><th class="l">Algorithm (comparisons)</th><th>best</th><th>worst</th><th>average</th></tr></thead>
                 <tbody>
@@ -804,9 +804,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def"><span class="term">Big-O</span>: \(f(n) = O(g(n))\) if there are constants \(C \gt 0\) and \(n_0\) with \(|f(n)| \le C\,|g(n)|\) for all \(n \ge n_0\). Read it as "\(f\) grows no faster than \(g\)".</div>
-              <div class="def"><span class="term">Big-Omega</span>: \(f(n) = \Omega(g(n))\) if \(|f(n)| \ge C\,|g(n)|\) for all \(n \ge n_0\), for some \(C \gt 0\): "\(f\) grows at least as fast as \(g\)".</div>
-              <div class="def"><span class="term">Big-Theta</span>: \(f(n) = \Theta(g(n))\) if \(f\) is both \(O(g(n))\) and \(\Omega(g(n))\): "the same growth rate, up to constant factors".</div>
+              <div class="def"><span class="term">Big-O</span>: \(f(n) = O(g(n))\) if there are constants \(C \gt 0\) and \(n_0\) with \(|f(n)| \le C\,|g(n)|\) for all \(n \ge n_0\). Read it as "\(f\) grows no faster than \(g\)".<div class="eg">\(2n + 3 \le 3n\) for \(n \ge 3\), so \(2n + 3 = O(n)\) with \(C = 3\), \(n_0 = 3\).</div></div>
+              <div class="def"><span class="term">Big-Omega</span>: \(f(n) = \Omega(g(n))\) if \(|f(n)| \ge C\,|g(n)|\) for all \(n \ge n_0\), for some \(C \gt 0\): "\(f\) grows at least as fast as \(g\)".<div class="eg">\(n^2 \ge n\) for every \(n \ge 1\), so \(n^2 = \Omega(n)\) with \(C = 1\), \(n_0 = 1\).</div></div>
+              <div class="def"><span class="term">Big-Theta</span>: \(f(n) = \Theta(g(n))\) if \(f\) is both \(O(g(n))\) and \(\Omega(g(n))\): "the same growth rate, up to constant factors".<div class="eg">\(2n \le 2n + 3 \le 3n\) once \(n \ge 3\), so \(2n + 3 = \Theta(n)\). But \(n^2\) is not \(\Theta(n)\): it is \(\Omega(n)\), not \(O(n)\).</div></div>
               <div class="ex">\(f(n) = 3n^2 + 5n + 2\). For \(n \ge 1\), \(5n \le 5n^2\) and \(2 \le 2n^2\), so \(f(n) \le 10n^2\): the witnesses \(C = 10\), \(n_0 = 1\) prove \(f = O(n^2)\). Also \(f(n) \ge 3n^2\), so \(f = \Omega(n^2)\), and therefore \(f = \Theta(n^2)\).</div>
             </div>
             <div class="stack">
@@ -1011,7 +1011,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">recursive algorithm</span> solves a problem by calling itself on a smaller input. The <span class="term">base case</span> is small enough to answer directly, and every call must move toward it.</div>
+              <div class="def">A <span class="term">recursive algorithm</span> solves a problem by calling itself on a smaller input, moving toward a <span class="term">base case</span> that is answered directly.<div class="eg">\(\text{sum}([4, 1]) = 4 + \text{sum}([1])\); the base case is \(\text{sum}([\,]) = 0\).</div></div>
               <div class="row" style="gap:0.6rem;align-items:stretch;flex-wrap:nowrap">
                 ${pseudoTag('factorial', 'flex:1 1 0')}
                 <p class="small" style="flex:1 1 0">\(4! = 4 \cdot 3!\), \(3! = 3 \cdot 2!\), …, down to \(0! = 1\). Then the answers multiply on the way back up: \(1, 1, 2, 6, 24\).</p>
@@ -1021,7 +1021,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
               <div class="warn">A missing base case, or a call that does not shrink the input, recurses forever. Python stops it after about 1000 nested calls with <code>RecursionError</code>.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">loop invariant</span> is a statement that is true before a loop starts and stays true after every iteration.</div>
+              <div class="def">A <span class="term">loop invariant</span> is a statement that is true before a loop starts and stays true after every iteration.<div class="eg">Counting coins into a pile: "count = coins in the pile" is true at the start (both 0) and after each coin, so at the end the count is right.</div></div>
               <div class="thm">To prove a loop correct, check three things (the same pattern as induction in Module 3):
                 <ol class="small" style="margin-top:0.2rem">
                   <li><b>Initialization:</b> the invariant holds before the first iteration.</li>

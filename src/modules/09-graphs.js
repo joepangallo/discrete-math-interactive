@@ -472,7 +472,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">graph</span> \(G = (V, E)\) has a set \(V\) of <span class="term" data-term="vertex">vertices</span> (also called nodes) and a set \(E\) of <span class="term" data-term="edge">edges</span>. Each edge joins two vertices, called its endpoints. The edge is <i>incident</i> on its endpoints, and two vertices joined by an edge are <span class="term">adjacent</span>.</div>
+              <div class="def">A <span class="term">graph</span> \(G = (V, E)\) has a set \(V\) of <span class="term" data-term="vertex">vertices</span> (also called nodes) and a set \(E\) of <span class="term" data-term="edge">edges</span>. Each edge joins two vertices, called its endpoints. The edge is <i>incident</i> on its endpoints, and two vertices joined by an edge are <span class="term">adjacent</span>.<div class="eg">\(V = \{a, b, c\}\) and \(E = \{\{a, b\}, \{b, c\}\}\) form the path a–b–c. Edge \(\{a, b\}\) is incident on \(a\) and \(b\), so they are adjacent; \(a\) and \(c\) are not.</div></div>
               <div class="figure">
                 <svg viewBox="0 0 410 205" role="img" aria-label="A graph with a loop, parallel edges and an isolated vertex" style="max-height:12.5rem">
                   <g fill="none" stroke="var(--ink-2)" stroke-width="2">
@@ -522,7 +522,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">degree</span> \(\deg(v)\) of a vertex is the number of edges incident on it, with a loop counted twice because it touches \(v\) at both ends. Johnsonbaugh writes \(\delta(v)\).</div>
+              <div class="def">The <span class="term">degree</span> \(\deg(v)\) of a vertex is the number of edges incident on it, with a loop counted twice because it touches \(v\) at both ends. Johnsonbaugh writes \(\delta(v)\).<div class="eg">In the path a–b–c, \(\deg(a) = \deg(c) = 1\) and \(\deg(b) = 2\). Add a loop at \(a\) and \(\deg(a)\) becomes 3.</div></div>
               <div class="thm"><b>Handshake theorem.</b> In every graph, \[\sum_{v \in V} \deg(v) = 2|E|.\] Each edge has two ends, and each end adds 1 to the degree of the vertex it touches.</div>
               <div class="thm" data-label="Corollary">Every graph has an <b>even</b> number of vertices of odd degree. An odd number of odd degrees would make the sum odd, but \(2|E|\) is even.</div>
               <div class="ex">Can 7 people each shake hands with exactly 3 of the others? The degrees would add up to \(7 \cdot 3 = 21\), an odd number. No graph has an odd degree sum, so it is impossible, however the people try.</div>
@@ -712,20 +712,20 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">path</span> of length \(k\) from \(v_0\) to \(v_k\) is a sequence of vertices \(v_0, v_1, \dots, v_k\) in which each consecutive pair is joined by an edge. The length counts edges. A <b>simple path</b> repeats no vertex.</div>
-              <div class="def">A <span class="term">cycle</span> is a path of nonzero length that starts and ends at the same vertex and repeats no edge. A <b>simple cycle</b> repeats no vertex either, apart from the shared start and end.</div>
-              <div class="def">A graph is <span class="term" data-term="connected graph">connected</span> if every pair of vertices is joined by a path. The largest connected pieces of a graph are its <b>components</b>. The "Two pieces" preset in the editor has two components.</div>
-              <div class="ai">Genome assemblers read millions of short, overlapping DNA fragments. They build a graph whose edges are the fragments and rebuild the genome as an Euler path through it, which degree counts make fast to find.</div>
+              <div class="def">A <span class="term">path</span> of length \(k\) is a sequence of vertices \(v_0, v_1, \dots, v_k\) joined by \(k\) edges, one per consecutive pair. A <b>simple path</b> repeats no vertex.<div class="eg">In the square a–b–c–d–a, \(a, b, c\) is a simple path of length 2.</div></div>
+              <div class="def">A <span class="term">cycle</span> is a path of nonzero length that ends where it starts and repeats no edge. A <b>simple cycle</b> repeats no vertex except the start.<div class="eg">In the square, \(a, b, c, d, a\) is a simple cycle. \(a, b, a\) is not a cycle: it uses edge a–b twice.</div></div>
+              <div class="def">A graph is <span class="term" data-term="connected graph">connected</span> if every pair of vertices is joined by a path. The largest connected pieces of a graph are its <b>components</b>.<div class="eg">The square is connected. Delete edges a–b and c–d and two components remain: a–d and b–c.</div></div>
+              <div class="ai">Genome assemblers turn millions of short, overlapping DNA fragments into the edges of a graph, then rebuild the genome as an Euler path through it, which degree counts make fast to find.</div>
             </div>
             <div class="stack">
-              <div class="def">An <span class="term">Euler cycle</span> uses every edge exactly once and returns to its start. An <b>Euler path</b> uses every edge exactly once but may end at a different vertex.</div>
+              <div class="def">An <span class="term">Euler cycle</span> uses every edge exactly once and returns to its start. An <b>Euler path</b> also uses every edge once but may end elsewhere.<div class="eg">In the triangle a–b–c–a, \(a, b, c, a\) is an Euler cycle. The path a–b–c has the Euler path \(a, b, c\) but no Euler cycle.</div></div>
               <div class="thm"><b>Euler's theorem.</b> Let \(G\) be a connected graph.
                 <ul style="margin-top:0.25rem">
                   <li>\(G\) has an Euler cycle if and only if every vertex has even degree.</li>
                   <li>\(G\) has an Euler path from \(v\) to \(w \neq v\), but no Euler cycle, if and only if \(v\) and \(w\) are the only vertices of odd degree.</li>
                 </ul></div>
-              <div class="why"><b>Why degrees decide.</b> Each time a walk passes through a vertex it uses one edge to arrive and another to leave: two edge ends at a time. Only the start and the end of an open walk can be left with an unmatched edge end. So more than two odd vertices make the walk impossible.</div>
-              <div class="ex">Königsberg (1736): four land masses joined by seven bridges have degrees 5, 3, 3 and 3. All four are odd, so no walk crosses every bridge exactly once. Euler's argument started graph theory. Try it yourself on the next slide.</div>
+              <div class="why"><b>Why degrees decide.</b> Each time a walk passes through a vertex it uses one edge to arrive and one to leave: two edge ends at a time. Only an open walk's start and end can keep an unmatched edge end, so more than two odd vertices make the walk impossible.</div>
+              <div class="ex">Königsberg (1736): seven bridges join four land masses with degrees 5, 3, 3, 3. All are odd, so no walk crosses every bridge exactly once. Euler's argument started graph theory; try it on the next slide.</div>
             </div>
           </div>`,
       },
@@ -1227,17 +1227,17 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">Hamiltonian cycle</span> visits every <i>vertex</i> exactly once and returns to the start. It is named after William Rowan Hamilton, who sold a puzzle in 1857 that asked for such a tour of the corners of a dodecahedron. Try to build one yourself on the next slide.</div>
+              <div class="def">A <span class="term">Hamiltonian cycle</span> visits every <i>vertex</i> exactly once and returns to the start. William Rowan Hamilton sold an 1857 puzzle asking for such a tour of a dodecahedron's corners; try it on the next slide.<div class="eg">\(K_4\) on \(a, b, c, d\) has the Hamiltonian cycle \(a, b, c, d, a\) but no Euler cycle: every degree is 3.</div></div>
               <table class="tt" style="width:100%;font-size:0.84rem">
                 <thead><tr><th class="l"></th><th>Euler cycle</th><th>Hamiltonian cycle</th></tr></thead>
                 <tbody>
                   <tr><td class="l">uses each…</td><td>edge exactly once</td><td>vertex exactly once</td></tr>
                   <tr><td class="l">simple test?</td><td>yes: every degree even</td><td>none known; <span class="term">Dirac's theorem</span> is only a sufficient condition</td></tr>
-                  <tr><td class="l">fast algorithm?</td><td>yes, linear time</td><td>none known</td></tr>
+                  <tr><td class="l">fast&nbsp;algorithm?</td><td>yes, linear time</td><td>none known</td></tr>
                 </tbody>
               </table>
-              <div class="def">The <b>traveling salesperson problem</b> (TSP): in a weighted complete graph, find a Hamiltonian cycle of smallest total weight. Think of the shortest round trip through every city once.</div>
-              <div class="warn">The two cycle problems sound alike, yet one is easy and one is hard. Always ask which question you are really facing before you promise a fast program.</div>
+              <div class="def">The <b>traveling salesperson problem</b> (TSP): in a weighted complete graph, find a Hamiltonian cycle of smallest total weight.<div class="eg">Cities on square \(abcd\): sides cost 1, diagonals 2. The round trip \(a, b, c, d, a\) costs 4; the other two cost 6.</div></div>
+              <div class="warn">The two cycle problems sound alike, yet one is easy and one is hard. Know which one you face before you promise a fast program.</div>
             </div>
             <div class="stack">
               <div class="card">
@@ -1504,25 +1504,25 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">Graphs \(G_1\) and \(G_2\) are <span class="term">isomorphic</span> if there is a one-to-one, onto function \(f\) from the vertices of \(G_1\) to the vertices of \(G_2\) such that \(u\) and \(v\) are adjacent exactly when \(f(u)\) and \(f(v)\) are. They are the same graph, drawn and labeled differently.</div>
+              <div class="def">Graphs \(G_1\) and \(G_2\) are <span class="term">isomorphic</span> if there is a one-to-one, onto function \(f\) from the vertices of \(G_1\) to the vertices of \(G_2\) such that \(u\) and \(v\) are adjacent exactly when \(f(u)\) and \(f(v)\) are. They are the same graph, drawn and labeled differently.<div class="eg">Path a–b–c is isomorphic to y–x–z via \(a \to y\), \(b \to x\), \(c \to z\).</div></div>
               <div class="gr-fig">
                 <div class="center">${FIG_C5}<div class="gr-cap">pentagon</div></div>
                 <div class="center" style="font-size:1.4rem;color:var(--ink-3)">≅</div>
                 <div class="center">${FIG_STAR}<div class="gr-cap">five-point star</div></div>
               </div>
               <p class="small center">\(f\): 1 → a, 2 → c, 3 → e, 4 → b, 5 → d maps every edge to an edge.</p>
-              <div class="tip">To <b>disprove</b> isomorphism, find a <span class="term">graph invariant</span> that differs: vertex or edge count, <span class="term">degree sequence</span>, number of components or triangles. To <b>prove</b> it, exhibit \(f\). Matching invariants alone prove nothing; the next lab asks for both.</div>
-              <div class="ai">Whether two molecules share a bond structure is an isomorphism question in AI-driven drug discovery; circuit-board layout is a planarity question, since wires on one layer must not cross.</div>
+              <div class="tip">To <b>disprove</b> isomorphism, find a <span class="term">graph invariant</span> that differs: vertex or edge count, <span class="term">degree sequence</span>, components, triangles. To <b>prove</b> it, exhibit \(f\). Matching invariants prove nothing; the lab asks for both.</div>
+              <div class="ai">AI drug discovery matches molecules by bond structure, an isomorphism test; one-layer circuit boards need planar wiring.</div>
             </div>
             <div class="stack">
-              <div class="def">A graph is <span class="term" data-term="planar graph">planar</span> if it can be drawn with no edges crossing. The drawing cuts the plane into <span class="term" data-term="face">faces</span>, including the unbounded outer face.</div>
+              <div class="def">A graph is <span class="term" data-term="planar graph">planar</span> if it can be drawn with no edges crossing. The drawing cuts the plane into <span class="term" data-term="face">faces</span>, including the unbounded outer face.<div class="eg">A square plus one diagonal is planar, with 3 faces.</div></div>
               <div class="gr-fig">
                 <div class="center">${FIG_K4X}<div class="gr-cap">K4 with a crossing</div></div>
                 <div class="center" style="font-size:1.2rem;color:var(--ink-3)">→</div>
                 <div class="center">${FIG_K4P}<div class="gr-cap">redrawn: no crossing</div></div>
               </div>
-              <div class="thm"><b>Euler's formula.</b> A connected planar graph drawn without crossings has \(V - E + F = 2\) (for \(K_4\): \(4 - 6 + 4 = 2\)). Each face has at least 3 boundary edges and each edge borders at most 2 faces, so \(3F \le 2E\); with Euler's formula this gives \(E \le 3V - 6\) when \(V \ge 3\). \(K_5\) has \(10 \gt 9\) edges: not planar.</div>
-              <div class="thm" data-label="Why K3,3 is not planar">The general bound allows \(K_{3,3}\) (\(9 \le 12\)). But \(K_{3,3}\) is bipartite, so it has no triangles, and every face would need at least 4 boundary edges: \(4F \le 2E\), so \(E \le 2V - 4 = 8\). Nine edges are one too many. <span class="term">Kuratowski's theorem</span> says these are the only two obstacles: a graph is planar if and only if no subgraph is a subdivision of \(K_5\) or \(K_{3,3}\) (edges replaced by paths).</div>
+              <div class="thm"><b>Euler's formula.</b> A connected planar graph has \(V - E + F = 2\) (for \(K_4\): \(4 - 6 + 4 = 2\)). Each face has at least 3 boundary edges, each edge borders at most 2 faces, so \(3F \le 2E\); with Euler's formula, \(E \le 3V - 6\) when \(V \ge 3\). \(K_5\) has \(10 \gt 9\) edges: not planar.</div>
+              <div class="thm" data-label="Why K3,3 is not planar">The general bound allows \(K_{3,3}\) (\(9 \le 12\)). But bipartite \(K_{3,3}\) has no triangles, so every face needs at least 4 boundary edges: \(4F \le 2E\) gives \(E \le 2V - 4 = 8\), one fewer than its 9. <span class="term">Kuratowski's theorem</span> says these are the only two obstacles: a graph is planar if and only if no subgraph is a subdivision of \(K_5\) or \(K_{3,3}\) (edges replaced by paths).</div>
             </div>
           </div>`,
       },

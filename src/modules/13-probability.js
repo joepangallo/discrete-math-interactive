@@ -293,8 +293,8 @@
         html: String.raw`
           <div class="split" style="align-items:stretch">
             <div class="stack" style="gap:0.5rem">
-              <div class="def">An <span class="term">experiment</span> is any process with an uncertain result, such as rolling a die. Each possible result is an <span class="term">outcome</span>. The <span class="term">sample space</span> \(S\) is the set of all outcomes, and an <span class="term">event</span> is any subset of \(S\).</div>
-              <div class="thm">When every outcome is <span class="term">equally likely</span>, probability is a ratio of two counts:
+              <div class="def">An <span class="term">experiment</span> is any process with an uncertain result, such as rolling a die. Each possible result is an <span class="term">outcome</span>. The <span class="term">sample space</span> \(S\) is the set of all outcomes, and an <span class="term">event</span> is any subset of \(S\).<div class="eg">Flip a coin: \(S = \{H, T\}\). The event "heads" is \(\{H\}\).</div></div>
+              <div class="thm">If all outcomes are <span class="term">equally likely</span>, probability is a ratio of counts:
                 \[P(E) = \frac{|E|}{|S|}\]</div>
               <div class="ex">Roll two dice. \(S = \{1,\dots,6\} \times \{1,\dots,6\}\), the Cartesian product from Module 1, so \(|S| = 36\). The event "sum is 7" holds six pairs, from \((1,6)\) to \((6,1)\), so \(P = 6/36 = 1/6\).</div>
               <p class="small">Events are sets, so Module 1's operations build new events. \(A \cap B\) means both happen. \(A \cup B\) means at least one happens. \(A'\) means \(A\) does not happen.</p>
@@ -386,7 +386,7 @@
             </div>
             <div class="stack">
               <div class="thm">Every probability obeys three axioms. \(0 \le P(E) \le 1\). \(P(S) = 1\). If \(A \cap B = \varnothing\), then \(P(A \cup B) = P(A) + P(B)\).</div>
-              <div class="def">Events with \(A \cap B = \varnothing\) are <span class="term">mutually exclusive</span>. They cannot happen together, like rolling a 1 and rolling a 2 with the same die.</div>
+              <div class="def"><span class="term">Mutually exclusive</span> events cannot happen together: \(A \cap B = \varnothing\).<div class="eg">On one die, "roll a 1" and "roll a 2" are mutually exclusive. "Roll an even number" and "roll a 2" are not: a 2 makes both happen.</div></div>
               <div class="thm" data-label="Two rules that follow">Complement: \(P(E') = 1 - P(E)\).<br>Union (inclusion–exclusion): \(P(A \cup B) = P(A) + P(B) - P(A \cap B)\).</div>
               <div class="ex">What is the chance of at least one 6 in two rolls? The complement is "no 6 at all", with probability \((5/6)^2 = 25/36\). So the answer is \(1 - 25/36 = 11/36\). Adding \(1/6 + 1/6 = 12/36\) overcounts, because the two events overlap at \((6,6)\).</div>
               <div class="tip">For any "at least one" question, compute the complement "none" and subtract from 1. It is usually one multiplication instead of many cases.</div>
@@ -680,12 +680,12 @@
             <div class="stack">
               <div class="def">The <span class="term">conditional probability</span> of \(A\) given \(B\) is
                 \[P(A \mid B) = \frac{P(A \cap B)}{P(B)}, \qquad P(B) \gt 0.\]
-                Knowing that \(B\) happened shrinks the sample space to \(B\). Only the part of \(A\) inside \(B\) still counts.</div>
+                Knowing that \(B\) happened shrinks the sample space to \(B\). Only the part of \(A\) inside \(B\) still counts.<div class="eg">Roll one die and learn it is even. Then \(P(6 \mid \text{even}) = (1/6)/(1/2) = 1/3\): the 6 is one of 3 even faces.</div></div>
               <div class="ex">Two dice are rolled and you learn the sum is 8. What is the chance of doubles? \(B = \{(2,6),(3,5),(4,4),(5,3),(6,2)\}\) and only \((4,4)\) is doubles, so \(P(\text{doubles} \mid \text{sum } 8) = 1/5\). Without the information, \(P(\text{doubles}) = 6/36 = 1/6\).</div>
               <div class="thm">Multiplication rule: \(P(A \cap B) = P(A) \cdot P(B \mid A)\).<br>Draw two cards without putting the first back. \(P(\text{both aces}) = \frac{4}{52} \cdot \frac{3}{51} = \frac{1}{221}\). The second factor is conditional, because one ace is already gone.</div>
             </div>
             <div class="stack">
-              <div class="def">\(A\) and \(B\) are <span class="term" data-term="independent events">independent</span> when \(P(A \cap B) = P(A) \cdot P(B)\), or equivalently \(P(A \mid B) = P(A)\). Learning that \(B\) happened tells you nothing about \(A\). Separate coin flips are independent. Cards drawn without replacement are not.</div>
+              <div class="def">\(A\) and \(B\) are <span class="term" data-term="independent events">independent</span> when \(P(A \cap B) = P(A) \cdot P(B)\), or equivalently \(P(A \mid B) = P(A)\). Learning that \(B\) happened tells you nothing about \(A\).<div class="eg">Two coin flips are independent: \(P(\text{both heads}) = 1/4 = 1/2 \cdot 1/2\). Two cards drawn without replacement are not, since a first ace makes a second ace less likely.</div></div>
               <div class="warn">Independent and mutually exclusive are different ideas. Mutually exclusive events with positive probabilities are always <i>dependent</i>: if one happens, the other's probability drops to 0. "First die shows 1" and "first die shows 2" are mutually exclusive. "First die shows 1" and "second die shows 2" are independent.</div>
               <div class="ai">A language model generates text one token at a time using conditional probabilities: \(P(\text{next token} \mid \text{all tokens so far})\). The probability of a whole sentence is the multiplication rule applied again and again: \(P(w_1) \cdot P(w_2 \mid w_1) \cdot P(w_3 \mid w_1, w_2) \cdots\)</div>
             </div>
@@ -969,16 +969,16 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">random variable</span> \(X\) assigns a number to every outcome. Its distribution lists \(P(X = x)\) for each value. Let \(X\) = the number of heads in 3 coin flips:
-                <table class="pb-dist"><tr><th>\(x\)</th><td>0</td><td>1</td><td>2</td><td>3</td></tr><tr><th>\(P(X = x)\)</th><td>1/8</td><td>3/8</td><td>3/8</td><td>1/8</td></tr></table></div>
+              <div class="def">A <span class="term">random variable</span> \(X\) assigns a number to every outcome. Its distribution lists \(P(X = x)\) for each value.<div class="eg">Let \(X\) = the number of heads in 3 coin flips:
+                <table class="pb-dist"><tr><th>\(x\)</th><td>0</td><td>1</td><td>2</td><td>3</td></tr><tr><th>\(P(X = x)\)</th><td>1/8</td><td>3/8</td><td>3/8</td><td>1/8</td></tr></table></div></div>
               <div class="def">The <span class="term">expected value</span> is the probability-weighted average
-                \[E[X] = \sum_x x \cdot P(X = x) = 0 \cdot \tfrac18 + 1 \cdot \tfrac38 + 2 \cdot \tfrac38 + 3 \cdot \tfrac18 = 1.5\]
-                No single game gives 1.5 heads. It is the long-run average over many repetitions.</div>
+                \[E[X] = \sum_x x \cdot P(X = x).\]
+                It is the long-run average over many repetitions.<div class="eg">For the 3 flips, \(E[X] = 0 \cdot \tfrac18 + 1 \cdot \tfrac38 + 2 \cdot \tfrac38 + 3 \cdot \tfrac18 = 1.5\), though no single game gives 1.5 heads.</div></div>
               <div class="ex">Pay $1 to roll a die and win $5 if it shows 6. Your net gain is $4 with probability 1/6 and −$1 with probability 5/6. \(E = 4 \cdot \frac16 - 1 \cdot \frac56 = -\frac16\). You lose about 17 cents per game on average, which is how casinos stay in business.</div>
             </div>
             <div class="stack">
               <div class="thm"><span class="term">Linearity of expectation</span>: \(E[X + Y] = E[X] + E[Y]\) and \(E[aX + b] = aE[X] + b\), always, even when \(X\) and \(Y\) are dependent. The expected sum of two dice is \(3.5 + 3.5 = 7\) with no table of 36 outcomes. The expected number of successes in \(n\) trials with chance \(p\) is \(np\).</div>
-              <div class="def"><span class="term">Variance</span> measures spread: \(\operatorname{Var}(X) = E[(X - \mu)^2] = E[X^2] - \mu^2\), where \(\mu = E[X]\). The standard deviation is \(\sigma = \sqrt{\operatorname{Var}(X)}\). For the 3 flips, \(E[X^2] = 3\), so \(\operatorname{Var}(X) = 3 - 1.5^2 = 0.75\) and \(\sigma \approx 0.87\).</div>
+              <div class="def"><span class="term">Variance</span> measures spread: \(\operatorname{Var}(X) = E[(X - \mu)^2] = E[X^2] - \mu^2\), where \(\mu = E[X]\). The standard deviation is \(\sigma = \sqrt{\operatorname{Var}(X)}\).<div class="eg">For the 3 flips, \(E[X^2] = (0 \cdot 1 + 1 \cdot 3 + 4 \cdot 3 + 9 \cdot 1)/8 = 3\), so \(\operatorname{Var}(X) = 3 - 1.5^2 = 0.75\) and \(\sigma \approx 0.87\).</div></div>
               <div class="ai">Training a model means minimizing its <i>expected loss</i>, estimated by the average loss over the training data. A reinforcement-learning agent picks the action with the highest expected reward. Variance matters too: two models with the same average accuracy can differ a lot in how much their results swing from run to run.</div>
             </div>
           </div>`,

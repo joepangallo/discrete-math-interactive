@@ -665,7 +665,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">function</span> \(f\) from a set \(X\) to a set \(Y\), written \(f: X \to Y\), assigns <b>each</b> element \(x \in X\) <b>exactly one</b> element \(f(x) \in Y\).</div>
+              <div class="def">A <span class="term">function</span> \(f\) from a set \(X\) to a set \(Y\), written \(f: X \to Y\), assigns <b>each</b> element \(x \in X\) <b>exactly one</b> element \(f(x) \in Y\).<div class="eg">"Birth month of" is a function from people to months: each person has exactly one. "Phone number of" is not, since some people have two or none.</div></div>
               <ul>
                 <li>The <span class="term">domain</span> \(X\) is the set of allowed inputs.</li>
                 <li>The <span class="term">codomain</span> \(Y\) is the set the outputs are declared to come from.</li>
@@ -700,9 +700,9 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">\(f: X \to Y\) is <span class="term">one-to-one</span> (injective) when different inputs give different outputs: \(f(x_1) = f(x_2) \Rightarrow x_1 = x_2\). No two arrows land on the same point.</div>
-              <div class="def">\(f\) is <span class="term">onto</span> (surjective) when every \(y \in Y\) is hit by some \(x\). Then the range equals the codomain.</div>
-              <div class="def">A <span class="term">bijection</span> is both. It pairs \(X\) with \(Y\) perfectly, so two finite sets joined by a bijection have the same size.</div>
+              <div class="def">\(f: X \to Y\) is <span class="term">one-to-one</span> (injective) when different inputs give different outputs: \(f(x_1) = f(x_2) \Rightarrow x_1 = x_2\). No two arrows share an output.<div class="eg">\(1 \mapsto a,\ 2 \mapsto b\) is one-to-one; \(1 \mapsto a,\ 2 \mapsto a\) is not.</div></div>
+              <div class="def">\(f\) is <span class="term">onto</span> (surjective) when every \(y \in Y\) is hit by some \(x\). Then the range equals the codomain.<div class="eg">\(1 \mapsto a,\ 2 \mapsto b,\ 3 \mapsto b\) is onto \(\{a, b\}\) but not onto \(\{a, b, c\}\).</div></div>
+              <div class="def">A <span class="term">bijection</span> is both. It pairs \(X\) with \(Y\) perfectly, so two finite sets joined by a bijection have the same size.<div class="eg">\(1 \mapsto a,\ 2 \mapsto b,\ 3 \mapsto c\) is a bijection, so \(|\{1, 2, 3\}| = |\{a, b, c\}|\).</div></div>
               <table class="tt" style="width:100%">
                 <thead><tr><th class="l">\(f: \mathbb{Z} \to \mathbb{Z}\)</th><th>one-to-one?</th><th>onto?</th></tr></thead>
                 <tbody>
@@ -714,7 +714,7 @@
             </div>
             <div class="stack">
               <div class="thm">\(f\) has an inverse \(f^{-1}: Y \to X\) exactly when \(f\) is a bijection. Reverse every arrow: \(f^{-1}(y) = x \iff f(x) = y\), so \(f^{-1}(f(x)) = x\).</div>
-              <div class="def">The <span class="term">composition</span> \(g \circ f\) applies \(f\) first, then \(g\): \((g \circ f)(x) = g(f(x))\). The outputs of \(f\) must be valid inputs for \(g\).</div>
+              <div class="def">The <span class="term">composition</span> \(g \circ f\) applies \(f\) first, then \(g\): \((g \circ f)(x) = g(f(x))\). The outputs of \(f\) must be valid inputs for \(g\).<div class="eg">With \(f(x) = x^2\) and \(g(x) = x - 1\): \((g \circ f)(2) = g(4) = 3\). Square first, then subtract 1.</div></div>
               <div class="warn">Order matters. With \(f(x) = x + 1\) and \(g(x) = 2x\): \((g \circ f)(3) = g(4) = 8\) but \((f \circ g)(3) = f(6) = 7\). Also, \(f^{-1}(x)\) means the inverse function, never \(1 / f(x)\).</div>
               <div class="ai">A neural network is a composition of layers, \(f_L \circ \cdots \circ f_2 \circ f_1\), so the input passes through \(f_1\) first. A tokenizer's encoder is a bijection between its tokens and their ID numbers, which is why decoding the IDs gives back exactly the original tokens.</div>
             </div>
@@ -839,7 +839,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">floor</span> \(\lfloor x \rfloor\) is the greatest integer \(\le x\). The ceiling \(\lceil x \rceil\) is the least integer \(\ge x\). Both are functions \(\mathbb{R} \to \mathbb{Z}\).</div>
+              <div class="def">The <span class="term">floor</span> \(\lfloor x \rfloor\) is the greatest integer \(\le x\). The ceiling \(\lceil x \rceil\) is the least integer \(\ge x\). Both are functions \(\mathbb{R} \to \mathbb{Z}\).<div class="eg">\(\lfloor 3.7 \rfloor = 3\) and \(\lceil 3.7 \rceil = 4\). Your age is a floor: at 19.8 years you say 19.</div></div>
               <table class="tt" style="width:100%">
                 <thead><tr><th>\(x\)</th><th>\(2.3\)</th><th>\(-2.3\)</th><th>\(5\)</th><th class="l">used for</th></tr></thead>
                 <tbody>
@@ -847,13 +847,13 @@
                   <tr><td>\(\lceil x \rceil\)</td><td>3</td><td>\(-2\)</td><td>5</td><td class="l small">23 people, 4 per table: \(\lceil 23/4 \rceil = 6\) tables</td></tr>
                 </tbody>
               </table>
-              <div class="def">\(n \bmod m\) is the remainder \(r\) with \(0 \le r \lt m\) and \(n = m \cdot q + r\), where \(q = \lfloor n/m \rfloor\). So "mod \(m\)" is a function \(\mathbb{Z} \to \{0, 1, \dots, m - 1\}\): onto, never one-to-one.</div>
+              <div class="def">\(n \bmod m\) is the remainder \(r\) with \(0 \le r \lt m\) and \(n = m \cdot q + r\), where \(q = \lfloor n/m \rfloor\). So "mod \(m\)" is a function \(\mathbb{Z} \to \{0, 1, \dots, m - 1\}\): onto, never one-to-one.<div class="eg">\(17 \bmod 5 = 2\), since \(17 = 5 \cdot 3 + 2\). And \(12 \bmod 5 = 2\) too: two inputs, one output.</div></div>
               <div class="warn">Python follows the math: <code>-7 % 3</code> is <code>2</code>, because \(-7 = 3 \cdot (-3) + 2\). C, Java and JavaScript return \(-1\) instead.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">hash function</span> maps keys from a huge domain (all possible strings) to a small codomain of slots \(\{0, \dots, m - 1\}\). A common recipe turns the key into an integer, then takes it mod \(m\).</div>
+              <div class="def">A <span class="term">hash function</span> maps keys from a huge domain to slots \(0, \dots, m - 1\), often by turning the key into an integer and taking it mod \(m\).<div class="eg">\(h(w) = (\text{length of } w) \bmod 4\) puts "hi" in slot 2 and "hello" in slot 1.</div></div>
               <div class="ex">With \(h(k) = k \bmod 11\): \(h(15) = 4\), \(h(26) = 4\), \(h(40) = 7\). Keys 15 and 26 <b>collide</b> in slot 4.</div>
-              <div class="thm">If there are more keys than slots, \(h\) cannot be one-to-one, so collisions are certain (the pigeonhole principle). A good hash spreads keys evenly over the slots.</div>
+              <div class="thm">With more keys than slots, \(h\) cannot be one-to-one, so collisions are certain (the pigeonhole principle). A good hash spreads keys evenly.</div>
               <div class="tip">A hash must be a function: the same key gives the same slot every time. That is why Python dictionary keys must be immutable.</div>
               <div class="ai">An embedding table is a function from token IDs \(\{0, \dots, V - 1\}\) to vectors in \(\mathbb{R}^d\). The "hashing trick" maps an unlimited vocabulary into \(m\) feature columns with \(\text{hash}(w) \bmod m\).</div>
             </div>
@@ -898,18 +898,18 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">sequence</span> is a function whose domain is a set of consecutive integers. Its value at \(n\) is the \(n\)-th term \(s_n\). Example: \(s_n = 2n + 1\) gives \(3, 5, 7, 9, \dots\)</div>
+              <div class="def">A <span class="term">sequence</span> is a function whose domain is a set of consecutive integers. Its value at \(n\) is the \(n\)-th term \(s_n\).<div class="eg">\(s_n = 2n + 1\) for \(n \ge 1\) gives \(3, 5, 7, 9, \dots\), so the 4th term is \(s_4 = 9\).</div></div>
               <ul class="small">
                 <li><b>Explicit</b> formula: compute any term directly, as in \(s_n = 2^n\).</li>
                 <li><b>Recursive</b> formula: give a starting term and a rule built from earlier terms. With \(t_1 = 1\) and \(t_n = t_{n-1} + n\) we get \(1, 3, 6, 10, 15, \dots\)</li>
                 <li><b>Increasing</b> means \(s_n \lt s_{n+1}\) for every \(n\); <b>decreasing</b> means \(s_n \gt s_{n+1}\).</li>
                 <li>A <b>subsequence</b> keeps some terms in their original order: \(3, 10, 15\) is a subsequence of \(1, 3, 6, 10, 15\), while \(10, 3\) is not.</li>
               </ul>
-              <div class="def">A <span class="term">string</span> over an alphabet \(X\) is a finite sequence of symbols from \(X\). \(\lambda\) is the empty string, \(|s|\) is the length, and \(X^*\) is the set of all strings. Over \(X = \{a, b\}\) there are \(2^n\) strings of length \(n\).</div>
+              <div class="def">A <span class="term">string</span> over an alphabet \(X\) is a finite sequence of symbols from \(X\). \(\lambda\) is the empty string, \(|s|\) is the length, and \(X^*\) is the set of all strings. Over \(X = \{a, b\}\) there are \(2^n\) strings of length \(n\).<div class="eg">Over \(\{a, b\}\), \(s = abba\) has \(|s| = 4\), and the \(2^2 = 4\) strings of length 2 are \(aa, ab, ba, bb\).</div></div>
             </div>
             <div class="stack">
               <div class="def" data-label="Sum and product notation">\[\sum_{i=m}^{n} a_i = a_m + a_{m+1} + \cdots + a_n \qquad \prod_{i=m}^{n} a_i = a_m \cdot a_{m+1} \cdots a_n\]
-                The index \(i\) runs from the lower limit \(m\) to the upper limit \(n\). When \(m \gt n\) there are no terms: the empty sum is 0 and the empty product is 1.</div>
+                The index \(i\) runs from the lower limit \(m\) to the upper limit \(n\). When \(m \gt n\) there are no terms: the empty sum is 0 and the empty product is 1.<div class="eg">\(\sum_{i=1}^{3} i^2 = 1 + 4 + 9 = 14\) and \(\prod_{i=1}^{3} i = 1 \cdot 2 \cdot 3 = 6\).</div></div>
               <div class="thm">Arithmetic sum: \(\displaystyle\sum_{i=1}^{n} i = \frac{n(n+1)}{2}\). Geometric sum: \(\displaystyle\sum_{i=0}^{n} r^i = \frac{r^{n+1} - 1}{r - 1}\) for \(r \ne 1\).</div>
               <div class="ex">\(1 + 2 + \cdots + 100 = \frac{100 \cdot 101}{2} = 5050\), and \(1 + 2 + 4 + \cdots + 2^9 = 2^{10} - 1 = 1023\).</div>
               <div class="ai">A prompt sent to a language model is a string over its vocabulary, stored as a sequence of token IDs. A time series is a sequence of readings, and a recurrent network defines its memory recursively: \(h_t = f(h_{t-1}, x_t)\).</div>
@@ -1057,7 +1057,7 @@
         html: String.raw`
           <div class="split-narrow">
             <div class="stack">
-              <div class="def">A <span class="term">relation</span> \(R\) from \(A\) to \(B\) is any subset \(R \subseteq A \times B\). We write \(a \mathrel{R} b\) when \((a, b) \in R\). A relation on \(A\) is a subset of \(A \times A\). Every function is a relation, but a relation may link an element to many partners or to none.</div>
+              <div class="def">A <span class="term">relation</span> \(R\) from \(A\) to \(B\) is any subset \(R \subseteq A \times B\). We write \(a \mathrel{R} b\) when \((a, b) \in R\). A relation on \(A\) is a subset of \(A \times A\). Every function is a relation, but a relation may link an element to many partners or to none.<div class="eg">\(\lt\) on \(\{1, 2, 3\}\) is the set \(\{(1, 2), (1, 3), (2, 3)\}\). It links 1 to two numbers and 3 to none, so it is not a function.</div></div>
               <p class="small">Example: "divides" on \(A = \{1, 2, 3, 4\}\), where \(x \mathrel{R} y\) means \(y\) is a multiple of \(x\). Draw an arrow \(x \to y\) for each pair (a loop for \((x, x)\)), or fill a matrix with a 1 in row \(x\), column \(y\).</p>
               <div class="row" style="align-items:center;gap:0.8rem;flex-wrap:nowrap" id="m4-rel-ex"></div>
             </div>
@@ -1093,7 +1093,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An <span class="term">equivalence relation</span> is reflexive, symmetric and transitive. The equivalence class of \(a\) is \([a] = \{x \in A \mid x \mathrel{R} a\}\).</div>
+              <div class="def">An <span class="term">equivalence relation</span> is reflexive, symmetric and transitive. The equivalence class of \(a\) is \([a] = \{x \in A \mid x \mathrel{R} a\}\).<div class="eg">On \(\{\text{ant}, \text{ape}, \text{bee}\}\), "starts with the same letter" is an equivalence relation: \([\text{ant}] = \{\text{ant}, \text{ape}\}\) and \([\text{bee}] = \{\text{bee}\}\).</div></div>
               <div class="thm">The equivalence classes <b>partition</b> \(A\): they are nonempty, never overlap, and together cover \(A\). Conversely, every partition defines the equivalence relation "is in the same block as".</div>
               <div class="ex" style="padding-bottom:0.6rem">Congruence mod \(n\): \(a \equiv b \pmod{n}\) when \(n \mid (a - b)\), that is, \(a\) and \(b\) leave the same remainder. Choose \(n\) to see the classes of \(0, \dots, 11\):
                 <div class="row" style="gap:0.5rem;margin:0.35rem 0 0.3rem"><span class="small muted">n =</span><span id="m4-modseg"></span></div>
@@ -1102,7 +1102,7 @@
               </div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">partial order</span> \(\preceq\) is reflexive, antisymmetric and transitive: \(\le\) on numbers, "divides" on positive integers, \(\subseteq\) on sets. It is a <b>total order</b> if every two elements are comparable. \(\le\) is total; divides is not, because \(2 \nmid 3\) and \(3 \nmid 2\).</div>
+              <div class="def">A <span class="term">partial order</span> \(\preceq\) is reflexive, antisymmetric and transitive: \(\le\) on numbers, "divides" on positive integers, \(\subseteq\) on sets. It is a <b>total order</b> if every two elements are comparable. \(\le\) is total; divides is not, because \(2 \nmid 3\) and \(3 \nmid 2\).<div class="eg">Under \(\subseteq\), \(\{a\} \subseteq \{a, b\}\), but neither of \(\{a\}\), \(\{b\}\) contains the other, so \(\subseteq\) is partial, not total.</div></div>
               <div class="row" style="gap:0.8rem;align-items:center;flex-wrap:nowrap">
                 <div id="m4-hasse12" style="flex:none"></div>
                 <p class="small">A <b>Hasse diagram</b> draws a partial order with less ink: drop the loops, drop every arrow implied by transitivity, and put smaller elements lower so arrowheads are unnecessary. Left: divisors of 12 under "divides".</p>
@@ -1259,7 +1259,7 @@
       {
         title: 'Lab: a tiny relational database',
         kind: 'lab',
-        html: String.raw`<div class="def">An <span class="term">n-ary relation</span> on sets \(A_1, \dots, A_n\) is a subset of \(A_1 \times \cdots \times A_n\), a set of \(n\)-tuples. A database table is one: each row is a tuple, each column an attribute. <b>Select</b> \(\sigma\) keeps the rows that pass a test, <b>project</b> \(\pi\) keeps chosen columns, and <b>join</b> \(\bowtie\) glues together tuples that agree on a shared attribute (here <code>sid</code>).</div>`,
+        html: String.raw`<div class="def">An <span class="term">n-ary relation</span> on sets \(A_1, \dots, A_n\) is a subset of \(A_1 \times \cdots \times A_n\), a set of \(n\)-tuples. A table is one: rows are tuples, columns are attributes. <b>Select</b> \(\sigma\) keeps rows that pass a test, <b>project</b> \(\pi\) keeps chosen columns, and <b>join</b> \(\bowtie\) glues tuples that agree on a shared attribute (here <code>sid</code>).<div class="eg">A schedule \(\{(\text{Mon}, 9, \text{Math}), (\text{Tue}, 10, \text{Art})\}\) is a 3-ary relation: 2 rows (tuples), 3 columns (day, hour, class).</div></div>`,
         render(body, ctx) {
           const { h } = ctx;
           const T = {
@@ -1320,7 +1320,7 @@
               h('table.data', h('thead', h('tr', t.cols.map((c) => h('th', { class: active && keep.includes(c) ? 'keep' : '' }, c)))),
                 h('tbody', t.rows.map((r, i) => h('tr', { class: hits.has(i) ? 'hit' : '' }, r.map((v) => h('td', String(v))))))));
             ctx.rc(left, srcTable(T.S, hitS, q.src !== 'E'), srcTable(T.E, hitE, q.src !== 'S'),
-              h('p.tiny.muted', 'Highlighted rows feed the result; colored headers mark the columns kept.'));
+              h('p.tiny.muted', 'Highlighted rows are used; colored headers mark kept columns.'));
             // result and step counts
             const steps = [];
             if (q.src === 'J') steps.push(`<b>Join:</b> checked ${T.S.rows.length} × ${T.E.rows.length} = ${T.S.rows.length * T.E.rows.length} (student, enrollment) pairs; ${T.J.rows.length} share a sid. Eli (sid 5) has no enrollment, so no joined tuple mentions Eli.`);

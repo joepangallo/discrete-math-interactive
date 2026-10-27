@@ -330,7 +330,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">For integers \(a \neq 0\) and \(b\), \(a\) <span class="term">divides</span> \(b\), written \(a \mid b\), when \(b = a k\) for some integer \(k\). Then \(a\) is a <b>divisor</b> (or factor) of \(b\), and \(b\) is a <b>multiple</b> of \(a\). So \(3 \mid 12\) because \(12 = 3 \cdot 4\), while \(5 \nmid 12\).</div>
+              <div class="def">For integers \(a \neq 0\) and \(b\), \(a\) <span class="term">divides</span> \(b\), written \(a \mid b\), when \(b = a k\) for some integer \(k\). Then \(a\) is a <b>divisor</b> (or factor) of \(b\), and \(b\) is a <b>multiple</b> of \(a\).<div class="eg">\(3 \mid 12\) because \(12 = 3 \cdot 4\), so 3 is a divisor of 12 and 12 is a multiple of 3. But \(5 \nmid 12\): no integer \(k\) gives \(5k = 12\).</div></div>
               <div class="thm">The <span class="term">division algorithm</span>. For any integer \(a\) and any integer \(d \gt 0\) there is exactly one pair of integers \(q\), the <span class="term">quotient</span>, and \(r\), the <span class="term">remainder</span>, with
                 \[a = d\,q + r, \qquad 0 \le r \lt d.\]
                 We write \(q = \lfloor a/d \rfloor\) and \(r = a \bmod d\).</div>
@@ -393,7 +393,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An integer \(p \gt 1\) is <span class="term">prime</span> when its only positive divisors are \(1\) and \(p\). An integer \(n \gt 1\) that is not prime is <span class="term">composite</span>: it factors as \(n = ab\) with \(1 \lt a, b \lt n\). The number 1 is neither prime nor composite.</div>
+              <div class="def">An integer \(p \gt 1\) is <span class="term">prime</span> when its only positive divisors are \(1\) and \(p\). An integer \(n \gt 1\) that is not prime is <span class="term">composite</span>: it factors as \(n = ab\) with \(1 \lt a, b \lt n\). The number 1 is neither prime nor composite.<div class="eg">7 is prime, since only 1 and 7 divide it. \(6 = 2 \cdot 3\) is composite.</div></div>
               <div class="thm">If \(n\) is composite, then \(n\) has a prime divisor \(p \le \sqrt{n}\).</div>
               <p>Here is why. Write \(n = ab\) with \(a \le b\). Then \(a \cdot a \le a \cdot b = n\), so \(a \le \sqrt n\), and any prime factor of \(a\) is at most \(a\). So <b>trial division</b> tests only the primes up to \(\sqrt n\). For \(n = 97\), \(\sqrt{97} \approx 9.8\), and none of 2, 3, 5, 7 divides 97, so 97 is prime. For \(n = 91\), the test finds \(7 \mid 91\), since \(91 = 7 \cdot 13\).</p>
               <div class="tip">Stopping at \(\sqrt n\) is a huge saving. For a 12-digit number it means about a million trial divisions instead of a trillion.</div>
@@ -540,7 +540,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">greatest common divisor</span> \(\gcd(a, b)\) is the largest integer dividing both \(a\) and \(b\) (not both 0). The <span class="term">least common multiple</span> \(\operatorname{lcm}(a, b)\) is the smallest positive integer that both divide. If \(\gcd(a, b) = 1\), then \(a\) and \(b\) are <span class="term">relatively prime</span>.</div>
+              <div class="def">The <span class="term">greatest common divisor</span> \(\gcd(a, b)\) is the largest integer dividing both \(a\) and \(b\) (not both 0). The <span class="term">least common multiple</span> \(\operatorname{lcm}(a, b)\) is the smallest positive integer that both divide. If \(\gcd(a, b) = 1\), then \(a\) and \(b\) are <span class="term">relatively prime</span>.<div class="eg">\(\gcd(4, 6) = 2\) and \(\operatorname{lcm}(4, 6) = 12\). Since \(\gcd(8, 9) = 1\), 8 and 9 are relatively prime, though neither is prime.</div></div>
               <div class="ex">From the factorizations \(360 = 2^3 \cdot 3^2 \cdot 5\) and \(84 = 2^2 \cdot 3 \cdot 7\): the gcd takes the <i>smaller</i> power of each prime, and the lcm takes the <i>larger</i>.
                 \[\gcd = 2^2 \cdot 3 = 12, \qquad \operatorname{lcm} = 2^3 \cdot 3^2 \cdot 5 \cdot 7 = 2520\]</div>
               <div class="thm">For positive \(a, b\): \(\gcd(a,b) \cdot \operatorname{lcm}(a,b) = a \cdot b\). Check: \(12 \cdot 2520 = 30240 = 360 \cdot 84\).</div>
@@ -704,13 +704,13 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">\(a\) is <span class="term">congruent</span> to \(b\) modulo \(n\), written \(a \equiv b \pmod{n}\), when \(n \mid (a - b)\). Equivalently, \(a\) and \(b\) leave the same remainder: \(a \bmod n = b \bmod n\). The number \(n\) is the <span class="term">modulus</span>.</div>
+              <div class="def">\(a\) is <span class="term">congruent</span> to \(b\) modulo \(n\), written \(a \equiv b \pmod{n}\), when \(n \mid (a - b)\). Equivalently, \(a\) and \(b\) leave the same remainder: \(a \bmod n = b \bmod n\). The number \(n\) is the <span class="term">modulus</span>.<div class="eg">\(17 \equiv 2 \pmod 5\), because \(17 - 2 = 15\) and \(5 \mid 15\). Both leave remainder 2 when divided by the modulus 5.</div></div>
               <div class="ex">\(38 \equiv 14 \equiv 2 \pmod{12}\), because 12 divides \(38 - 14 = 24\) and \(38 - 2 = 36\). A clock works this way: 38 hours after midnight it shows 2. Likewise, 100 days after a Wednesday is a Friday, since \(100 \bmod 7 = 2\).</div>
               <div class="thm">If \(a \equiv c\) and \(b \equiv d \pmod n\), then \(a + b \equiv c + d\), \(a - b \equiv c - d\) and \(ab \equiv cd \pmod n\). So you may reduce at every step: \((123 \cdot 456) \bmod 10 = (3 \cdot 6) \bmod 10 = 8\).</div>
               <div class="warn">Division does not carry over. \(2 \cdot 3 \equiv 2 \cdot 8 \pmod{10}\), yet \(3 \not\equiv 8 \pmod{10}\). You may cancel a factor only when it has an inverse.</div>
             </div>
             <div class="stack">
-              <div class="def">An <span class="term" data-term="modular inverse">inverse</span> of \(a\) modulo \(n\) is a number \(x\) with \(a x \equiv 1 \pmod n\). We write it \(a^{-1}\).</div>
+              <div class="def">An <span class="term" data-term="modular inverse">inverse</span> of \(a\) modulo \(n\) is a number \(x\) with \(a x \equiv 1 \pmod n\). We write it \(a^{-1}\).<div class="eg">\(2^{-1} \equiv 3 \pmod 5\), because \(2 \cdot 3 = 6 \equiv 1 \pmod 5\).</div></div>
               <div class="thm">\(a\) has an inverse modulo \(n\) exactly when \(\gcd(a, n) = 1\). Bézout supplies it: if \(s a + t n = 1\), then \(s a \equiv 1 \pmod n\), so \(a^{-1} \equiv s\).</div>
               <div class="ex">\(3^{-1} \equiv 5 \pmod 7\), since \(3 \cdot 5 = 15 = 2 \cdot 7 + 1\). To solve \(3x \equiv 4 \pmod 7\), multiply both sides by 5: \(x \equiv 20 \equiv 6\). On the other hand, 4 has no inverse mod 6: \(\gcd(4, 6) = 2\), and \(4x \bmod 6\) is always 0, 2 or 4. In Python, <code>pow(3, -1, 7)</code> returns 5.</div>
               <div class="ai">Time features are modular: hour 23 and hour 0 are one hour apart. Models encode hour \(h\) as the point \(\big(\cos \tfrac{2\pi h}{24}, \sin \tfrac{2\pi h}{24}\big)\) on a circle, so the step from 23 to 0 looks like any other one-hour step.</div>
@@ -857,7 +857,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In <span class="term">base</span> \(b \ge 2\) the digits \(d_k \dots d_1 d_0\), each with \(0 \le d_i \lt b\), stand for \(n = d_k b^k + \cdots + d_1 b + d_0\). So \((1011)_2 = 8 + 2 + 1 = 11\) and \((2F)_{16} = 2 \cdot 16 + 15 = 47\), with A to F standing for 10 to 15.</div>
+              <div class="def">In <span class="term">base</span> \(b \ge 2\) the digits \(d_k \dots d_1 d_0\), each with \(0 \le d_i \lt b\), stand for \(n = d_k b^k + \cdots + d_1 b + d_0\).<div class="eg">\((1011)_2 = 8 + 2 + 1 = 11\). In base 16, A to F stand for 10 to 15, so \((2F)_{16} = 2 \cdot 16 + 15 = 47\).</div></div>
               <p class="small"><b>Decimal to base \(b\):</b> divide by \(b\) again and again, which is the division algorithm on repeat. The remainders are the digits, last one first. Try it:</p>
               <div class="card nt-conv stack" style="gap:0.4rem;padding:0.55rem 0.75rem"></div>
               <p class="small"><b>Binary to hex or octal:</b> group the bits in fours (hex) or threes (octal) from the right. \((1001\,1100)_2 = (9C)_{16}\), because \(16 = 2^4\).</p>

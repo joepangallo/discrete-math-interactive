@@ -687,12 +687,12 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">transport network</span> is a directed graph where every edge \((u, v)\) has a nonnegative <span class="term">capacity</span> \(c(u, v)\). One vertex is the <span class="term">source</span> \(s\) (no edges come in) and one is the <span class="term">sink</span> \(t\) (no edges go out). Picture water pipes: the capacity is how much a pipe can carry per second.</div>
+              <div class="def">A <span class="term">transport network</span> is a directed graph where every edge \((u, v)\) has a nonnegative <span class="term">capacity</span> \(c(u, v)\). One vertex is the <span class="term">source</span> \(s\) (no edges come in) and one is the <span class="term">sink</span> \(t\) (no edges go out). Picture water pipes: the capacity is how much a pipe can carry per second.<div class="eg">Edges \(s \to a\) with capacity 4 and \(a \to t\) with capacity 2 form a network with source \(s\) and sink \(t\).</div></div>
               <div class="def">A <span class="term">flow</span> puts an amount \(f(u, v)\) on every edge and obeys two rules.
                 <ol style="margin-top:0.25rem">
                   <li><b>Capacity rule:</b> \(0 \le f(u, v) \le c(u, v)\) on every edge.</li>
                   <li><b><span class="term">Conservation of flow</span>:</b> at every vertex other than \(s\) and \(t\), flow in equals flow out.</li>
-                </ol></div>
+                </ol><div class="eg">With capacities 4 on \(s \to a\) and 2 on \(a \to t\), putting 2 on each edge is a flow. Putting 3 on \(s \to a\) is not: 3 units reach \(a\), but at most 2 can leave.</div></div>
               <div class="thm">The <span class="term">value of a flow</span> \(|f|\) is the total leaving \(s\). Because nothing is created or lost at the vertices in between, it also equals the total entering \(t\).</div>
             </div>
             <div class="stack">
@@ -714,11 +714,11 @@
             <div class="stack">
               <p>To grow a flow, look for spare room. The <span class="term">residual network</span> records two kinds of room for every edge \(u \to v\) with flow \(f\) and capacity \(c\):</p>
               <ul>
-                <li><b>Forward step</b> \(u \to v\): room \(c - f\). That many more units fit.</li>
+                <li><b>Forward step</b> \(u \to v\): room \(c - f\), the units that still fit.</li>
                 <li><b>Backward step</b> \(v \dashrightarrow u\): room \(f\). Units already sent along \(u \to v\) can be canceled, which has the same effect as sending them back.</li>
               </ul>
-              <div class="def">An <span class="term">augmenting path</span> is a path from \(s\) to \(t\) in the residual network where every step has positive <span class="term">residual capacity</span>. Its <span class="term">bottleneck</span> is the smallest room on the path. Pushing the bottleneck along it (add on forward steps, subtract on backward steps) raises \(|f|\) by exactly that amount and keeps both flow rules true.</div>
-              <div class="why">Without backward steps, an early bad choice is permanent and a greedy algorithm can get stuck below the maximum. Backward steps let the algorithm change its mind.</div>
+              <div class="def">An <span class="term">augmenting path</span> is a path from \(s\) to \(t\) in the residual network where every step has positive <span class="term">residual capacity</span>. Its <span class="term">bottleneck</span> is the smallest room on the path. Pushing the bottleneck along it (add on forward steps, subtract on backward steps) raises \(|f|\) by exactly that amount and keeps both flow rules true.<div class="eg">If \(s \to a\) has room 3 and \(a \to t\) room 1, then \(s \to a \to t\) is augmenting with bottleneck 1.</div></div>
+              <div class="why">Without backward steps, an early bad choice is permanent and a greedy algorithm can stall below the maximum. Backward steps let it change its mind.</div>
             </div>
             <div class="ex stack" style="gap:0.4rem">
               <p class="small">Every edge has capacity 1. A careless first path \(s \to a \to b \to t\) fills three edges (left). No forward route is left, yet the maximum flow is 2.</p>
@@ -882,12 +882,12 @@
                   <li>Search the residual network for an augmenting path.</li>
                   <li>If there is none, stop: the flow is maximum.</li>
                   <li>Push the bottleneck along the path (up on forward steps, down on backward steps), then go back to step 2.</li>
-                </ol></div>
+                </ol><div class="eg">On \(s \to a \to t\) with capacities 4 and 2, start at 0 and push the bottleneck, 2, along that path. Now \(a \to t\) is full, no augmenting path is left, and the flow of 2 is maximum.</div></div>
               <div class="thm">With integer capacities, every push adds at least 1 to \(|f|\), so the method stops after at most \(|f^*|\) pushes (\(f^*\) a maximum flow). It also finds a maximum flow that is a whole number on every edge.</div>
               <p class="small muted">Johnsonbaugh calls this the <i>maximal flow algorithm</i> and finds paths by labeling vertices. The labeling is one way to search the residual network.</p>
             </div>
             <div class="stack">
-              <div class="def">The <span class="term">Edmonds–Karp algorithm</span> adds one rule: always use a <i>shortest</i> augmenting path (fewest edges), found by breadth-first search. It needs at most \(|V| \cdot |E|\) augmentations, so it runs in \(O(|V| \cdot |E|^2)\) time however large the capacities are.</div>
+              <div class="def">The <span class="term">Edmonds–Karp algorithm</span> adds one rule: always use a <i>shortest</i> augmenting path (fewest edges), found by breadth-first search. It needs at most \(|V| \cdot |E|\) augmentations, so it runs in \(O(|V| \cdot |E|^2)\) time however large the capacities are.<div class="eg">If \(s \to t\) and \(s \to a \to t\) both have room, BFS takes \(s \to t\) first: 1 edge beats 2.</div></div>
               <div class="warn">
                 <div class="split" style="grid-template-columns:minmax(0,1fr) 14.5rem;gap:0.6rem;align-items:center">
                   <p class="small">The rule matters. Here a careless search might keep using the middle edge, alternating \(s \to a \to b \to t\) and \(s \to b \dashrightarrow a \to t\). Each round pushes 1 unit, so it takes 2000 rounds. BFS takes the two outer paths and finishes in 2. With irrational capacities, a bad rule can even run forever.</p>
@@ -907,7 +907,7 @@
             <div class="stack">
               <div class="def">A <span class="term">cut</span> \((S, T)\) splits the vertices into two groups with \(s \in S\) and \(t \in T\). Its capacity adds up the edges that go from \(S\) to \(T\):
                 \[c(S, T) = \sum_{u \in S,\ v \in T} c(u, v)\]
-                Edges that point from \(T\) back to \(S\) do not count.</div>
+                Edges that point from \(T\) back to \(S\) do not count.<div class="eg">On \(s \to a \to t\) with capacities 4 and 2, the cut \(S = \{s\}\) has capacity 4, and \(S = \{s, a\}\) has capacity 2.</div></div>
               <div class="thm">For every flow \(f\) and every cut, \(|f| \le c(S, T)\). Every unit that travels from \(s\) to \(t\) has to cross from \(S\) to \(T\) at least once.</div>
               <div class="thm" data-label="Max-flow min-cut theorem">The value of a maximum flow equals the capacity of a <span class="term">minimum cut</span>. This is the <span class="term">max-flow min-cut theorem</span>.</div>
               <div class="why">A minimum cut is a certificate and an explanation in one. It proves no flow can do better, and it names the links that limit throughput. Upgrading a link outside the minimum cut cannot raise the maximum flow.</div>
@@ -1013,7 +1013,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In a <span class="term">bipartite graph</span> the vertices form two groups, here workers \(W\) and jobs \(J\), and every edge joins a worker to a job they are qualified for. A <span class="term">matching</span> is a set of edges with no shared endpoints: each worker does at most one job and each job gets at most one worker. A <b><span class="term">maximum matching</span></b> has as many edges as possible.</div>
+              <div class="def">In a <span class="term">bipartite graph</span> the vertices form two groups, here workers \(W\) and jobs \(J\), and every edge joins a worker to a job they are qualified for. A <span class="term">matching</span> is a set of edges with no shared endpoints: each worker does at most one job and each job gets at most one worker. A <b><span class="term">maximum matching</span></b> has as many edges as possible.<div class="eg">Kim can do jobs 1 and 2, Raj only job 1. {Kim–1} is a matching, but it leaves Raj idle; {Kim–2, Raj–1} is a maximum matching.</div></div>
               <p><b>Matching as a flow.</b> Add a source \(s\) with an edge to every worker, point each qualification edge from worker to job, and add an edge from every job to a sink \(t\). Give every edge capacity 1. An integer maximum flow sends at most one unit through each worker and each job, so its value is the size of a maximum matching.</p>
               <div class="card" style="padding:0.3rem 0.5rem">${FIG_MATCH.replace('<svg ', '<svg style="width:100%;max-height:10.5rem;display:block" ')}</div>
             </div>

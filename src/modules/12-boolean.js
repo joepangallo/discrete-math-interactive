@@ -688,11 +688,11 @@
         title: 'Logic gates: the building blocks',
         kind: 'concept',
         html: String.raw`
-          <div class="def">A <span class="term">logic gate</span> is a tiny circuit that reads one or two input bits and produces one output bit. A bit is 0 (low voltage, false) or 1 (high voltage, true). Each gate below shows its symbol, its algebra and its truth table. Click a column of a table or an input circle to try the gate.</div>
+          <div class="def">A <span class="term">logic gate</span> is a tiny circuit that reads one or two input bits and produces one output bit. A bit is 0 (low voltage, false) or 1 (high voltage, true). Each gate below shows its symbol, its algebra and its truth table. Click a column of a table or an input circle to try the gate.<div class="eg">With inputs 1 and 0, AND outputs 0 (it needs both 1s), OR outputs 1 (one 1 is enough), and NOT turns 1 into 0.</div></div>
           <div class="cols-3 bl-gates"></div>
           <div class="split" style="align-items:stretch">
-            <div class="box"><span class="lbl">Reading the symbols</span>A small circle on an output, called a bubble, means "then flip the result". So NAND is AND followed by NOT. Engineers usually write \(x \cdot y\) as \(xy\), the way algebra writes \(3x\), and they write the complement of \(x\) as \(x'\) or \(\bar{x}\).</div>
-            <div class="ai">A GPU contains tens of billions of transistors wired into gates like these. Every multiplication inside a neural network becomes streams of bits flowing through AND, OR and XOR gates in adder circuits, which you will build later in this module.</div>
+            <div class="box"><span class="lbl">Reading the symbols</span>A small circle on an output, called a bubble, means "then flip the result", so NAND is AND then NOT. Engineers write \(x \cdot y\) as \(xy\), the way algebra writes \(3x\), and the complement of \(x\) as \(x'\) or \(\bar{x}\).</div>
+            <div class="ai">A GPU wires tens of billions of transistors into gates like these. Every multiplication in a neural network runs as bits through AND, OR and XOR gates in adder circuits, which you will build later.</div>
           </div>`,
         render(body, ctx) {
           const { h, rc } = ctx;
@@ -735,7 +735,7 @@
         html: String.raw`
           <div class="split fill" style="align-items:stretch; min-height:0">
             <div class="stack" style="min-height:0">
-              <div class="def">A <span class="term">combinatorial circuit</span> is a network of gates with no loops, so signals flow one way, from inputs to outputs. Its output depends only on the inputs right now, so it has no memory, and a truth table describes it completely.</div>
+              <div class="def">A <span class="term">combinatorial circuit</span> is a network of gates with no loops, so signals flow one way, from inputs to outputs. Its output depends only on the inputs right now, so it has no memory, and a truth table describes it completely.<div class="eg">Feed \(x\) and \(y\) into an AND gate, then a NOT gate: the output is \((xy)'\). Inputs 1, 1 give 0 every time, whatever came before.</div></div>
               <div class="figure bl-fig bl-c2-fig" style="flex:1"></div>
               <p class="tiny muted">Click a switch or a table row. A dot joins wires. Wires that cross without a dot are not connected.</p>
             </div>
@@ -885,7 +885,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">Boolean algebra</span> is a set \(B\) with operations \(+\) and \(\cdot\), a complement operation \(x'\), and two different elements \(0\) and \(1\) that obey these laws for all \(x, y, z \in B\).</div>
+              <div class="def">A <span class="term">Boolean algebra</span> is a set \(B\) with operations \(+\) and \(\cdot\), a complement operation \(x'\), and two different elements \(0\) and \(1\) that obey these laws for all \(x, y, z \in B\).<div class="eg">The smallest one is \(B = \{0, 1\}\) with OR, AND and NOT: \(1 + 0 = 1\), \(1 \cdot 0 = 0\) and \(0' = 1\).</div></div>
               <table class="tt bl-ax" style="width:100%">
                 <thead><tr><th class="l">Law</th><th>Sum form</th><th>Product form</th></tr></thead>
                 <tbody>
@@ -924,7 +924,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">Boolean function</span> of \(n\) variables gives an output bit for each of the \(2^n\) input rows. A <span class="term">literal</span> is a variable or its complement, like \(x\) or \(x'\). A <span class="term">minterm</span> is a product with every variable once, such as \(x'yz\). It equals 1 on exactly one row.</div>
+              <div class="def">A <span class="term">Boolean function</span> of \(n\) variables gives an output bit for each of the \(2^n\) input rows. A <span class="term">literal</span> is a variable or its complement, like \(x\) or \(x'\). A <span class="term">minterm</span> is a product with every variable once, such as \(x'yz\). It equals 1 on exactly one row.<div class="eg">With 2 variables a function has \(2^2 = 4\) rows. The minterm \(xy'\) has literals \(x\) and \(y'\), and it is 1 only on the row \(x = 1, y = 0\).</div></div>
               <div class="thm">Every Boolean function equals the sum of the minterms of the rows where it is 1. That sum is its <span class="term">disjunctive normal form</span> (DNF), also called a sum of minterms.</div>
               <div class="ex">Read the DNF straight off the table. For each row with \(f = 1\), write \(x\) where the bit is 1 and \(x'\) where it is 0, then add the products. Row \(011\) gives \(x'yz\), the minterm \(m_3\).</div>
               <div class="why">This proves that AND, OR and NOT can build <i>every</i> Boolean function, since any truth table turns into a DNF. With \(n\) variables there are \(2^{2^n}\) functions: 16 for two variables and 256 for three.</div>
@@ -1032,7 +1032,7 @@
               <div class="ai">Quantized neural networks store weights in 8, 4 or even 1 bit so that inference needs fewer, simpler gates. A 1-bit network replaces multiplication with XNOR gates and bit counting.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">Karnaugh map</span> is a truth table folded into a grid. Rows and columns follow Gray-code order 00, 01, 11, 10, so neighboring cells differ in exactly one variable. Two neighboring 1s merge because \(Ax + Ax' = A\).</div>
+              <div class="def">A <span class="term">Karnaugh map</span> is a truth table folded into a grid. Rows and columns follow Gray-code order 00, 01, 11, 10, so neighboring cells differ in exactly one variable. Two neighboring 1s merge because \(Ax + Ax' = A\).<div class="eg">Cells \(x'y\) (01) and \(xy\) (11) are neighbors, since only \(x\) changes. Two 1s there merge: \(x'y + xy = y\).</div></div>
               <div class="thm"><b>Grouping rules.</b>
                 <ol style="margin:0.2rem 0 0">
                   <li>Groups are rectangles of 1, 2, 4, 8 or 16 cells.</li>

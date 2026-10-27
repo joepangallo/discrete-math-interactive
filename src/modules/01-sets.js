@@ -240,7 +240,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">set</span> is an unordered collection of distinct objects, called its <span class="term">element</span>s. We write \(x \in A\) for "\(x\) is an element of \(A\)" and \(x \notin A\) for "it is not".</div>
+              <div class="def">A <span class="term">set</span> is an unordered collection of distinct objects, called its <span class="term">element</span>s. We write \(x \in A\) for "\(x\) is an element of \(A\)" and \(x \notin A\) for "it is not".<div class="eg">\(A = \{2, 4, 6\}\) has three elements, so \(4 \in A\) and \(5 \notin A\).</div></div>
               <p>There are two standard ways to describe a set:</p>
               <ul>
                 <li><b><span class="term">Roster notation</span></b> lists the elements: \(V = \{a, e, i, o, u\}\).</li>
@@ -274,7 +274,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">\(A \subseteq B\) (a <span class="term">subset</span>) means every element of \(A\) is also in \(B\). \(A \subset B\) (a <span class="term">proper subset</span>) adds that \(B\) has something extra.</div>
+              <div class="def">\(A \subseteq B\) (a <span class="term">subset</span>) means every element of \(A\) is also in \(B\). \(A \subset B\) (a <span class="term">proper subset</span>) adds that \(B\) has something extra.<div class="eg">\(\{a, b\} \subset \{a, b, c\}\): both are in, and \(c\) is extra. \(\{a, d\} \not\subseteq \{a, b, c\}\) because \(d\) is missing.</div></div>
               <div class="thm">Two sets are equal exactly when each is a subset of the other:
                 \[A = B \iff (A \subseteq B \text{ and } B \subseteq A)\]
                 This is how you <i>prove</i> two sets are equal: show every element of the left is in the right, then the reverse.</div>
@@ -282,7 +282,7 @@
               <div class="warn">\(\in\) and \(\subseteq\) are different questions. \(1 \in \{1, 2\}\) is true, but \(1 \subseteq \{1, 2\}\) is meaningless because 1 is a number, not a set. The correct subset statement is \(\{1\} \subseteq \{1, 2\}\).</div>
             </div>
             <div class="stack">
-              <div class="def">The <span class="term">power set</span> \(\mathcal{P}(A)\) is the set of <i>all</i> subsets of \(A\), including \(\varnothing\) and \(A\) itself.</div>
+              <div class="def">The <span class="term">power set</span> \(\mathcal{P}(A)\) is the set of <i>all</i> subsets of \(A\), including \(\varnothing\) and \(A\) itself.<div class="eg">\(\mathcal{P}(\{7\}) = \{\varnothing, \{7\}\}\): take nothing, or take the 7.</div></div>
               <p class="big-math">\(\mathcal{P}(\{a,b\}) = \{\varnothing, \{a\}, \{b\}, \{a,b\}\}\)</p>
               <div class="thm">If \(|A| = n\), then \(|\mathcal{P}(A)| = 2^n\).</div>
               <p>Why \(2^n\)? Building a subset means making one yes/no decision per element: "is \(a\) in? is \(b\) in? …". That is \(n\) independent two-way choices, so \(2 \cdot 2 \cdots 2 = 2^n\) subsets. Each subset matches one \(n\)-bit binary string, where bit \(i\) says whether element \(i\) is in. The next slide lets you see this happen.</p>
@@ -522,7 +522,7 @@
       {
         title: 'Lab: ordered pairs and the Cartesian product',
         kind: 'lab',
-        html: String.raw`<div class="def">An <span class="term">ordered pair</span> \((a, b)\) remembers order, so \((1, 2) \neq (2, 1)\). The <span class="term">Cartesian product</span> is \(A \times B = \{(a, b) \mid a \in A,\ b \in B\}\), and \(|A \times B| = |A| \cdot |B|\).</div>`,
+        html: String.raw`<div class="def">An <span class="term">ordered pair</span> \((a, b)\) remembers order, so \((1, 2) \neq (2, 1)\). The <span class="term">Cartesian product</span> is \(A \times B = \{(a, b) \mid a \in A,\ b \in B\}\), and \(|A \times B| = |A| \cdot |B|\).<div class="eg">\(\{1, 2\} \times \{x, y\} = \{(1, x), (1, y), (2, x), (2, y)\}\), which is \(2 \cdot 2 = 4\) pairs.</div></div>`,
         render(body, ctx) {
           const { h } = ctx;
           let A = ['S', 'M', 'L'];

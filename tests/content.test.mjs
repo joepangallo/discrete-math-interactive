@@ -48,6 +48,24 @@ const POSITIONAL_CHOICE = /^(both|neither)\b|^(all|none) of\b|\b(of the above|of
 
 const modules = files.map((file) => ({ file, m: load(file) }));
 
+/* Each <div class="def"> block in a module source, matched to its own closing tag (examples nest a div inside). */
+function defBlocks(src) {
+  const out = [];
+  for (let at = src.indexOf('<div class="def"'); at !== -1; at = src.indexOf('<div class="def"', at + 1)) {
+    const tag = /<\/?div\b/g;
+    tag.lastIndex = at;
+    let depth = 0, m;
+    while ((m = tag.exec(src))) {
+      depth += m[0] === '<div' ? 1 : -1;
+      if (depth === 0) break;
+    }
+    assert.ok(m, `unclosed definition box near: ${src.slice(at, at + 80)}`);
+    out.push(src.slice(at, src.indexOf('>', m.index) + 1));
+  }
+  return out;
+}
+const EXAMPLE = /<div class="eg">([\s\S]*?)<\/div>\s*<\/div>$/;
+
 test('module ids are unique and numbers are contiguous from 0', () => {
   const ids = modules.map(({ m }) => m.id);
   assert.equal(new Set(ids).size, ids.length, `duplicate module ids: ${ids.join(', ')}`);
@@ -118,6 +136,18 @@ for (const { file, m } of modules) {
     assert.doesNotMatch(src, /Math\.random/, 'use the seeded R helper, not Math.random');
     assert.doesNotMatch(src, /\$\$(?!\{)[^$]+\$\$(?!\{)/, 'use \\[ \\] for display math, not $$');
     assert.deepEqual(britishWords(src), [], 'use American spelling');
+  });
+
+  /* A definition is never left abstract: its box ends with one small concrete instance. */
+  test(`${file}: every definition box ends with a short example`, () => {
+    for (const block of defBlocks(src)) {
+      const name = block.replace(/<[^>]+>/g, '').slice(0, 70);
+      const eg = block.match(EXAMPLE);
+      assert.ok(eg, `definition "${name}…" needs a <div class="eg"> as its last child`);
+      const text = eg[1].replace(/<[^>]+>/g, '').trim();
+      assert.ok(text.length >= 15, `definition "${name}…": the example is empty`);
+      assert.ok(text.length <= 320, `definition "${name}…": keep the example to one or two short sentences (${text.length} chars)`);
+    }
   });
 
   test(`${file}: timers and global listeners are cleaned up when the slide is hidden`, () => {

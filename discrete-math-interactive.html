@@ -286,6 +286,9 @@ svg text { font-family: var(--font-body); }
 .def, .thm, .ex, .ai, .warn, .tip, .why { border-radius: var(--radius); padding: 0.55rem 0.85rem; border: 1px solid var(--rule); background: var(--sheet); }
 .def { border-left: 3px solid var(--accent); }
 .def::before { content: "Definition"; color: var(--accent); }
+/* the small example every definition box ends with: one concrete instance before any theory builds on it */
+.def .eg { margin-top: 0.3rem; padding-top: 0.28rem; border-top: 1px dashed var(--rule); }
+.def .eg::before { content: "Example"; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); margin-right: 0.5rem; }
 .thm { border-left: 3px solid var(--fnc); }
 .thm::before { content: "Theorem / Rule"; color: var(--fnc); }
 .ex { border-style: dashed; }
@@ -3597,7 +3600,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">set</span> is an unordered collection of distinct objects, called its <span class="term">element</span>s. We write \(x \in A\) for "\(x\) is an element of \(A\)" and \(x \notin A\) for "it is not".</div>
+              <div class="def">A <span class="term">set</span> is an unordered collection of distinct objects, called its <span class="term">element</span>s. We write \(x \in A\) for "\(x\) is an element of \(A\)" and \(x \notin A\) for "it is not".<div class="eg">\(A = \{2, 4, 6\}\) has three elements, so \(4 \in A\) and \(5 \notin A\).</div></div>
               <p>There are two standard ways to describe a set:</p>
               <ul>
                 <li><b><span class="term">Roster notation</span></b> lists the elements: \(V = \{a, e, i, o, u\}\).</li>
@@ -3631,7 +3634,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">\(A \subseteq B\) (a <span class="term">subset</span>) means every element of \(A\) is also in \(B\). \(A \subset B\) (a <span class="term">proper subset</span>) adds that \(B\) has something extra.</div>
+              <div class="def">\(A \subseteq B\) (a <span class="term">subset</span>) means every element of \(A\) is also in \(B\). \(A \subset B\) (a <span class="term">proper subset</span>) adds that \(B\) has something extra.<div class="eg">\(\{a, b\} \subset \{a, b, c\}\): both are in, and \(c\) is extra. \(\{a, d\} \not\subseteq \{a, b, c\}\) because \(d\) is missing.</div></div>
               <div class="thm">Two sets are equal exactly when each is a subset of the other:
                 \[A = B \iff (A \subseteq B \text{ and } B \subseteq A)\]
                 This is how you <i>prove</i> two sets are equal: show every element of the left is in the right, then the reverse.</div>
@@ -3639,7 +3642,7 @@ DM.module({
               <div class="warn">\(\in\) and \(\subseteq\) are different questions. \(1 \in \{1, 2\}\) is true, but \(1 \subseteq \{1, 2\}\) is meaningless because 1 is a number, not a set. The correct subset statement is \(\{1\} \subseteq \{1, 2\}\).</div>
             </div>
             <div class="stack">
-              <div class="def">The <span class="term">power set</span> \(\mathcal{P}(A)\) is the set of <i>all</i> subsets of \(A\), including \(\varnothing\) and \(A\) itself.</div>
+              <div class="def">The <span class="term">power set</span> \(\mathcal{P}(A)\) is the set of <i>all</i> subsets of \(A\), including \(\varnothing\) and \(A\) itself.<div class="eg">\(\mathcal{P}(\{7\}) = \{\varnothing, \{7\}\}\): take nothing, or take the 7.</div></div>
               <p class="big-math">\(\mathcal{P}(\{a,b\}) = \{\varnothing, \{a\}, \{b\}, \{a,b\}\}\)</p>
               <div class="thm">If \(|A| = n\), then \(|\mathcal{P}(A)| = 2^n\).</div>
               <p>Why \(2^n\)? Building a subset means making one yes/no decision per element: "is \(a\) in? is \(b\) in? …". That is \(n\) independent two-way choices, so \(2 \cdot 2 \cdots 2 = 2^n\) subsets. Each subset matches one \(n\)-bit binary string, where bit \(i\) says whether element \(i\) is in. The next slide lets you see this happen.</p>
@@ -3879,7 +3882,7 @@ DM.module({
       {
         title: 'Lab: ordered pairs and the Cartesian product',
         kind: 'lab',
-        html: String.raw`<div class="def">An <span class="term">ordered pair</span> \((a, b)\) remembers order, so \((1, 2) \neq (2, 1)\). The <span class="term">Cartesian product</span> is \(A \times B = \{(a, b) \mid a \in A,\ b \in B\}\), and \(|A \times B| = |A| \cdot |B|\).</div>`,
+        html: String.raw`<div class="def">An <span class="term">ordered pair</span> \((a, b)\) remembers order, so \((1, 2) \neq (2, 1)\). The <span class="term">Cartesian product</span> is \(A \times B = \{(a, b) \mid a \in A,\ b \in B\}\), and \(|A \times B| = |A| \cdot |B|\).<div class="eg">\(\{1, 2\} \times \{x, y\} = \{(1, x), (1, y), (2, x), (2, y)\}\), which is \(2 \cdot 2 = 4\) pairs.</div></div>`,
         render(body, ctx) {
           const { h } = ctx;
           let A = ['S', 'M', 'L'];
@@ -4762,7 +4765,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">proposition</span> is a sentence that is either true or false (T or F), but not both. We name propositions with letters such as \(p\), \(q\) and \(r\).</div>
+              <div class="def">A <span class="term">proposition</span> is a sentence that is either true or false (T or F), but not both. We name propositions with letters such as \(p\), \(q\) and \(r\).<div class="eg">\(p\): "10 is even" is a true proposition. \(q\): "\(3 \gt 8\)" is a false one.</div></div>
               <div class="split" style="gap:0.6rem">
                 <div class="box small"><span class="lbl ok">Propositions</span>"7 is prime." (T)<br>"\(2 + 2 = 5\)." (F)<br>"Every even number above 2 is a sum of two primes." (Nobody knows which, yet it is one of the two.)</div>
                 <div class="box small"><span class="lbl bad">Not propositions</span>"Close the door." (a command)<br>"Is it raining?" (a question)<br>"\(x + 1 = 3\)." (true or false only once \(x\) is chosen)</div>
@@ -4791,13 +4794,13 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">conditional</span> \(p \to q\) reads "if \(p\), then \(q\)". \(p\) is the <b>hypothesis</b> (or antecedent) and \(q\) is the <b>conclusion</b> (or consequent). It is false in exactly one case: \(p\) true and \(q\) false.</div>
+              <div class="def">The <span class="term">conditional</span> \(p \to q\) reads "if \(p\), then \(q\)". \(p\) is the <b>hypothesis</b> (or antecedent) and \(q\) is the <b>conclusion</b> (or consequent). It is false in exactly one case: \(p\) true and \(q\) false.<div class="eg">"If it snows, then school closes": \(p\) is "it snows" and \(q\) is "school closes". Only snow with school open makes it false.</div></div>
               <div class="row" style="align-items:flex-start;gap:1rem;flex-wrap:nowrap">
                 ${TT_COND}
                 <p class="small">Think of \(p \to q\) as a promise. The highlighted row is the only way to break it. When the hypothesis is false, nothing was promised, so the conditional counts as true. We say it is <span class="term">vacuously true</span>.</p>
               </div>
-              <div class="ex">"If \(2 + 2 = 5\), then the moon is made of cheese" is true, because its hypothesis is false. "If 7 is prime, then \(2 + 2 = 4\)" is also true, even though the two parts have nothing to do with each other. Logic looks only at truth values; it never asks whether the parts are related.</div>
-              <div class="why">Every <code>if</code> in a program, every requirement in a specification ("if the input is valid, the output is sorted") and every step of a proof is a conditional. A test whose input never makes the hypothesis true can never catch a broken promise.</div>
+              <div class="ex">"If \(2 + 2 = 5\), then the moon is made of cheese" is true, because its hypothesis is false. "If 7 is prime, then \(2 + 2 = 4\)" is true too, though its parts are unrelated: logic looks only at truth values.</div>
+              <div class="why">Every <code>if</code> in a program, every spec rule ("if the input is valid, the output is sorted") and every proof step is a conditional. A test that never makes the hypothesis true can never catch a broken promise.</div>
             </div>
             <div class="card lg-promise"></div>
           </div>`,
@@ -4859,7 +4862,7 @@ DM.module({
                 </tbody>
               </table>
               <div class="warn">"You pass only if you submit the project" is pass \(\to\) submit. Submitting is necessary, not sufficient: you can submit and still fail.</div>
-              <div class="def">The <span class="term">biconditional</span> \(p \leftrightarrow q\) ("\(p\) if and only if \(q\)") is true when \(p\) and \(q\) have the same truth value. It equals \((p \to q) \land (q \to p)\): each is necessary and sufficient for the other.</div>
+              <div class="def">The <span class="term">biconditional</span> \(p \leftrightarrow q\) ("\(p\) if and only if \(q\)") is true when \(p\) and \(q\) have the same truth value. It equals \((p \to q) \land (q \to p)\): each is necessary and sufficient for the other.<div class="eg">"The light is on if and only if the switch is up" is false only on a mismatch: switch up and light off, or switch down and light on.</div></div>
             </div>
             <div class="stack">
               <table class="data small">
@@ -4949,7 +4952,7 @@ DM.module({
         html: String.raw`
           <div class="split-wide">
             <div class="stack">
-              <div class="def">A <span class="term">tautology</span> is true in every row, a <span class="term">contradiction</span> is false in every row, and anything else is a contingency. Two formulas are <span class="term">logically equivalent</span>, written \(P \equiv Q\), when they agree in every row. That is the same as saying \(P \leftrightarrow Q\) is a tautology.</div>
+              <div class="def">A <span class="term">tautology</span> is true in every row, a <span class="term">contradiction</span> is false in every row, and anything else is a contingency. Two formulas are <span class="term">logically equivalent</span>, written \(P \equiv Q\), when they agree in every row. That is the same as saying \(P \leftrightarrow Q\) is a tautology.<div class="eg">\(p \to p\) is a tautology, \(p \leftrightarrow \neg p\) a contradiction, and \(p \lor q\) a contingency (F only when both parts are F). \(p \land q \equiv q \land p\): their columns match.</div></div>
               <table class="tt" style="width:100%;font-size:0.84rem">
                 <thead><tr><th class="l">Law</th><th>Equivalence</th></tr></thead>
                 <tbody>
@@ -5078,8 +5081,8 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">predicate</span> \(P(x)\) is a statement with a variable. It becomes a proposition once \(x\) takes a value from the <span class="term">domain of discourse</span> \(D\). With \(P(x)\): "\(x \gt 3\)", \(P(5)\) is true and \(P(1)\) is false.</div>
-              <div class="def" data-label="Quantifiers">The <span class="term">universal quantifier</span> \(\forall x\  P(x)\) ("for all \(x\)") is true when \(P(x)\) holds for <i>every</i> \(x\) in \(D\). The <span class="term">existential quantifier</span> \(\exists x\  P(x)\) ("there exists \(x\)") is true when <i>at least one</i> \(x\), a witness, makes \(P(x)\) true.</div>
+              <div class="def">A <span class="term">predicate</span> \(P(x)\) is a statement with a variable. It becomes a proposition once \(x\) takes a value from the <span class="term">domain of discourse</span> \(D\).<div class="eg">With \(P(x)\): "\(x \gt 3\)", \(P(5)\) is true, \(P(1)\) is false, and \(P(x)\) alone is neither.</div></div>
+              <div class="def" data-label="Quantifiers">The <span class="term">universal quantifier</span> \(\forall x\  P(x)\) ("for all \(x\)") is true when \(P(x)\) holds for <i>every</i> \(x\) in \(D\). The <span class="term">existential quantifier</span> \(\exists x\  P(x)\) ("there exists \(x\)") is true when <i>at least one</i> \(x\), a witness, makes \(P(x)\) true.<div class="eg">Over \(D = \{1, 2, 3\}\): \(\forall x\ (x \gt 0)\) is true; \(\exists x\ (x \gt 2)\) is true, with witness 3; \(\forall x\ (x \gt 2)\) is false, since 1 and 2 fail.</div></div>
               <div class="ex">The domain matters. \(\forall x\  (x^2 \ge x)\) is true over the integers \(\mathbb{Z}\), but false over the reals \(\mathbb{R}\): \(x = \tfrac12\) gives \(\tfrac14 \lt \tfrac12\).</div>
               <div class="warn">"Every circle is red" is \(\forall x\  (\text{Circle}(x) \to \text{Red}(x))\). With \(\land\) instead it would say every object is a red circle. "Some circle is red" uses \(\land\): \(\exists x\  (\text{Circle}(x) \land \text{Red}(x))\).</div>
             </div>
@@ -5193,7 +5196,7 @@ DM.module({
               </table>
             </div>
             <div class="stack">
-              <div class="def"><span class="term">Short-circuit evaluation</span>: Python evaluates <code>and</code> and <code>or</code> from left to right and stops as soon as the answer is known. In <code>a and b</code>, if <code>a</code> is false, <code>b</code> never runs.</div>
+              <div class="def"><span class="term">Short-circuit evaluation</span>: Python evaluates <code>and</code> and <code>or</code> from left to right and stops as soon as the answer is known.<div class="eg"><code>False and 1/0</code> gives <code>False</code> and <code>True or 1/0</code> gives <code>True</code>, with no error: <code>1/0</code> never runs.</div></div>
               <div class="ex">Guard first, then use: <code>if user is not None and user.is_admin:</code> never touches <code>user.is_admin</code> when there is no user. Swap the two sides and a missing user crashes the program.</div>
               <div class="ex" data-label="Refactoring with De Morgan"><code>if not (is_weekend or is_holiday):</code> tests the same thing as <code>if not is_weekend and not is_holiday:</code>, and the second version reads as "a normal working day".</div>
               <div class="ai">Data filtering in pandas and NumPy uses Boolean masks such as <code>df[(df.age &gt; 30) &amp; ~df.churned]</code>. There <code>&amp;</code>, <code>|</code> and <code>~</code> work row by row, and the parentheses are required because <code>&amp;</code> binds tighter than <code>&gt;</code>.</div>
@@ -6456,7 +6459,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">proof</span> is a chain of statements. Each one is a hypothesis, an <span class="term">axiom</span>, a definition, an earlier result, or follows from earlier statements by a rule of logic. The last statement is the claim being proved.</div>
+              <div class="def">A <span class="term">proof</span> is a chain of statements. Each one is a hypothesis, an <span class="term">axiom</span>, a definition, an earlier result, or follows from earlier statements by a rule of logic. The last statement is the claim being proved.<div class="eg">Claim: 10 is even. (1) \(10 = 2 \cdot 5\), by arithmetic. (2) 5 is an integer, so by the definition of even (\(n = 2k\)), 10 is even. ∎</div></div>
               <table class="data small">
                 <tbody>
                   <tr><td><b>Axiom</b></td><td>Accepted without proof, such as: the sum and the product of two integers are integers.</td></tr>
@@ -6486,7 +6489,7 @@ DM.module({
       {
         title: 'Lab: rules of inference and fallacies',
         kind: 'lab',
-        html: String.raw`<div class="def" style="padding:0.4rem 0.8rem">An argument is <span class="term" data-term="valid argument">valid</span> when its conclusion is true in <i>every</i> row where all its premises are true. A <span class="term">rule of inference</span> is a small valid argument you may use as one step of a proof. Pick a rule: rows with every premise true are shaded, and a red row is a counterexample.</div>`,
+        html: String.raw`<div class="def" style="padding:0.4rem 0.8rem">An argument is <span class="term" data-term="valid argument">valid</span> when its conclusion is true in <i>every</i> row where all its premises are true. A <span class="term">rule of inference</span> is a small valid argument you may use as one step of a proof. Pick a rule: rows with every premise true are shaded, and a red row is a counterexample.<div class="eg">"If it is Monday, I have class. It is Monday. So I have class." is valid, and its pattern is the rule called modus ponens.</div></div>`,
         render(body, ctx) {
           const { h } = ctx;
           let ri = 0;
@@ -6667,7 +6670,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In a <span class="term">proof by cases</span>, split the situation into cases that together cover every possibility, and prove the claim in each one. It rests on the law \((p_1 \lor p_2) \to q \equiv (p_1 \to q) \land (p_2 \to q)\).</div>
+              <div class="def">In a <span class="term">proof by cases</span>, split the situation into cases that together cover every possibility, and prove the claim in each one. It rests on the law \((p_1 \lor p_2) \to q \equiv (p_1 \to q) \land (p_2 \to q)\).<div class="eg">Claim: \(\max(a, b) \ge a\). Case \(a \ge b\): the max is \(a\) itself. Case \(a \lt b\): the max is \(b\), which exceeds \(a\). Every pair lands in one case.</div></div>
               <div class="ex"><b>Claim.</b> For every integer \(n\), \(n^2 + n\) is even.<br>
                 <b>Case 1:</b> \(n\) is even, \(n = 2k\). Then \(n^2 + n = 4k^2 + 2k = 2(2k^2 + k)\), which is even.<br>
                 <b>Case 2:</b> \(n\) is odd, \(n = 2k + 1\). Then \(n^2 + n = (2k+1)(2k+2) = 2(2k+1)(k+1)\), which is even.<br>
@@ -6675,7 +6678,7 @@ DM.module({
               <div class="tip">The cases must be exhaustive. Forgetting one, such as \(n = 0\) or negative numbers, is like an <code>if/elif</code> chain with a missing branch.</div>
             </div>
             <div class="stack">
-              <div class="def" data-label="Existence and disproof">To prove \(\exists x\ P(x)\), show a witness: "there is a prime above 100" is proved by 101. To disprove \(\forall x\ P(x)\), one <span class="term">counterexample</span> suffices, because \(\neg\forall x\ P(x) \equiv \exists x\ \neg P(x)\). "Every prime is odd" fails at 2.</div>
+              <div class="def" data-label="Existence and disproof">To prove \(\exists x\ P(x)\), show one witness. To disprove \(\forall x\ P(x)\), one <span class="term">counterexample</span> suffices, because \(\neg\forall x\ P(x) \equiv \exists x\ \neg P(x)\).<div class="eg">"There is a prime above 100" is proved by the witness 101. "Every prime is odd" is disproved by the counterexample 2.</div></div>
               <div class="warn">Examples never prove a universal claim. \(n^2 + n + 41\) is prime for \(n = 0, 1, \dots, 39\), forty cases in a row, and then \(n = 40\) gives \(1681 = 41^2\). The next lab lets you hunt for failures like this one.</div>
               <div class="why">A failing test case is a counterexample to the claim "this function is correct". One is enough to prove there is a bug. A thousand passing tests are still only examples.</div>
             </div>
@@ -6908,12 +6911,12 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In <span class="term">strong induction</span>, the inductive step may assume <i>all</i> of \(P(n_0), P(n_0 + 1), \dots, P(k)\) to prove \(P(k+1)\). Use it when \(k + 1\) breaks into smaller pieces that are not simply \(k\).</div>
+              <div class="def">In <span class="term">strong induction</span>, the inductive step may assume <i>all</i> of \(P(n_0), P(n_0 + 1), \dots, P(k)\) to prove \(P(k+1)\). Use it when \(k + 1\) breaks into smaller pieces that are not simply \(k\).<div class="eg">For \(P(6)\) you may assume \(P(2)\) through \(P(5)\) at once. Since \(6 = 2 \cdot 3\), a step about factors uses \(P(2)\) and \(P(3)\), not just \(P(5)\).</div></div>
               <div class="ex"><b>Claim.</b> Every integer \(n \ge 2\) is a product of primes.<br>
                 <b>Base case:</b> 2 is prime.<br>
                 <b>Step:</b> take \(k + 1\). If it is prime, we are done. Otherwise \(k + 1 = ab\) with \(2 \le a, b \le k\). By the strong hypothesis, \(a\) and \(b\) are products of primes, so their product \(k + 1\) is too. ∎<br>
-                Ordinary induction would only give us \(P(k)\), which says nothing about \(a\) and \(b\).</div>
-              <div class="def" data-label="Well-ordering principle">The <span class="term">well-ordering principle</span>: every nonempty set of nonnegative integers has a smallest element. It is equivalent to induction. It powers "smallest counterexample" proofs: if a claim failed, take the smallest failure and show a smaller one exists, a contradiction.</div>
+                Ordinary induction gives only \(P(k)\): no help with \(a\) and \(b\).</div>
+              <div class="def" data-label="Well-ordering principle">The <span class="term">well-ordering principle</span>: every nonempty set of nonnegative integers has a smallest element. It is equivalent to induction and powers "smallest counterexample" proofs: take the smallest failure and find a smaller one, a contradiction.<div class="eg">\(\{9, 4, 15\}\) has smallest element 4. The positive real numbers have none: below any \(x \gt 0\) sits \(x/2\).</div></div>
             </div>
             <div class="card stack pf-postage" style="gap:0.45rem"></div>
           </div>`,
@@ -6961,7 +6964,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">loop invariant</span> is a statement about a loop's variables that is true before the loop starts and stays true after every iteration. It is induction in disguise, with the iteration count as \(n\).</div>
+              <div class="def">A <span class="term">loop invariant</span> is a statement about a loop's variables that is true before the loop starts and stays true after every iteration. It is induction in disguise, with the iteration count as \(n\).<div class="eg">From <code>c = 0</code>, passes of <code>c += 2</code> give 0, 2, 4, 6. "<code>c</code> is even" holds before the loop and after every pass, so it is an invariant.</div></div>
               <pre class="pf-code">${INVARIANT_CODE}</pre>
               <table class="data small">
                 <thead><tr><th>Check</th><th>For this loop</th><th>Induction</th></tr></thead>
@@ -6973,7 +6976,7 @@ DM.module({
               </table>
             </div>
             <div class="stack">
-              <div class="def" data-label="Correctness">An algorithm is correct when every valid input produces the right output. The proof has two parts: <b>partial correctness</b> (if it stops, the answer is right, which the invariant gives) and <b>termination</b> (it does stop). For termination, find a quantity that drops each pass and can never go below 0. Here it is \(n - k\).</div>
+              <div class="def" data-label="Correctness">An algorithm is correct when every valid input produces the right output. The proof has two parts: <b>partial correctness</b> (if it stops, the answer is right, which the invariant gives) and <b>termination</b> (it does stop). For termination, find a quantity that drops each pass and can never go below 0. Here it is \(n - k\).<div class="eg">For <code>while n &gt; 0: n -= 1</code> on a whole number <code>n</code>: if it stops, <code>n == 0</code> (partial correctness), and it does stop, since <code>n</code> drops by 1 each pass and cannot go below 0.</div></div>
               <div class="ex" data-label="Recursion is induction too"><pre class="pf-code" style="margin:0.15rem 0 0.35rem">${RECURSION_CODE}</pre>The base case of the recursion is the base case of the proof. If <code>sum_to(k)</code> is right, then <code>sum_to(k + 1)</code> adds \(k + 1\) to it and is right as well.</div>
               <div class="ai">Formal verification tools prove properties of trained neural networks, such as "changing any pixel by at most 1% never changes this classification", for every input in a region. Testing samples a handful of inputs; a proof covers all infinitely many.</div>
             </div>
@@ -8113,7 +8116,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">function</span> \(f\) from a set \(X\) to a set \(Y\), written \(f: X \to Y\), assigns <b>each</b> element \(x \in X\) <b>exactly one</b> element \(f(x) \in Y\).</div>
+              <div class="def">A <span class="term">function</span> \(f\) from a set \(X\) to a set \(Y\), written \(f: X \to Y\), assigns <b>each</b> element \(x \in X\) <b>exactly one</b> element \(f(x) \in Y\).<div class="eg">"Birth month of" is a function from people to months: each person has exactly one. "Phone number of" is not, since some people have two or none.</div></div>
               <ul>
                 <li>The <span class="term">domain</span> \(X\) is the set of allowed inputs.</li>
                 <li>The <span class="term">codomain</span> \(Y\) is the set the outputs are declared to come from.</li>
@@ -8148,9 +8151,9 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">\(f: X \to Y\) is <span class="term">one-to-one</span> (injective) when different inputs give different outputs: \(f(x_1) = f(x_2) \Rightarrow x_1 = x_2\). No two arrows land on the same point.</div>
-              <div class="def">\(f\) is <span class="term">onto</span> (surjective) when every \(y \in Y\) is hit by some \(x\). Then the range equals the codomain.</div>
-              <div class="def">A <span class="term">bijection</span> is both. It pairs \(X\) with \(Y\) perfectly, so two finite sets joined by a bijection have the same size.</div>
+              <div class="def">\(f: X \to Y\) is <span class="term">one-to-one</span> (injective) when different inputs give different outputs: \(f(x_1) = f(x_2) \Rightarrow x_1 = x_2\). No two arrows share an output.<div class="eg">\(1 \mapsto a,\ 2 \mapsto b\) is one-to-one; \(1 \mapsto a,\ 2 \mapsto a\) is not.</div></div>
+              <div class="def">\(f\) is <span class="term">onto</span> (surjective) when every \(y \in Y\) is hit by some \(x\). Then the range equals the codomain.<div class="eg">\(1 \mapsto a,\ 2 \mapsto b,\ 3 \mapsto b\) is onto \(\{a, b\}\) but not onto \(\{a, b, c\}\).</div></div>
+              <div class="def">A <span class="term">bijection</span> is both. It pairs \(X\) with \(Y\) perfectly, so two finite sets joined by a bijection have the same size.<div class="eg">\(1 \mapsto a,\ 2 \mapsto b,\ 3 \mapsto c\) is a bijection, so \(|\{1, 2, 3\}| = |\{a, b, c\}|\).</div></div>
               <table class="tt" style="width:100%">
                 <thead><tr><th class="l">\(f: \mathbb{Z} \to \mathbb{Z}\)</th><th>one-to-one?</th><th>onto?</th></tr></thead>
                 <tbody>
@@ -8162,7 +8165,7 @@ DM.module({
             </div>
             <div class="stack">
               <div class="thm">\(f\) has an inverse \(f^{-1}: Y \to X\) exactly when \(f\) is a bijection. Reverse every arrow: \(f^{-1}(y) = x \iff f(x) = y\), so \(f^{-1}(f(x)) = x\).</div>
-              <div class="def">The <span class="term">composition</span> \(g \circ f\) applies \(f\) first, then \(g\): \((g \circ f)(x) = g(f(x))\). The outputs of \(f\) must be valid inputs for \(g\).</div>
+              <div class="def">The <span class="term">composition</span> \(g \circ f\) applies \(f\) first, then \(g\): \((g \circ f)(x) = g(f(x))\). The outputs of \(f\) must be valid inputs for \(g\).<div class="eg">With \(f(x) = x^2\) and \(g(x) = x - 1\): \((g \circ f)(2) = g(4) = 3\). Square first, then subtract 1.</div></div>
               <div class="warn">Order matters. With \(f(x) = x + 1\) and \(g(x) = 2x\): \((g \circ f)(3) = g(4) = 8\) but \((f \circ g)(3) = f(6) = 7\). Also, \(f^{-1}(x)\) means the inverse function, never \(1 / f(x)\).</div>
               <div class="ai">A neural network is a composition of layers, \(f_L \circ \cdots \circ f_2 \circ f_1\), so the input passes through \(f_1\) first. A tokenizer's encoder is a bijection between its tokens and their ID numbers, which is why decoding the IDs gives back exactly the original tokens.</div>
             </div>
@@ -8287,7 +8290,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">floor</span> \(\lfloor x \rfloor\) is the greatest integer \(\le x\). The ceiling \(\lceil x \rceil\) is the least integer \(\ge x\). Both are functions \(\mathbb{R} \to \mathbb{Z}\).</div>
+              <div class="def">The <span class="term">floor</span> \(\lfloor x \rfloor\) is the greatest integer \(\le x\). The ceiling \(\lceil x \rceil\) is the least integer \(\ge x\). Both are functions \(\mathbb{R} \to \mathbb{Z}\).<div class="eg">\(\lfloor 3.7 \rfloor = 3\) and \(\lceil 3.7 \rceil = 4\). Your age is a floor: at 19.8 years you say 19.</div></div>
               <table class="tt" style="width:100%">
                 <thead><tr><th>\(x\)</th><th>\(2.3\)</th><th>\(-2.3\)</th><th>\(5\)</th><th class="l">used for</th></tr></thead>
                 <tbody>
@@ -8295,13 +8298,13 @@ DM.module({
                   <tr><td>\(\lceil x \rceil\)</td><td>3</td><td>\(-2\)</td><td>5</td><td class="l small">23 people, 4 per table: \(\lceil 23/4 \rceil = 6\) tables</td></tr>
                 </tbody>
               </table>
-              <div class="def">\(n \bmod m\) is the remainder \(r\) with \(0 \le r \lt m\) and \(n = m \cdot q + r\), where \(q = \lfloor n/m \rfloor\). So "mod \(m\)" is a function \(\mathbb{Z} \to \{0, 1, \dots, m - 1\}\): onto, never one-to-one.</div>
+              <div class="def">\(n \bmod m\) is the remainder \(r\) with \(0 \le r \lt m\) and \(n = m \cdot q + r\), where \(q = \lfloor n/m \rfloor\). So "mod \(m\)" is a function \(\mathbb{Z} \to \{0, 1, \dots, m - 1\}\): onto, never one-to-one.<div class="eg">\(17 \bmod 5 = 2\), since \(17 = 5 \cdot 3 + 2\). And \(12 \bmod 5 = 2\) too: two inputs, one output.</div></div>
               <div class="warn">Python follows the math: <code>-7 % 3</code> is <code>2</code>, because \(-7 = 3 \cdot (-3) + 2\). C, Java and JavaScript return \(-1\) instead.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">hash function</span> maps keys from a huge domain (all possible strings) to a small codomain of slots \(\{0, \dots, m - 1\}\). A common recipe turns the key into an integer, then takes it mod \(m\).</div>
+              <div class="def">A <span class="term">hash function</span> maps keys from a huge domain to slots \(0, \dots, m - 1\), often by turning the key into an integer and taking it mod \(m\).<div class="eg">\(h(w) = (\text{length of } w) \bmod 4\) puts "hi" in slot 2 and "hello" in slot 1.</div></div>
               <div class="ex">With \(h(k) = k \bmod 11\): \(h(15) = 4\), \(h(26) = 4\), \(h(40) = 7\). Keys 15 and 26 <b>collide</b> in slot 4.</div>
-              <div class="thm">If there are more keys than slots, \(h\) cannot be one-to-one, so collisions are certain (the pigeonhole principle). A good hash spreads keys evenly over the slots.</div>
+              <div class="thm">With more keys than slots, \(h\) cannot be one-to-one, so collisions are certain (the pigeonhole principle). A good hash spreads keys evenly.</div>
               <div class="tip">A hash must be a function: the same key gives the same slot every time. That is why Python dictionary keys must be immutable.</div>
               <div class="ai">An embedding table is a function from token IDs \(\{0, \dots, V - 1\}\) to vectors in \(\mathbb{R}^d\). The "hashing trick" maps an unlimited vocabulary into \(m\) feature columns with \(\text{hash}(w) \bmod m\).</div>
             </div>
@@ -8346,18 +8349,18 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">sequence</span> is a function whose domain is a set of consecutive integers. Its value at \(n\) is the \(n\)-th term \(s_n\). Example: \(s_n = 2n + 1\) gives \(3, 5, 7, 9, \dots\)</div>
+              <div class="def">A <span class="term">sequence</span> is a function whose domain is a set of consecutive integers. Its value at \(n\) is the \(n\)-th term \(s_n\).<div class="eg">\(s_n = 2n + 1\) for \(n \ge 1\) gives \(3, 5, 7, 9, \dots\), so the 4th term is \(s_4 = 9\).</div></div>
               <ul class="small">
                 <li><b>Explicit</b> formula: compute any term directly, as in \(s_n = 2^n\).</li>
                 <li><b>Recursive</b> formula: give a starting term and a rule built from earlier terms. With \(t_1 = 1\) and \(t_n = t_{n-1} + n\) we get \(1, 3, 6, 10, 15, \dots\)</li>
                 <li><b>Increasing</b> means \(s_n \lt s_{n+1}\) for every \(n\); <b>decreasing</b> means \(s_n \gt s_{n+1}\).</li>
                 <li>A <b>subsequence</b> keeps some terms in their original order: \(3, 10, 15\) is a subsequence of \(1, 3, 6, 10, 15\), while \(10, 3\) is not.</li>
               </ul>
-              <div class="def">A <span class="term">string</span> over an alphabet \(X\) is a finite sequence of symbols from \(X\). \(\lambda\) is the empty string, \(|s|\) is the length, and \(X^*\) is the set of all strings. Over \(X = \{a, b\}\) there are \(2^n\) strings of length \(n\).</div>
+              <div class="def">A <span class="term">string</span> over an alphabet \(X\) is a finite sequence of symbols from \(X\). \(\lambda\) is the empty string, \(|s|\) is the length, and \(X^*\) is the set of all strings. Over \(X = \{a, b\}\) there are \(2^n\) strings of length \(n\).<div class="eg">Over \(\{a, b\}\), \(s = abba\) has \(|s| = 4\), and the \(2^2 = 4\) strings of length 2 are \(aa, ab, ba, bb\).</div></div>
             </div>
             <div class="stack">
               <div class="def" data-label="Sum and product notation">\[\sum_{i=m}^{n} a_i = a_m + a_{m+1} + \cdots + a_n \qquad \prod_{i=m}^{n} a_i = a_m \cdot a_{m+1} \cdots a_n\]
-                The index \(i\) runs from the lower limit \(m\) to the upper limit \(n\). When \(m \gt n\) there are no terms: the empty sum is 0 and the empty product is 1.</div>
+                The index \(i\) runs from the lower limit \(m\) to the upper limit \(n\). When \(m \gt n\) there are no terms: the empty sum is 0 and the empty product is 1.<div class="eg">\(\sum_{i=1}^{3} i^2 = 1 + 4 + 9 = 14\) and \(\prod_{i=1}^{3} i = 1 \cdot 2 \cdot 3 = 6\).</div></div>
               <div class="thm">Arithmetic sum: \(\displaystyle\sum_{i=1}^{n} i = \frac{n(n+1)}{2}\). Geometric sum: \(\displaystyle\sum_{i=0}^{n} r^i = \frac{r^{n+1} - 1}{r - 1}\) for \(r \ne 1\).</div>
               <div class="ex">\(1 + 2 + \cdots + 100 = \frac{100 \cdot 101}{2} = 5050\), and \(1 + 2 + 4 + \cdots + 2^9 = 2^{10} - 1 = 1023\).</div>
               <div class="ai">A prompt sent to a language model is a string over its vocabulary, stored as a sequence of token IDs. A time series is a sequence of readings, and a recurrent network defines its memory recursively: \(h_t = f(h_{t-1}, x_t)\).</div>
@@ -8505,7 +8508,7 @@ DM.module({
         html: String.raw`
           <div class="split-narrow">
             <div class="stack">
-              <div class="def">A <span class="term">relation</span> \(R\) from \(A\) to \(B\) is any subset \(R \subseteq A \times B\). We write \(a \mathrel{R} b\) when \((a, b) \in R\). A relation on \(A\) is a subset of \(A \times A\). Every function is a relation, but a relation may link an element to many partners or to none.</div>
+              <div class="def">A <span class="term">relation</span> \(R\) from \(A\) to \(B\) is any subset \(R \subseteq A \times B\). We write \(a \mathrel{R} b\) when \((a, b) \in R\). A relation on \(A\) is a subset of \(A \times A\). Every function is a relation, but a relation may link an element to many partners or to none.<div class="eg">\(\lt\) on \(\{1, 2, 3\}\) is the set \(\{(1, 2), (1, 3), (2, 3)\}\). It links 1 to two numbers and 3 to none, so it is not a function.</div></div>
               <p class="small">Example: "divides" on \(A = \{1, 2, 3, 4\}\), where \(x \mathrel{R} y\) means \(y\) is a multiple of \(x\). Draw an arrow \(x \to y\) for each pair (a loop for \((x, x)\)), or fill a matrix with a 1 in row \(x\), column \(y\).</p>
               <div class="row" style="align-items:center;gap:0.8rem;flex-wrap:nowrap" id="m4-rel-ex"></div>
             </div>
@@ -8541,7 +8544,7 @@ DM.module({
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An <span class="term">equivalence relation</span> is reflexive, symmetric and transitive. The equivalence class of \(a\) is \([a] = \{x \in A \mid x \mathrel{R} a\}\).</div>
+              <div class="def">An <span class="term">equivalence relation</span> is reflexive, symmetric and transitive. The equivalence class of \(a\) is \([a] = \{x \in A \mid x \mathrel{R} a\}\).<div class="eg">On \(\{\text{ant}, \text{ape}, \text{bee}\}\), "starts with the same letter" is an equivalence relation: \([\text{ant}] = \{\text{ant}, \text{ape}\}\) and \([\text{bee}] = \{\text{bee}\}\).</div></div>
               <div class="thm">The equivalence classes <b>partition</b> \(A\): they are nonempty, never overlap, and together cover \(A\). Conversely, every partition defines the equivalence relation "is in the same block as".</div>
               <div class="ex" style="padding-bottom:0.6rem">Congruence mod \(n\): \(a \equiv b \pmod{n}\) when \(n \mid (a - b)\), that is, \(a\) and \(b\) leave the same remainder. Choose \(n\) to see the classes of \(0, \dots, 11\):
                 <div class="row" style="gap:0.5rem;margin:0.35rem 0 0.3rem"><span class="small muted">n =</span><span id="m4-modseg"></span></div>
@@ -8550,7 +8553,7 @@ DM.module({
               </div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">partial order</span> \(\preceq\) is reflexive, antisymmetric and transitive: \(\le\) on numbers, "divides" on positive integers, \(\subseteq\) on sets. It is a <b>total order</b> if every two elements are comparable. \(\le\) is total; divides is not, because \(2 \nmid 3\) and \(3 \nmid 2\).</div>
+              <div class="def">A <span class="term">partial order</span> \(\preceq\) is reflexive, antisymmetric and transitive: \(\le\) on numbers, "divides" on positive integers, \(\subseteq\) on sets. It is a <b>total order</b> if every two elements are comparable. \(\le\) is total; divides is not, because \(2 \nmid 3\) and \(3 \nmid 2\).<div class="eg">Under \(\subseteq\), \(\{a\} \subseteq \{a, b\}\), but neither of \(\{a\}\), \(\{b\}\) contains the other, so \(\subseteq\) is partial, not total.</div></div>
               <div class="row" style="gap:0.8rem;align-items:center;flex-wrap:nowrap">
                 <div id="m4-hasse12" style="flex:none"></div>
                 <p class="small">A <b>Hasse diagram</b> draws a partial order with less ink: drop the loops, drop every arrow implied by transitivity, and put smaller elements lower so arrowheads are unnecessary. Left: divisors of 12 under "divides".</p>
@@ -8707,7 +8710,7 @@ DM.module({
       {
         title: 'Lab: a tiny relational database',
         kind: 'lab',
-        html: String.raw`<div class="def">An <span class="term">n-ary relation</span> on sets \(A_1, \dots, A_n\) is a subset of \(A_1 \times \cdots \times A_n\), a set of \(n\)-tuples. A database table is one: each row is a tuple, each column an attribute. <b>Select</b> \(\sigma\) keeps the rows that pass a test, <b>project</b> \(\pi\) keeps chosen columns, and <b>join</b> \(\bowtie\) glues together tuples that agree on a shared attribute (here <code>sid</code>).</div>`,
+        html: String.raw`<div class="def">An <span class="term">n-ary relation</span> on sets \(A_1, \dots, A_n\) is a subset of \(A_1 \times \cdots \times A_n\), a set of \(n\)-tuples. A table is one: rows are tuples, columns are attributes. <b>Select</b> \(\sigma\) keeps rows that pass a test, <b>project</b> \(\pi\) keeps chosen columns, and <b>join</b> \(\bowtie\) glues tuples that agree on a shared attribute (here <code>sid</code>).<div class="eg">A schedule \(\{(\text{Mon}, 9, \text{Math}), (\text{Tue}, 10, \text{Art})\}\) is a 3-ary relation: 2 rows (tuples), 3 columns (day, hour, class).</div></div>`,
         render(body, ctx) {
           const { h } = ctx;
           const T = {
@@ -8768,7 +8771,7 @@ DM.module({
               h('table.data', h('thead', h('tr', t.cols.map((c) => h('th', { class: active && keep.includes(c) ? 'keep' : '' }, c)))),
                 h('tbody', t.rows.map((r, i) => h('tr', { class: hits.has(i) ? 'hit' : '' }, r.map((v) => h('td', String(v))))))));
             ctx.rc(left, srcTable(T.S, hitS, q.src !== 'E'), srcTable(T.E, hitE, q.src !== 'S'),
-              h('p.tiny.muted', 'Highlighted rows feed the result; colored headers mark the columns kept.'));
+              h('p.tiny.muted', 'Highlighted rows are used; colored headers mark kept columns.'));
             // result and step counts
             const steps = [];
             if (q.src === 'J') steps.push(`<b>Join:</b> checked ${T.S.rows.length} × ${T.E.rows.length} = ${T.S.rows.length * T.E.rows.length} (student, enrollment) pairs; ${T.J.rows.length} share a sid. Eli (sid 5) has no enrollment, so no joined tuple mentions Eli.`);
@@ -9672,7 +9675,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An <span class="term">algorithm</span> is a finite sequence of precise instructions for solving a problem. Every algorithm has seven properties:</div>
+              <div class="def">An <span class="term">algorithm</span> is a finite sequence of precise instructions for solving a problem. Every algorithm has the seven properties below.<div class="eg">Smaller of \(a\) and \(b\): if \(a \lt b\) return \(a\), otherwise return \(b\). It is precise, stops after one comparison, and works for any pair.</div></div>
               <table class="tt" style="width:100%">
                 <tbody class="small">
                   <tr><td class="l"><b>Input</b></td><td class="l">It receives data (possibly none).</td></tr>
@@ -9956,7 +9959,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
           <div class="split-wide">
             <div class="stack">
               <p>Seconds depend on the machine, the language and what else is running. Analysis therefore counts a <span class="term">basic operation</span>, usually a comparison, as a function of the <span class="term">input size</span> \(n\).</p>
-              <div class="def">The <span class="term">worst case</span> \(W(n)\) is the most operations over all inputs of size \(n\); the <span class="term">best case</span> \(B(n)\) is the fewest. The <span class="term">average case</span> \(A(n)\) is the expected count when inputs follow a stated probability distribution.</div>
+              <div class="def">The <span class="term">worst case</span> \(W(n)\) is the most operations over all inputs of size \(n\); the <span class="term">best case</span> \(B(n)\) is the fewest. The <span class="term">average case</span> \(A(n)\) is the expected count when inputs follow a stated probability distribution.<div class="eg">Searching 3 unsorted cards for a name: 1 look if it is on top (best), 3 if it is at the bottom (worst), \((1 + 2 + 3)/3 = 2\) on average if every spot is equally likely.</div></div>
               <table class="tt" style="width:100%">
                 <thead><tr><th class="l">Algorithm (comparisons)</th><th>best</th><th>worst</th><th>average</th></tr></thead>
                 <tbody>
@@ -10018,9 +10021,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def"><span class="term">Big-O</span>: \(f(n) = O(g(n))\) if there are constants \(C \gt 0\) and \(n_0\) with \(|f(n)| \le C\,|g(n)|\) for all \(n \ge n_0\). Read it as "\(f\) grows no faster than \(g\)".</div>
-              <div class="def"><span class="term">Big-Omega</span>: \(f(n) = \Omega(g(n))\) if \(|f(n)| \ge C\,|g(n)|\) for all \(n \ge n_0\), for some \(C \gt 0\): "\(f\) grows at least as fast as \(g\)".</div>
-              <div class="def"><span class="term">Big-Theta</span>: \(f(n) = \Theta(g(n))\) if \(f\) is both \(O(g(n))\) and \(\Omega(g(n))\): "the same growth rate, up to constant factors".</div>
+              <div class="def"><span class="term">Big-O</span>: \(f(n) = O(g(n))\) if there are constants \(C \gt 0\) and \(n_0\) with \(|f(n)| \le C\,|g(n)|\) for all \(n \ge n_0\). Read it as "\(f\) grows no faster than \(g\)".<div class="eg">\(2n + 3 \le 3n\) for \(n \ge 3\), so \(2n + 3 = O(n)\) with \(C = 3\), \(n_0 = 3\).</div></div>
+              <div class="def"><span class="term">Big-Omega</span>: \(f(n) = \Omega(g(n))\) if \(|f(n)| \ge C\,|g(n)|\) for all \(n \ge n_0\), for some \(C \gt 0\): "\(f\) grows at least as fast as \(g\)".<div class="eg">\(n^2 \ge n\) for every \(n \ge 1\), so \(n^2 = \Omega(n)\) with \(C = 1\), \(n_0 = 1\).</div></div>
+              <div class="def"><span class="term">Big-Theta</span>: \(f(n) = \Theta(g(n))\) if \(f\) is both \(O(g(n))\) and \(\Omega(g(n))\): "the same growth rate, up to constant factors".<div class="eg">\(2n \le 2n + 3 \le 3n\) once \(n \ge 3\), so \(2n + 3 = \Theta(n)\). But \(n^2\) is not \(\Theta(n)\): it is \(\Omega(n)\), not \(O(n)\).</div></div>
               <div class="ex">\(f(n) = 3n^2 + 5n + 2\). For \(n \ge 1\), \(5n \le 5n^2\) and \(2 \le 2n^2\), so \(f(n) \le 10n^2\): the witnesses \(C = 10\), \(n_0 = 1\) prove \(f = O(n^2)\). Also \(f(n) \ge 3n^2\), so \(f = \Omega(n^2)\), and therefore \(f = \Theta(n^2)\).</div>
             </div>
             <div class="stack">
@@ -10225,7 +10228,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">recursive algorithm</span> solves a problem by calling itself on a smaller input. The <span class="term">base case</span> is small enough to answer directly, and every call must move toward it.</div>
+              <div class="def">A <span class="term">recursive algorithm</span> solves a problem by calling itself on a smaller input, moving toward a <span class="term">base case</span> that is answered directly.<div class="eg">\(\text{sum}([4, 1]) = 4 + \text{sum}([1])\); the base case is \(\text{sum}([\,]) = 0\).</div></div>
               <div class="row" style="gap:0.6rem;align-items:stretch;flex-wrap:nowrap">
                 ${pseudoTag('factorial', 'flex:1 1 0')}
                 <p class="small" style="flex:1 1 0">\(4! = 4 \cdot 3!\), \(3! = 3 \cdot 2!\), …, down to \(0! = 1\). Then the answers multiply on the way back up: \(1, 1, 2, 6, 24\).</p>
@@ -10235,7 +10238,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
               <div class="warn">A missing base case, or a call that does not shrink the input, recurses forever. Python stops it after about 1000 nested calls with <code>RecursionError</code>.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">loop invariant</span> is a statement that is true before a loop starts and stays true after every iteration.</div>
+              <div class="def">A <span class="term">loop invariant</span> is a statement that is true before a loop starts and stays true after every iteration.<div class="eg">Counting coins into a pile: "count = coins in the pile" is true at the start (both 0) and after each coin, so at the end the count is right.</div></div>
               <div class="thm">To prove a loop correct, check three things (the same pattern as induction in Module 3):
                 <ol class="small" style="margin-top:0.2rem">
                   <li><b>Initialization:</b> the invariant holds before the first iteration.</li>
@@ -11022,7 +11025,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">For integers \(a \neq 0\) and \(b\), \(a\) <span class="term">divides</span> \(b\), written \(a \mid b\), when \(b = a k\) for some integer \(k\). Then \(a\) is a <b>divisor</b> (or factor) of \(b\), and \(b\) is a <b>multiple</b> of \(a\). So \(3 \mid 12\) because \(12 = 3 \cdot 4\), while \(5 \nmid 12\).</div>
+              <div class="def">For integers \(a \neq 0\) and \(b\), \(a\) <span class="term">divides</span> \(b\), written \(a \mid b\), when \(b = a k\) for some integer \(k\). Then \(a\) is a <b>divisor</b> (or factor) of \(b\), and \(b\) is a <b>multiple</b> of \(a\).<div class="eg">\(3 \mid 12\) because \(12 = 3 \cdot 4\), so 3 is a divisor of 12 and 12 is a multiple of 3. But \(5 \nmid 12\): no integer \(k\) gives \(5k = 12\).</div></div>
               <div class="thm">The <span class="term">division algorithm</span>. For any integer \(a\) and any integer \(d \gt 0\) there is exactly one pair of integers \(q\), the <span class="term">quotient</span>, and \(r\), the <span class="term">remainder</span>, with
                 \[a = d\,q + r, \qquad 0 \le r \lt d.\]
                 We write \(q = \lfloor a/d \rfloor\) and \(r = a \bmod d\).</div>
@@ -11085,7 +11088,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An integer \(p \gt 1\) is <span class="term">prime</span> when its only positive divisors are \(1\) and \(p\). An integer \(n \gt 1\) that is not prime is <span class="term">composite</span>: it factors as \(n = ab\) with \(1 \lt a, b \lt n\). The number 1 is neither prime nor composite.</div>
+              <div class="def">An integer \(p \gt 1\) is <span class="term">prime</span> when its only positive divisors are \(1\) and \(p\). An integer \(n \gt 1\) that is not prime is <span class="term">composite</span>: it factors as \(n = ab\) with \(1 \lt a, b \lt n\). The number 1 is neither prime nor composite.<div class="eg">7 is prime, since only 1 and 7 divide it. \(6 = 2 \cdot 3\) is composite.</div></div>
               <div class="thm">If \(n\) is composite, then \(n\) has a prime divisor \(p \le \sqrt{n}\).</div>
               <p>Here is why. Write \(n = ab\) with \(a \le b\). Then \(a \cdot a \le a \cdot b = n\), so \(a \le \sqrt n\), and any prime factor of \(a\) is at most \(a\). So <b>trial division</b> tests only the primes up to \(\sqrt n\). For \(n = 97\), \(\sqrt{97} \approx 9.8\), and none of 2, 3, 5, 7 divides 97, so 97 is prime. For \(n = 91\), the test finds \(7 \mid 91\), since \(91 = 7 \cdot 13\).</p>
               <div class="tip">Stopping at \(\sqrt n\) is a huge saving. For a 12-digit number it means about a million trial divisions instead of a trillion.</div>
@@ -11232,7 +11235,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">greatest common divisor</span> \(\gcd(a, b)\) is the largest integer dividing both \(a\) and \(b\) (not both 0). The <span class="term">least common multiple</span> \(\operatorname{lcm}(a, b)\) is the smallest positive integer that both divide. If \(\gcd(a, b) = 1\), then \(a\) and \(b\) are <span class="term">relatively prime</span>.</div>
+              <div class="def">The <span class="term">greatest common divisor</span> \(\gcd(a, b)\) is the largest integer dividing both \(a\) and \(b\) (not both 0). The <span class="term">least common multiple</span> \(\operatorname{lcm}(a, b)\) is the smallest positive integer that both divide. If \(\gcd(a, b) = 1\), then \(a\) and \(b\) are <span class="term">relatively prime</span>.<div class="eg">\(\gcd(4, 6) = 2\) and \(\operatorname{lcm}(4, 6) = 12\). Since \(\gcd(8, 9) = 1\), 8 and 9 are relatively prime, though neither is prime.</div></div>
               <div class="ex">From the factorizations \(360 = 2^3 \cdot 3^2 \cdot 5\) and \(84 = 2^2 \cdot 3 \cdot 7\): the gcd takes the <i>smaller</i> power of each prime, and the lcm takes the <i>larger</i>.
                 \[\gcd = 2^2 \cdot 3 = 12, \qquad \operatorname{lcm} = 2^3 \cdot 3^2 \cdot 5 \cdot 7 = 2520\]</div>
               <div class="thm">For positive \(a, b\): \(\gcd(a,b) \cdot \operatorname{lcm}(a,b) = a \cdot b\). Check: \(12 \cdot 2520 = 30240 = 360 \cdot 84\).</div>
@@ -11396,13 +11399,13 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">\(a\) is <span class="term">congruent</span> to \(b\) modulo \(n\), written \(a \equiv b \pmod{n}\), when \(n \mid (a - b)\). Equivalently, \(a\) and \(b\) leave the same remainder: \(a \bmod n = b \bmod n\). The number \(n\) is the <span class="term">modulus</span>.</div>
+              <div class="def">\(a\) is <span class="term">congruent</span> to \(b\) modulo \(n\), written \(a \equiv b \pmod{n}\), when \(n \mid (a - b)\). Equivalently, \(a\) and \(b\) leave the same remainder: \(a \bmod n = b \bmod n\). The number \(n\) is the <span class="term">modulus</span>.<div class="eg">\(17 \equiv 2 \pmod 5\), because \(17 - 2 = 15\) and \(5 \mid 15\). Both leave remainder 2 when divided by the modulus 5.</div></div>
               <div class="ex">\(38 \equiv 14 \equiv 2 \pmod{12}\), because 12 divides \(38 - 14 = 24\) and \(38 - 2 = 36\). A clock works this way: 38 hours after midnight it shows 2. Likewise, 100 days after a Wednesday is a Friday, since \(100 \bmod 7 = 2\).</div>
               <div class="thm">If \(a \equiv c\) and \(b \equiv d \pmod n\), then \(a + b \equiv c + d\), \(a - b \equiv c - d\) and \(ab \equiv cd \pmod n\). So you may reduce at every step: \((123 \cdot 456) \bmod 10 = (3 \cdot 6) \bmod 10 = 8\).</div>
               <div class="warn">Division does not carry over. \(2 \cdot 3 \equiv 2 \cdot 8 \pmod{10}\), yet \(3 \not\equiv 8 \pmod{10}\). You may cancel a factor only when it has an inverse.</div>
             </div>
             <div class="stack">
-              <div class="def">An <span class="term" data-term="modular inverse">inverse</span> of \(a\) modulo \(n\) is a number \(x\) with \(a x \equiv 1 \pmod n\). We write it \(a^{-1}\).</div>
+              <div class="def">An <span class="term" data-term="modular inverse">inverse</span> of \(a\) modulo \(n\) is a number \(x\) with \(a x \equiv 1 \pmod n\). We write it \(a^{-1}\).<div class="eg">\(2^{-1} \equiv 3 \pmod 5\), because \(2 \cdot 3 = 6 \equiv 1 \pmod 5\).</div></div>
               <div class="thm">\(a\) has an inverse modulo \(n\) exactly when \(\gcd(a, n) = 1\). Bézout supplies it: if \(s a + t n = 1\), then \(s a \equiv 1 \pmod n\), so \(a^{-1} \equiv s\).</div>
               <div class="ex">\(3^{-1} \equiv 5 \pmod 7\), since \(3 \cdot 5 = 15 = 2 \cdot 7 + 1\). To solve \(3x \equiv 4 \pmod 7\), multiply both sides by 5: \(x \equiv 20 \equiv 6\). On the other hand, 4 has no inverse mod 6: \(\gcd(4, 6) = 2\), and \(4x \bmod 6\) is always 0, 2 or 4. In Python, <code>pow(3, -1, 7)</code> returns 5.</div>
               <div class="ai">Time features are modular: hour 23 and hour 0 are one hour apart. Models encode hour \(h\) as the point \(\big(\cos \tfrac{2\pi h}{24}, \sin \tfrac{2\pi h}{24}\big)\) on a circle, so the step from 23 to 0 looks like any other one-hour step.</div>
@@ -11549,7 +11552,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In <span class="term">base</span> \(b \ge 2\) the digits \(d_k \dots d_1 d_0\), each with \(0 \le d_i \lt b\), stand for \(n = d_k b^k + \cdots + d_1 b + d_0\). So \((1011)_2 = 8 + 2 + 1 = 11\) and \((2F)_{16} = 2 \cdot 16 + 15 = 47\), with A to F standing for 10 to 15.</div>
+              <div class="def">In <span class="term">base</span> \(b \ge 2\) the digits \(d_k \dots d_1 d_0\), each with \(0 \le d_i \lt b\), stand for \(n = d_k b^k + \cdots + d_1 b + d_0\).<div class="eg">\((1011)_2 = 8 + 2 + 1 = 11\). In base 16, A to F stand for 10 to 15, so \((2F)_{16} = 2 \cdot 16 + 15 = 47\).</div></div>
               <p class="small"><b>Decimal to base \(b\):</b> divide by \(b\) again and again, which is the division algorithm on repeat. The remainders are the digits, last one first. Try it:</p>
               <div class="card nt-conv stack" style="gap:0.4rem;padding:0.55rem 0.75rem"></div>
               <p class="small"><b>Binary to hex or octal:</b> group the bits in fours (hex) or threes (octal) from the right. \((1001\,1100)_2 = (9C)_{16}\), because \(16 = 2^4\).</p>
@@ -12469,9 +12472,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def" data-label="Product rule">If a task is a sequence of steps, step 1 can be done in \(n_1\) ways, step 2 in \(n_2\) ways, and so on, and each count does not depend on the earlier choices, then the whole task can be done in \(n_1 \cdot n_2 \cdots n_k\) ways. This is the <span class="term">product rule</span>.</div>
+              <div class="def" data-label="Product rule">If a task is a sequence of steps, step 1 can be done in \(n_1\) ways, step 2 in \(n_2\) ways, and so on, and each count does not depend on the earlier choices, then the whole task can be done in \(n_1 \cdot n_2 \cdots n_k\) ways. This is the <span class="term">product rule</span>.<div class="eg">A drink (3 kinds) and a sandwich (2 kinds): \(3 \cdot 2 = 6\) lunches.</div></div>
               <div class="ex">A license plate has 3 letters followed by 4 digits: \(26^3 \cdot 10^4 = 175{,}760{,}000\) plates. If the letters may not repeat, the letter choices shrink step by step: \(26 \cdot 25 \cdot 24 \cdot 10^4 = 156{,}000{,}000\).</div>
-              <div class="def" data-label="Sum rule">If a choice comes from one of several groups that do not overlap, with \(n_1, n_2, \dots\) options, then there are \(n_1 + n_2 + \cdots\) choices in all. This is the <span class="term">sum rule</span>.</div>
+              <div class="def" data-label="Sum rule">If a choice comes from one of several groups that do not overlap, with \(n_1, n_2, \dots\) options, then there are \(n_1 + n_2 + \cdots\) choices in all. This is the <span class="term">sum rule</span>.<div class="eg">A drink (3 kinds) or a sandwich (2 kinds): \(3 + 2 = 5\) choices.</div></div>
               <div class="ex">Bit strings of length at most 3: split them by length (the groups cannot overlap), then count each length with the product rule: \(2 + 4 + 8 = 14\).</div>
             </div>
             <div class="stack">
@@ -12606,13 +12609,13 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An <span class="term">r-permutation</span> of \(n\) distinct objects is an <i>ordered</i> arrangement of \(r\) of them. There are \(n\) choices for the first position, \(n - 1\) for the second, and so on, so by the product rule
+              <div class="def">An <span class="term">r-permutation</span> of \(n\) distinct objects is an <i>ordered</i> arrangement of \(r\) of them. The product rule (\(n\) choices, then \(n - 1\), …) gives
                 \[P(n, r) = n(n-1)\cdots(n-r+1) = \frac{n!}{(n-r)!}.\]
-                Here \(n! = n(n-1)\cdots 2 \cdot 1\) is \(n\) <span class="term">factorial</span>, and \(0! = 1\).</div>
+                Here \(n! = n(n-1)\cdots 2 \cdot 1\) is \(n\) <span class="term">factorial</span>, and \(0! = 1\).<div class="eg">Driver and passenger from 4 friends: \(P(4, 2) = 4 \cdot 3 = 12\).</div></div>
               <div class="ex">Gold, silver and bronze among 8 runners: \(P(8, 3) = 8 \cdot 7 \cdot 6 = 336\). Every order of 5 books on a shelf: \(5! = 120\).</div>
               <div class="def">An <span class="term">r-combination</span> is an <i>unordered</i> selection of \(r\) of the \(n\) objects. Their number is the <span class="term">binomial coefficient</span>
-                \[C(n, r) = \binom{n}{r} = \frac{n!}{r!\,(n-r)!}.\]</div>
-              <div class="ai">Picking 10 of 100 input features for a model gives \(C(100, 10) \approx 1.7 \times 10^{13}\) feature subsets, far too many to test one by one.</div>
+                \[C(n, r) = \binom{n}{r} = \frac{n!}{r!\,(n-r)!}.\]<div class="eg">Invite 2 of the 4 friends: \(C(4, 2) = 12/2! = 6\) pairs.</div></div>
+              <div class="ai">Picking 10 of 100 input features for a model gives \(C(100, 10) \approx 1.7 \times 10^{13}\) subsets, far too many to test one by one.</div>
             </div>
             <div class="stack">
               <div class="thm" data-label="The divide-by-r! idea">Each unordered group of \(r\) objects appears \(r!\) times in the list of ordered arrangements, once for each of its orders. So \(C(n, r) = P(n, r) / r!\).
@@ -12986,7 +12989,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
       {
         title: 'Lab: the pigeonhole principle',
         kind: 'lab',
-        html: String.raw`<div class="split"><div class="def">The <span class="term">pigeonhole principle</span>. If \(n\) items go into \(k\) boxes and \(n \gt k\), then some box holds at least two items.</div><div class="thm" data-label="Generalized pigeonhole principle">If \(n\) items go into \(k\) boxes, some box holds at least \(\lceil n/k \rceil\) items. If every box held fewer, the total would be below \(k \cdot n/k = n\).</div></div>`,
+        html: String.raw`<div class="split"><div class="def">The <span class="term">pigeonhole principle</span>. If \(n\) items go into \(k\) boxes and \(n \gt k\), then some box holds at least two items.<div class="eg">Mail 3 letters to 2 mailboxes: one gets at least 2.</div></div><div class="thm" data-label="Generalized pigeonhole principle">If \(n\) items go into \(k\) boxes, some box holds at least \(\lceil n/k \rceil\) items. If every box held fewer, the total would be below \(k \cdot n/k = n\).</div></div>`,
         render(body, ctx) {
           const { h, s } = ctx;
           const SCEN = [
@@ -13867,7 +13870,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">recurrence relation</span> for a <span class="term">sequence</span> \(a_0, a_1, a_2, \dots\) is a rule that gives each term \(a_n\) in terms of earlier terms. The <span class="term" data-term="initial condition">initial conditions</span> state the first term or terms outright. A rule plus enough initial conditions defines exactly one sequence.</div>
+              <div class="def">A <span class="term">recurrence relation</span> for a <span class="term">sequence</span> \(a_0, a_1, a_2, \dots\) is a rule that gives each term \(a_n\) in terms of earlier terms. The <span class="term" data-term="initial condition">initial conditions</span> state the first term or terms outright. A rule plus enough initial conditions defines exactly one sequence.<div class="eg">The rule \(a_n = a_{n-1} + 3\) with initial condition \(a_0 = 2\) gives the sequence \(2, 5, 8, 11, \dots\)</div></div>
               <div class="ex">You deposit $1000 at 5% interest per year. Let \(A_n\) be the balance after \(n\) years. Each year adds 5% of the previous balance:
                 \[A_n = 1.05\,A_{n-1} \quad (n \ge 1), \qquad A_0 = 1000.\]
                 The rule says how to take one step. The initial condition says where to start.</div>
@@ -14171,7 +14174,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
             <div class="stack">
               <div class="def">A <span class="term">linear homogeneous recurrence</span> of <span class="term">order</span> 2 with constant coefficients has the form
                 \[a_n = c_1 a_{n-1} + c_2 a_{n-2}, \qquad c_2 \neq 0.\]
-                <i>Linear</i>: earlier terms are only multiplied by constants. <i>Homogeneous</i>: no extra term such as \(+1\). <i>Order 2</i>: it looks back two steps.</div>
+                <i>Linear</i>: earlier terms are only multiplied by constants. <i>Homogeneous</i>: no extra term such as \(+1\). <i>Order 2</i>: it looks back two steps.<div class="eg">\(a_n = 2a_{n-1} + 3a_{n-2}\) fits, with \(c_1 = 2\) and \(c_2 = 3\). \(a_n = a_{n-1} + a_{n-2} + 1\) does not, because of the \(+1\).</div></div>
               <p><b>The key idea.</b> Guess a solution of the form \(a_n = r^n\). Substituting gives \(r^n = c_1 r^{n-1} + c_2 r^{n-2}\). Dividing by \(r^{n-2}\) leaves the <span class="term">characteristic equation</span></p>
               <p class="big-math">\(r^2 - c_1 r - c_2 = 0.\)</p>
               <p class="small">Each root \(r\) gives a solution \(r^n\), and any sum of multiples of solutions is again a solution.</p>
@@ -15545,7 +15548,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">graph</span> \(G = (V, E)\) has a set \(V\) of <span class="term" data-term="vertex">vertices</span> (also called nodes) and a set \(E\) of <span class="term" data-term="edge">edges</span>. Each edge joins two vertices, called its endpoints. The edge is <i>incident</i> on its endpoints, and two vertices joined by an edge are <span class="term">adjacent</span>.</div>
+              <div class="def">A <span class="term">graph</span> \(G = (V, E)\) has a set \(V\) of <span class="term" data-term="vertex">vertices</span> (also called nodes) and a set \(E\) of <span class="term" data-term="edge">edges</span>. Each edge joins two vertices, called its endpoints. The edge is <i>incident</i> on its endpoints, and two vertices joined by an edge are <span class="term">adjacent</span>.<div class="eg">\(V = \{a, b, c\}\) and \(E = \{\{a, b\}, \{b, c\}\}\) form the path a–b–c. Edge \(\{a, b\}\) is incident on \(a\) and \(b\), so they are adjacent; \(a\) and \(c\) are not.</div></div>
               <div class="figure">
                 <svg viewBox="0 0 410 205" role="img" aria-label="A graph with a loop, parallel edges and an isolated vertex" style="max-height:12.5rem">
                   <g fill="none" stroke="var(--ink-2)" stroke-width="2">
@@ -15595,7 +15598,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">degree</span> \(\deg(v)\) of a vertex is the number of edges incident on it, with a loop counted twice because it touches \(v\) at both ends. Johnsonbaugh writes \(\delta(v)\).</div>
+              <div class="def">The <span class="term">degree</span> \(\deg(v)\) of a vertex is the number of edges incident on it, with a loop counted twice because it touches \(v\) at both ends. Johnsonbaugh writes \(\delta(v)\).<div class="eg">In the path a–b–c, \(\deg(a) = \deg(c) = 1\) and \(\deg(b) = 2\). Add a loop at \(a\) and \(\deg(a)\) becomes 3.</div></div>
               <div class="thm"><b>Handshake theorem.</b> In every graph, \[\sum_{v \in V} \deg(v) = 2|E|.\] Each edge has two ends, and each end adds 1 to the degree of the vertex it touches.</div>
               <div class="thm" data-label="Corollary">Every graph has an <b>even</b> number of vertices of odd degree. An odd number of odd degrees would make the sum odd, but \(2|E|\) is even.</div>
               <div class="ex">Can 7 people each shake hands with exactly 3 of the others? The degrees would add up to \(7 \cdot 3 = 21\), an odd number. No graph has an odd degree sum, so it is impossible, however the people try.</div>
@@ -15785,20 +15788,20 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">path</span> of length \(k\) from \(v_0\) to \(v_k\) is a sequence of vertices \(v_0, v_1, \dots, v_k\) in which each consecutive pair is joined by an edge. The length counts edges. A <b>simple path</b> repeats no vertex.</div>
-              <div class="def">A <span class="term">cycle</span> is a path of nonzero length that starts and ends at the same vertex and repeats no edge. A <b>simple cycle</b> repeats no vertex either, apart from the shared start and end.</div>
-              <div class="def">A graph is <span class="term" data-term="connected graph">connected</span> if every pair of vertices is joined by a path. The largest connected pieces of a graph are its <b>components</b>. The "Two pieces" preset in the editor has two components.</div>
-              <div class="ai">Genome assemblers read millions of short, overlapping DNA fragments. They build a graph whose edges are the fragments and rebuild the genome as an Euler path through it, which degree counts make fast to find.</div>
+              <div class="def">A <span class="term">path</span> of length \(k\) is a sequence of vertices \(v_0, v_1, \dots, v_k\) joined by \(k\) edges, one per consecutive pair. A <b>simple path</b> repeats no vertex.<div class="eg">In the square a–b–c–d–a, \(a, b, c\) is a simple path of length 2.</div></div>
+              <div class="def">A <span class="term">cycle</span> is a path of nonzero length that ends where it starts and repeats no edge. A <b>simple cycle</b> repeats no vertex except the start.<div class="eg">In the square, \(a, b, c, d, a\) is a simple cycle. \(a, b, a\) is not a cycle: it uses edge a–b twice.</div></div>
+              <div class="def">A graph is <span class="term" data-term="connected graph">connected</span> if every pair of vertices is joined by a path. The largest connected pieces of a graph are its <b>components</b>.<div class="eg">The square is connected. Delete edges a–b and c–d and two components remain: a–d and b–c.</div></div>
+              <div class="ai">Genome assemblers turn millions of short, overlapping DNA fragments into the edges of a graph, then rebuild the genome as an Euler path through it, which degree counts make fast to find.</div>
             </div>
             <div class="stack">
-              <div class="def">An <span class="term">Euler cycle</span> uses every edge exactly once and returns to its start. An <b>Euler path</b> uses every edge exactly once but may end at a different vertex.</div>
+              <div class="def">An <span class="term">Euler cycle</span> uses every edge exactly once and returns to its start. An <b>Euler path</b> also uses every edge once but may end elsewhere.<div class="eg">In the triangle a–b–c–a, \(a, b, c, a\) is an Euler cycle. The path a–b–c has the Euler path \(a, b, c\) but no Euler cycle.</div></div>
               <div class="thm"><b>Euler's theorem.</b> Let \(G\) be a connected graph.
                 <ul style="margin-top:0.25rem">
                   <li>\(G\) has an Euler cycle if and only if every vertex has even degree.</li>
                   <li>\(G\) has an Euler path from \(v\) to \(w \neq v\), but no Euler cycle, if and only if \(v\) and \(w\) are the only vertices of odd degree.</li>
                 </ul></div>
-              <div class="why"><b>Why degrees decide.</b> Each time a walk passes through a vertex it uses one edge to arrive and another to leave: two edge ends at a time. Only the start and the end of an open walk can be left with an unmatched edge end. So more than two odd vertices make the walk impossible.</div>
-              <div class="ex">Königsberg (1736): four land masses joined by seven bridges have degrees 5, 3, 3 and 3. All four are odd, so no walk crosses every bridge exactly once. Euler's argument started graph theory. Try it yourself on the next slide.</div>
+              <div class="why"><b>Why degrees decide.</b> Each time a walk passes through a vertex it uses one edge to arrive and one to leave: two edge ends at a time. Only an open walk's start and end can keep an unmatched edge end, so more than two odd vertices make the walk impossible.</div>
+              <div class="ex">Königsberg (1736): seven bridges join four land masses with degrees 5, 3, 3, 3. All are odd, so no walk crosses every bridge exactly once. Euler's argument started graph theory; try it on the next slide.</div>
             </div>
           </div>`,
       },
@@ -16300,17 +16303,17 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">Hamiltonian cycle</span> visits every <i>vertex</i> exactly once and returns to the start. It is named after William Rowan Hamilton, who sold a puzzle in 1857 that asked for such a tour of the corners of a dodecahedron. Try to build one yourself on the next slide.</div>
+              <div class="def">A <span class="term">Hamiltonian cycle</span> visits every <i>vertex</i> exactly once and returns to the start. William Rowan Hamilton sold an 1857 puzzle asking for such a tour of a dodecahedron's corners; try it on the next slide.<div class="eg">\(K_4\) on \(a, b, c, d\) has the Hamiltonian cycle \(a, b, c, d, a\) but no Euler cycle: every degree is 3.</div></div>
               <table class="tt" style="width:100%;font-size:0.84rem">
                 <thead><tr><th class="l"></th><th>Euler cycle</th><th>Hamiltonian cycle</th></tr></thead>
                 <tbody>
                   <tr><td class="l">uses each…</td><td>edge exactly once</td><td>vertex exactly once</td></tr>
                   <tr><td class="l">simple test?</td><td>yes: every degree even</td><td>none known; <span class="term">Dirac's theorem</span> is only a sufficient condition</td></tr>
-                  <tr><td class="l">fast algorithm?</td><td>yes, linear time</td><td>none known</td></tr>
+                  <tr><td class="l">fast&nbsp;algorithm?</td><td>yes, linear time</td><td>none known</td></tr>
                 </tbody>
               </table>
-              <div class="def">The <b>traveling salesperson problem</b> (TSP): in a weighted complete graph, find a Hamiltonian cycle of smallest total weight. Think of the shortest round trip through every city once.</div>
-              <div class="warn">The two cycle problems sound alike, yet one is easy and one is hard. Always ask which question you are really facing before you promise a fast program.</div>
+              <div class="def">The <b>traveling salesperson problem</b> (TSP): in a weighted complete graph, find a Hamiltonian cycle of smallest total weight.<div class="eg">Cities on square \(abcd\): sides cost 1, diagonals 2. The round trip \(a, b, c, d, a\) costs 4; the other two cost 6.</div></div>
+              <div class="warn">The two cycle problems sound alike, yet one is easy and one is hard. Know which one you face before you promise a fast program.</div>
             </div>
             <div class="stack">
               <div class="card">
@@ -16577,25 +16580,25 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">Graphs \(G_1\) and \(G_2\) are <span class="term">isomorphic</span> if there is a one-to-one, onto function \(f\) from the vertices of \(G_1\) to the vertices of \(G_2\) such that \(u\) and \(v\) are adjacent exactly when \(f(u)\) and \(f(v)\) are. They are the same graph, drawn and labeled differently.</div>
+              <div class="def">Graphs \(G_1\) and \(G_2\) are <span class="term">isomorphic</span> if there is a one-to-one, onto function \(f\) from the vertices of \(G_1\) to the vertices of \(G_2\) such that \(u\) and \(v\) are adjacent exactly when \(f(u)\) and \(f(v)\) are. They are the same graph, drawn and labeled differently.<div class="eg">Path a–b–c is isomorphic to y–x–z via \(a \to y\), \(b \to x\), \(c \to z\).</div></div>
               <div class="gr-fig">
                 <div class="center">${FIG_C5}<div class="gr-cap">pentagon</div></div>
                 <div class="center" style="font-size:1.4rem;color:var(--ink-3)">≅</div>
                 <div class="center">${FIG_STAR}<div class="gr-cap">five-point star</div></div>
               </div>
               <p class="small center">\(f\): 1 → a, 2 → c, 3 → e, 4 → b, 5 → d maps every edge to an edge.</p>
-              <div class="tip">To <b>disprove</b> isomorphism, find a <span class="term">graph invariant</span> that differs: vertex or edge count, <span class="term">degree sequence</span>, number of components or triangles. To <b>prove</b> it, exhibit \(f\). Matching invariants alone prove nothing; the next lab asks for both.</div>
-              <div class="ai">Whether two molecules share a bond structure is an isomorphism question in AI-driven drug discovery; circuit-board layout is a planarity question, since wires on one layer must not cross.</div>
+              <div class="tip">To <b>disprove</b> isomorphism, find a <span class="term">graph invariant</span> that differs: vertex or edge count, <span class="term">degree sequence</span>, components, triangles. To <b>prove</b> it, exhibit \(f\). Matching invariants prove nothing; the lab asks for both.</div>
+              <div class="ai">AI drug discovery matches molecules by bond structure, an isomorphism test; one-layer circuit boards need planar wiring.</div>
             </div>
             <div class="stack">
-              <div class="def">A graph is <span class="term" data-term="planar graph">planar</span> if it can be drawn with no edges crossing. The drawing cuts the plane into <span class="term" data-term="face">faces</span>, including the unbounded outer face.</div>
+              <div class="def">A graph is <span class="term" data-term="planar graph">planar</span> if it can be drawn with no edges crossing. The drawing cuts the plane into <span class="term" data-term="face">faces</span>, including the unbounded outer face.<div class="eg">A square plus one diagonal is planar, with 3 faces.</div></div>
               <div class="gr-fig">
                 <div class="center">${FIG_K4X}<div class="gr-cap">K4 with a crossing</div></div>
                 <div class="center" style="font-size:1.2rem;color:var(--ink-3)">→</div>
                 <div class="center">${FIG_K4P}<div class="gr-cap">redrawn: no crossing</div></div>
               </div>
-              <div class="thm"><b>Euler's formula.</b> A connected planar graph drawn without crossings has \(V - E + F = 2\) (for \(K_4\): \(4 - 6 + 4 = 2\)). Each face has at least 3 boundary edges and each edge borders at most 2 faces, so \(3F \le 2E\); with Euler's formula this gives \(E \le 3V - 6\) when \(V \ge 3\). \(K_5\) has \(10 \gt 9\) edges: not planar.</div>
-              <div class="thm" data-label="Why K3,3 is not planar">The general bound allows \(K_{3,3}\) (\(9 \le 12\)). But \(K_{3,3}\) is bipartite, so it has no triangles, and every face would need at least 4 boundary edges: \(4F \le 2E\), so \(E \le 2V - 4 = 8\). Nine edges are one too many. <span class="term">Kuratowski's theorem</span> says these are the only two obstacles: a graph is planar if and only if no subgraph is a subdivision of \(K_5\) or \(K_{3,3}\) (edges replaced by paths).</div>
+              <div class="thm"><b>Euler's formula.</b> A connected planar graph has \(V - E + F = 2\) (for \(K_4\): \(4 - 6 + 4 = 2\)). Each face has at least 3 boundary edges, each edge borders at most 2 faces, so \(3F \le 2E\); with Euler's formula, \(E \le 3V - 6\) when \(V \ge 3\). \(K_5\) has \(10 \gt 9\) edges: not planar.</div>
+              <div class="thm" data-label="Why K3,3 is not planar">The general bound allows \(K_{3,3}\) (\(9 \le 12\)). But bipartite \(K_{3,3}\) has no triangles, so every face needs at least 4 boundary edges: \(4F \le 2E\) gives \(E \le 2V - 4 = 8\), one fewer than its 9. <span class="term">Kuratowski's theorem</span> says these are the only two obstacles: a graph is planar if and only if no subgraph is a subdivision of \(K_5\) or \(K_{3,3}\) (edges replaced by paths).</div>
             </div>
           </div>`,
       },
@@ -18077,7 +18080,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">tree</span> is a connected graph with no cycles. A graph with no cycles that may fall apart into several pieces is a <span class="term">forest</span>: each piece is a tree.</div>
+              <div class="def">A <span class="term">tree</span> is a connected graph with no cycles. A graph with no cycles that may fall apart into several pieces is a <span class="term">forest</span>: each piece is a tree.<div class="eg">The path a–b–c is a tree; the triangle a–b–c–a is not, since it has a cycle. Delete edge b–c from the path and you get a forest: a–b and the lone vertex \(c\).</div></div>
               <div class="thm">For a graph \(T\) with \(n\) vertices, these four statements are equivalent (each one implies the others):
                 <ol style="margin-top:0.3rem">
                   <li>\(T\) is connected and has no cycles.</li>
@@ -18198,7 +18201,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">Two trees are <b>isomorphic</b> (<span class="term">tree isomorphism</span>) when one can be relabeled into the other: a one-to-one correspondence between their vertices such that two vertices are adjacent in the first tree exactly when their partners are adjacent in the second. Isomorphic trees are one tree drawn twice. For <b>rooted</b> trees the correspondence must also send root to root, and therefore children to children.</div>
+              <div class="def">Two trees are <b>isomorphic</b> (<span class="term">tree isomorphism</span>) when one can be relabeled into the other: a one-to-one correspondence between their vertices under which two vertices are adjacent exactly when their partners are. Isomorphic trees are one tree drawn twice. For <b>rooted</b> trees it must also send root to root, and so children to children.<div class="eg">Edges a–b, b–c, c–d and p–r, r–s, s–q give isomorphic trees: sending \(a, b, c, d\) to \(p, r, s, q\) keeps every edge.</div></div>
               <div class="thm">Isomorphic trees agree on every property that ignores the names: the number of vertices and edges, the <span class="term">degree sequence</span>, the length of the longest path, and the height when each is hung from its <span class="term" data-term="center of a tree">center</span>. So a single mismatch proves two trees different. Agreement proves nothing: the two trees on the right share all of these numbers and are still different.</div>
               <div class="ex">A path of three vertices hung from its middle vertex has height 1; hung from an end it has height 2. As plain trees the two drawings are isomorphic. As rooted trees they are not, because the roots are vertices of different degree.</div>
             </div>
@@ -18210,8 +18213,8 @@ bsearch(s, i, j, key) {     // search s[i..j]
                 </div>
                 <p class="small" style="margin-top:0.3rem">Both have 6 vertices, 5 edges, the same degree sequence, a longest path of 4 edges and height 2 from the center. Yet on the left the degree-3 vertex touches two vertices of degree 2, on the right only one, and no relabeling can change that.</p>
               </div>
-              <div class="def" data-label="Canonical name">A <span class="term">canonical name</span> is a string that depends only on the shape. Name a leaf <code>()</code>, and name every other vertex by writing its children's names in sorted order inside one pair of parentheses. Two rooted trees are isomorphic exactly when their roots get the same name. For unrooted trees, first hang each tree from its center (strip all the leaves, repeat, and the last one or two vertices standing are the center), then compare the names.</div>
-              <div class="ai">Canonical forms turn "same structure?" into string equality. Chemical databases match molecules that way, compilers find duplicated code by naming syntax trees, and query engines recognize repeated sub-expressions by their canonical form.</div>
+              <div class="def" data-label="Canonical name">A <span class="term">canonical name</span> is a string that depends only on the shape. Name a leaf <code>()</code>; name any other vertex by its children's names, sorted, inside one pair of parentheses. Two rooted trees are isomorphic exactly when their roots get the same name. Hang an unrooted tree from its center first: strip all leaves repeatedly until one or two vertices remain.<div class="eg">A root with two leaf children is <code>(()())</code>. Give either leaf a child and the root becomes <code>(()(()))</code>.</div></div>
+              <div class="ai">Canonical forms turn "same structure?" into string equality. Chemical databases use them to match molecules; compilers and query engines, to find repeated code and sub-expressions.</div>
             </div>
           </div>`,
       },
@@ -18318,8 +18321,8 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">spanning tree</span> of a connected graph \(G\) is a subgraph that contains <b>every</b> vertex of \(G\) and is a tree. It keeps \(n - 1\) edges: just enough to connect everything, with no redundant loops. Every connected graph has one, because you can delete edges on cycles until no cycle is left.</div>
-              <div class="def" data-label="Definition">In a weighted graph every edge carries a number, such as a cost or a distance. A <span class="term">minimal spanning tree</span> (MST) is a spanning tree \(T\) whose total weight \(w(T)\) is as small as possible.</div>
+              <div class="def">A <span class="term">spanning tree</span> of a connected graph \(G\) is a subgraph that contains <b>every</b> vertex of \(G\) and is a tree. It keeps \(n - 1\) edges: just enough to connect everything, with no redundant loops. Every connected graph has one, because you can delete edges on cycles until no cycle is left.<div class="eg">Drop any one edge of the square a–b–c–d–a and the path that is left is a spanning tree: all 4 vertices, 3 edges.</div></div>
+              <div class="def" data-label="Definition">In a weighted graph every edge carries a number, such as a cost or a distance. A <span class="term">minimal spanning tree</span> (MST) is a spanning tree \(T\) whose total weight \(w(T)\) is as small as possible.<div class="eg">Triangle a–b–c with weights a–b 1, b–c 2, c–a 3: its three spanning trees weigh 3, 4 and 5, so the MST is a–b plus b–c.</div></div>
               <div class="thm">The cut property. Split the vertices into any two groups. The lightest edge between the two groups belongs to some minimal spanning tree. Kruskal and Prim only ever add such an edge, which is why a greedy choice never needs to be undone.</div>
             </div>
             <div class="stack">
@@ -18496,13 +18499,13 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">binary tree</span> is a rooted tree in which every vertex has at most two children, each labeled <b>left child</b> or <b>right child</b>. In a <span class="term">full binary tree</span> every internal vertex has exactly two children.</div>
+              <div class="def">A <span class="term">binary tree</span> is a rooted tree in which every vertex has at most two children, each labeled <b>left child</b> or <b>right child</b>. In a <span class="term">full binary tree</span> every internal vertex has exactly two children.<div class="eg">A root with only a left child is a binary tree, but not full. Add a right child and it is full: 1 internal vertex, 2 leaves.</div></div>
               <div class="thm">A full binary tree with \(i\) internal vertices has \(i + 1\) leaves and \(2i + 1\) vertices.<br>A binary tree of <span class="term">height</span> \(h\) has at most \(2^h\) leaves, so a binary tree with \(t\) leaves has \(h \ge \lceil \log_2 t \rceil\).</div>
               <p class="small">Why \(2^h\)? Level 0 holds one vertex, and each level can at most double the one above: 1, 2, 4, 8, …. After \(h\) levels there is room for \(2^h\) leaves.</p>
               <div class="ai">Databases index millions of rows with B-trees, balanced search trees with many children per vertex. Nearest-neighbor search in machine learning libraries uses k-d trees, which split on one coordinate per level, much like a BST.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">binary search tree</span> (BST) holds a key in each vertex. For every vertex \(v\), all keys in its left subtree are smaller than \(v\)'s key and all keys in its right subtree are larger.</div>
+              <div class="def">A <span class="term">binary search tree</span> (BST) holds a key in each vertex. For every vertex \(v\), all keys in its left subtree are smaller than \(v\)'s key and all keys in its right subtree are larger.<div class="eg">Root 5 with left child 3 and right child 8 is a BST: \(3 < 5 < 8\).</div></div>
               <p class="small"><b>Search</b> starts at the root. Equal means found, smaller means go left, larger means go right, and falling off the tree means the key is absent. <b>Insert</b> searches, then attaches the new key where the search fell off. Both cost at most \(h + 1\) comparisons.</p>
               <div class="warn">Insertion order shapes the tree. Inserting 1, 2, 3, …, \(n\) in order builds a path of height \(n - 1\), so a search may compare against every key. Shuffled input usually stays close to balanced. Self-balancing trees (AVL, red-black) rotate after inserts to keep \(h\) near \(\log_2 n\).</div>
               <div class="card split" style="padding:0.45rem 0.6rem;gap:0.6rem">
@@ -18662,7 +18665,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">traversal</span> visits every vertex of a tree exactly once, in a fixed order. Writing \(T_L\) and \(T_R\) for the left and right subtrees, the depth-first orders are recursive:</div>
+              <div class="def">A <span class="term">traversal</span> visits every vertex of a tree exactly once, in a fixed order. Writing \(T_L\) and \(T_R\) for the left and right subtrees, the depth-first orders in the table are recursive.<div class="eg">Root \(r\) with left child \(a\) and right child \(b\): preorder \(r, a, b\); inorder \(a, r, b\); postorder \(a, b, r\).</div></div>
               <table class="tt tr-ex-row" style="width:100%">
                 <thead><tr><th class="l">Order</th><th class="l">Rule</th><th class="l">On the tree below</th></tr></thead>
                 <tbody>
@@ -18675,7 +18678,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
               <div class="tr-concept-fig" style="height:10.5rem">${binSVG(EXAMPLE_EXPR, { label: exLabel, dx: 44, dy: 50, r: 16, pad: 20, aria: 'Expression tree for (3 + 4) × (5 − 2)' })}</div>
             </div>
             <div class="stack">
-              <div class="def">An <span class="term">expression tree</span> stores a formula. Leaves hold numbers, and each internal vertex holds an operator applied to its two subtrees.</div>
+              <div class="def">An <span class="term">expression tree</span> stores a formula. Leaves hold numbers, and each internal vertex holds an operator applied to its two subtrees.<div class="eg">For \(2 \times (1 + 3)\), the root × has leaf 2 on its left and, on its right, a + vertex with leaves 1 and 3.</div></div>
               <p class="small">The three depth-first orders give three notations. Preorder gives <b>prefix</b> (Polish) notation. Inorder gives the usual <b>infix</b>, which needs parentheses to keep its meaning: \((3 + 4) \times (5 - 2)\). Postorder gives <b>postfix</b> (reverse Polish), which never needs parentheses.</p>
               <div class="ex">Evaluate postfix with a stack: push each number; at an operator, pop two values (the first pop is the right operand), apply it, and push the result.<br><span class="mono small">3 4 + → 7 &nbsp;·&nbsp; 7 5 2 − → 7 3 &nbsp;·&nbsp; 7 3 × → 21</span></div>
               <div class="ai">Python turns your source code into an abstract syntax tree before running it (see the <code>ast</code> module). Deep-learning frameworks record each computation as a graph and run backpropagation over it in reverse, children before parents.</div>
@@ -20385,12 +20388,12 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">transport network</span> is a directed graph where every edge \((u, v)\) has a nonnegative <span class="term">capacity</span> \(c(u, v)\). One vertex is the <span class="term">source</span> \(s\) (no edges come in) and one is the <span class="term">sink</span> \(t\) (no edges go out). Picture water pipes: the capacity is how much a pipe can carry per second.</div>
+              <div class="def">A <span class="term">transport network</span> is a directed graph where every edge \((u, v)\) has a nonnegative <span class="term">capacity</span> \(c(u, v)\). One vertex is the <span class="term">source</span> \(s\) (no edges come in) and one is the <span class="term">sink</span> \(t\) (no edges go out). Picture water pipes: the capacity is how much a pipe can carry per second.<div class="eg">Edges \(s \to a\) with capacity 4 and \(a \to t\) with capacity 2 form a network with source \(s\) and sink \(t\).</div></div>
               <div class="def">A <span class="term">flow</span> puts an amount \(f(u, v)\) on every edge and obeys two rules.
                 <ol style="margin-top:0.25rem">
                   <li><b>Capacity rule:</b> \(0 \le f(u, v) \le c(u, v)\) on every edge.</li>
                   <li><b><span class="term">Conservation of flow</span>:</b> at every vertex other than \(s\) and \(t\), flow in equals flow out.</li>
-                </ol></div>
+                </ol><div class="eg">With capacities 4 on \(s \to a\) and 2 on \(a \to t\), putting 2 on each edge is a flow. Putting 3 on \(s \to a\) is not: 3 units reach \(a\), but at most 2 can leave.</div></div>
               <div class="thm">The <span class="term">value of a flow</span> \(|f|\) is the total leaving \(s\). Because nothing is created or lost at the vertices in between, it also equals the total entering \(t\).</div>
             </div>
             <div class="stack">
@@ -20412,11 +20415,11 @@ bsearch(s, i, j, key) {     // search s[i..j]
             <div class="stack">
               <p>To grow a flow, look for spare room. The <span class="term">residual network</span> records two kinds of room for every edge \(u \to v\) with flow \(f\) and capacity \(c\):</p>
               <ul>
-                <li><b>Forward step</b> \(u \to v\): room \(c - f\). That many more units fit.</li>
+                <li><b>Forward step</b> \(u \to v\): room \(c - f\), the units that still fit.</li>
                 <li><b>Backward step</b> \(v \dashrightarrow u\): room \(f\). Units already sent along \(u \to v\) can be canceled, which has the same effect as sending them back.</li>
               </ul>
-              <div class="def">An <span class="term">augmenting path</span> is a path from \(s\) to \(t\) in the residual network where every step has positive <span class="term">residual capacity</span>. Its <span class="term">bottleneck</span> is the smallest room on the path. Pushing the bottleneck along it (add on forward steps, subtract on backward steps) raises \(|f|\) by exactly that amount and keeps both flow rules true.</div>
-              <div class="why">Without backward steps, an early bad choice is permanent and a greedy algorithm can get stuck below the maximum. Backward steps let the algorithm change its mind.</div>
+              <div class="def">An <span class="term">augmenting path</span> is a path from \(s\) to \(t\) in the residual network where every step has positive <span class="term">residual capacity</span>. Its <span class="term">bottleneck</span> is the smallest room on the path. Pushing the bottleneck along it (add on forward steps, subtract on backward steps) raises \(|f|\) by exactly that amount and keeps both flow rules true.<div class="eg">If \(s \to a\) has room 3 and \(a \to t\) room 1, then \(s \to a \to t\) is augmenting with bottleneck 1.</div></div>
+              <div class="why">Without backward steps, an early bad choice is permanent and a greedy algorithm can stall below the maximum. Backward steps let it change its mind.</div>
             </div>
             <div class="ex stack" style="gap:0.4rem">
               <p class="small">Every edge has capacity 1. A careless first path \(s \to a \to b \to t\) fills three edges (left). No forward route is left, yet the maximum flow is 2.</p>
@@ -20580,12 +20583,12 @@ bsearch(s, i, j, key) {     // search s[i..j]
                   <li>Search the residual network for an augmenting path.</li>
                   <li>If there is none, stop: the flow is maximum.</li>
                   <li>Push the bottleneck along the path (up on forward steps, down on backward steps), then go back to step 2.</li>
-                </ol></div>
+                </ol><div class="eg">On \(s \to a \to t\) with capacities 4 and 2, start at 0 and push the bottleneck, 2, along that path. Now \(a \to t\) is full, no augmenting path is left, and the flow of 2 is maximum.</div></div>
               <div class="thm">With integer capacities, every push adds at least 1 to \(|f|\), so the method stops after at most \(|f^*|\) pushes (\(f^*\) a maximum flow). It also finds a maximum flow that is a whole number on every edge.</div>
               <p class="small muted">Johnsonbaugh calls this the <i>maximal flow algorithm</i> and finds paths by labeling vertices. The labeling is one way to search the residual network.</p>
             </div>
             <div class="stack">
-              <div class="def">The <span class="term">Edmonds–Karp algorithm</span> adds one rule: always use a <i>shortest</i> augmenting path (fewest edges), found by breadth-first search. It needs at most \(|V| \cdot |E|\) augmentations, so it runs in \(O(|V| \cdot |E|^2)\) time however large the capacities are.</div>
+              <div class="def">The <span class="term">Edmonds–Karp algorithm</span> adds one rule: always use a <i>shortest</i> augmenting path (fewest edges), found by breadth-first search. It needs at most \(|V| \cdot |E|\) augmentations, so it runs in \(O(|V| \cdot |E|^2)\) time however large the capacities are.<div class="eg">If \(s \to t\) and \(s \to a \to t\) both have room, BFS takes \(s \to t\) first: 1 edge beats 2.</div></div>
               <div class="warn">
                 <div class="split" style="grid-template-columns:minmax(0,1fr) 14.5rem;gap:0.6rem;align-items:center">
                   <p class="small">The rule matters. Here a careless search might keep using the middle edge, alternating \(s \to a \to b \to t\) and \(s \to b \dashrightarrow a \to t\). Each round pushes 1 unit, so it takes 2000 rounds. BFS takes the two outer paths and finishes in 2. With irrational capacities, a bad rule can even run forever.</p>
@@ -20605,7 +20608,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
             <div class="stack">
               <div class="def">A <span class="term">cut</span> \((S, T)\) splits the vertices into two groups with \(s \in S\) and \(t \in T\). Its capacity adds up the edges that go from \(S\) to \(T\):
                 \[c(S, T) = \sum_{u \in S,\ v \in T} c(u, v)\]
-                Edges that point from \(T\) back to \(S\) do not count.</div>
+                Edges that point from \(T\) back to \(S\) do not count.<div class="eg">On \(s \to a \to t\) with capacities 4 and 2, the cut \(S = \{s\}\) has capacity 4, and \(S = \{s, a\}\) has capacity 2.</div></div>
               <div class="thm">For every flow \(f\) and every cut, \(|f| \le c(S, T)\). Every unit that travels from \(s\) to \(t\) has to cross from \(S\) to \(T\) at least once.</div>
               <div class="thm" data-label="Max-flow min-cut theorem">The value of a maximum flow equals the capacity of a <span class="term">minimum cut</span>. This is the <span class="term">max-flow min-cut theorem</span>.</div>
               <div class="why">A minimum cut is a certificate and an explanation in one. It proves no flow can do better, and it names the links that limit throughput. Upgrading a link outside the minimum cut cannot raise the maximum flow.</div>
@@ -20711,7 +20714,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">In a <span class="term">bipartite graph</span> the vertices form two groups, here workers \(W\) and jobs \(J\), and every edge joins a worker to a job they are qualified for. A <span class="term">matching</span> is a set of edges with no shared endpoints: each worker does at most one job and each job gets at most one worker. A <b><span class="term">maximum matching</span></b> has as many edges as possible.</div>
+              <div class="def">In a <span class="term">bipartite graph</span> the vertices form two groups, here workers \(W\) and jobs \(J\), and every edge joins a worker to a job they are qualified for. A <span class="term">matching</span> is a set of edges with no shared endpoints: each worker does at most one job and each job gets at most one worker. A <b><span class="term">maximum matching</span></b> has as many edges as possible.<div class="eg">Kim can do jobs 1 and 2, Raj only job 1. {Kim–1} is a matching, but it leaves Raj idle; {Kim–2, Raj–1} is a maximum matching.</div></div>
               <p><b>Matching as a flow.</b> Add a source \(s\) with an edge to every worker, point each qualification edge from worker to job, and add an edge from every job to a sink \(t\). Give every edge capacity 1. An integer maximum flow sends at most one unit through each worker and each job, so its value is the size of a maximum matching.</p>
               <div class="card" style="padding:0.3rem 0.5rem">${FIG_MATCH.replace('<svg ', '<svg style="width:100%;max-height:10.5rem;display:block" ')}</div>
             </div>
@@ -22103,11 +22106,11 @@ bsearch(s, i, j, key) {     // search s[i..j]
         title: 'Logic gates: the building blocks',
         kind: 'concept',
         html: String.raw`
-          <div class="def">A <span class="term">logic gate</span> is a tiny circuit that reads one or two input bits and produces one output bit. A bit is 0 (low voltage, false) or 1 (high voltage, true). Each gate below shows its symbol, its algebra and its truth table. Click a column of a table or an input circle to try the gate.</div>
+          <div class="def">A <span class="term">logic gate</span> is a tiny circuit that reads one or two input bits and produces one output bit. A bit is 0 (low voltage, false) or 1 (high voltage, true). Each gate below shows its symbol, its algebra and its truth table. Click a column of a table or an input circle to try the gate.<div class="eg">With inputs 1 and 0, AND outputs 0 (it needs both 1s), OR outputs 1 (one 1 is enough), and NOT turns 1 into 0.</div></div>
           <div class="cols-3 bl-gates"></div>
           <div class="split" style="align-items:stretch">
-            <div class="box"><span class="lbl">Reading the symbols</span>A small circle on an output, called a bubble, means "then flip the result". So NAND is AND followed by NOT. Engineers usually write \(x \cdot y\) as \(xy\), the way algebra writes \(3x\), and they write the complement of \(x\) as \(x'\) or \(\bar{x}\).</div>
-            <div class="ai">A GPU contains tens of billions of transistors wired into gates like these. Every multiplication inside a neural network becomes streams of bits flowing through AND, OR and XOR gates in adder circuits, which you will build later in this module.</div>
+            <div class="box"><span class="lbl">Reading the symbols</span>A small circle on an output, called a bubble, means "then flip the result", so NAND is AND then NOT. Engineers write \(x \cdot y\) as \(xy\), the way algebra writes \(3x\), and the complement of \(x\) as \(x'\) or \(\bar{x}\).</div>
+            <div class="ai">A GPU wires tens of billions of transistors into gates like these. Every multiplication in a neural network runs as bits through AND, OR and XOR gates in adder circuits, which you will build later.</div>
           </div>`,
         render(body, ctx) {
           const { h, rc } = ctx;
@@ -22150,7 +22153,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split fill" style="align-items:stretch; min-height:0">
             <div class="stack" style="min-height:0">
-              <div class="def">A <span class="term">combinatorial circuit</span> is a network of gates with no loops, so signals flow one way, from inputs to outputs. Its output depends only on the inputs right now, so it has no memory, and a truth table describes it completely.</div>
+              <div class="def">A <span class="term">combinatorial circuit</span> is a network of gates with no loops, so signals flow one way, from inputs to outputs. Its output depends only on the inputs right now, so it has no memory, and a truth table describes it completely.<div class="eg">Feed \(x\) and \(y\) into an AND gate, then a NOT gate: the output is \((xy)'\). Inputs 1, 1 give 0 every time, whatever came before.</div></div>
               <div class="figure bl-fig bl-c2-fig" style="flex:1"></div>
               <p class="tiny muted">Click a switch or a table row. A dot joins wires. Wires that cross without a dot are not connected.</p>
             </div>
@@ -22300,7 +22303,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">Boolean algebra</span> is a set \(B\) with operations \(+\) and \(\cdot\), a complement operation \(x'\), and two different elements \(0\) and \(1\) that obey these laws for all \(x, y, z \in B\).</div>
+              <div class="def">A <span class="term">Boolean algebra</span> is a set \(B\) with operations \(+\) and \(\cdot\), a complement operation \(x'\), and two different elements \(0\) and \(1\) that obey these laws for all \(x, y, z \in B\).<div class="eg">The smallest one is \(B = \{0, 1\}\) with OR, AND and NOT: \(1 + 0 = 1\), \(1 \cdot 0 = 0\) and \(0' = 1\).</div></div>
               <table class="tt bl-ax" style="width:100%">
                 <thead><tr><th class="l">Law</th><th>Sum form</th><th>Product form</th></tr></thead>
                 <tbody>
@@ -22339,7 +22342,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">Boolean function</span> of \(n\) variables gives an output bit for each of the \(2^n\) input rows. A <span class="term">literal</span> is a variable or its complement, like \(x\) or \(x'\). A <span class="term">minterm</span> is a product with every variable once, such as \(x'yz\). It equals 1 on exactly one row.</div>
+              <div class="def">A <span class="term">Boolean function</span> of \(n\) variables gives an output bit for each of the \(2^n\) input rows. A <span class="term">literal</span> is a variable or its complement, like \(x\) or \(x'\). A <span class="term">minterm</span> is a product with every variable once, such as \(x'yz\). It equals 1 on exactly one row.<div class="eg">With 2 variables a function has \(2^2 = 4\) rows. The minterm \(xy'\) has literals \(x\) and \(y'\), and it is 1 only on the row \(x = 1, y = 0\).</div></div>
               <div class="thm">Every Boolean function equals the sum of the minterms of the rows where it is 1. That sum is its <span class="term">disjunctive normal form</span> (DNF), also called a sum of minterms.</div>
               <div class="ex">Read the DNF straight off the table. For each row with \(f = 1\), write \(x\) where the bit is 1 and \(x'\) where it is 0, then add the products. Row \(011\) gives \(x'yz\), the minterm \(m_3\).</div>
               <div class="why">This proves that AND, OR and NOT can build <i>every</i> Boolean function, since any truth table turns into a DNF. With \(n\) variables there are \(2^{2^n}\) functions: 16 for two variables and 256 for three.</div>
@@ -22447,7 +22450,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
               <div class="ai">Quantized neural networks store weights in 8, 4 or even 1 bit so that inference needs fewer, simpler gates. A 1-bit network replaces multiplication with XNOR gates and bit counting.</div>
             </div>
             <div class="stack">
-              <div class="def">A <span class="term">Karnaugh map</span> is a truth table folded into a grid. Rows and columns follow Gray-code order 00, 01, 11, 10, so neighboring cells differ in exactly one variable. Two neighboring 1s merge because \(Ax + Ax' = A\).</div>
+              <div class="def">A <span class="term">Karnaugh map</span> is a truth table folded into a grid. Rows and columns follow Gray-code order 00, 01, 11, 10, so neighboring cells differ in exactly one variable. Two neighboring 1s merge because \(Ax + Ax' = A\).<div class="eg">Cells \(x'y\) (01) and \(xy\) (11) are neighbors, since only \(x\) changes. Two 1s there merge: \(x'y + xy = y\).</div></div>
               <div class="thm"><b>Grouping rules.</b>
                 <ol style="margin:0.2rem 0 0">
                   <li>Groups are rectangles of 1, 2, 4, 8 or 16 cells.</li>
@@ -23618,8 +23621,8 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split" style="align-items:stretch">
             <div class="stack" style="gap:0.5rem">
-              <div class="def">An <span class="term">experiment</span> is any process with an uncertain result, such as rolling a die. Each possible result is an <span class="term">outcome</span>. The <span class="term">sample space</span> \(S\) is the set of all outcomes, and an <span class="term">event</span> is any subset of \(S\).</div>
-              <div class="thm">When every outcome is <span class="term">equally likely</span>, probability is a ratio of two counts:
+              <div class="def">An <span class="term">experiment</span> is any process with an uncertain result, such as rolling a die. Each possible result is an <span class="term">outcome</span>. The <span class="term">sample space</span> \(S\) is the set of all outcomes, and an <span class="term">event</span> is any subset of \(S\).<div class="eg">Flip a coin: \(S = \{H, T\}\). The event "heads" is \(\{H\}\).</div></div>
+              <div class="thm">If all outcomes are <span class="term">equally likely</span>, probability is a ratio of counts:
                 \[P(E) = \frac{|E|}{|S|}\]</div>
               <div class="ex">Roll two dice. \(S = \{1,\dots,6\} \times \{1,\dots,6\}\), the Cartesian product from Module 1, so \(|S| = 36\). The event "sum is 7" holds six pairs, from \((1,6)\) to \((6,1)\), so \(P = 6/36 = 1/6\).</div>
               <p class="small">Events are sets, so Module 1's operations build new events. \(A \cap B\) means both happen. \(A \cup B\) means at least one happens. \(A'\) means \(A\) does not happen.</p>
@@ -23711,7 +23714,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
             </div>
             <div class="stack">
               <div class="thm">Every probability obeys three axioms. \(0 \le P(E) \le 1\). \(P(S) = 1\). If \(A \cap B = \varnothing\), then \(P(A \cup B) = P(A) + P(B)\).</div>
-              <div class="def">Events with \(A \cap B = \varnothing\) are <span class="term">mutually exclusive</span>. They cannot happen together, like rolling a 1 and rolling a 2 with the same die.</div>
+              <div class="def"><span class="term">Mutually exclusive</span> events cannot happen together: \(A \cap B = \varnothing\).<div class="eg">On one die, "roll a 1" and "roll a 2" are mutually exclusive. "Roll an even number" and "roll a 2" are not: a 2 makes both happen.</div></div>
               <div class="thm" data-label="Two rules that follow">Complement: \(P(E') = 1 - P(E)\).<br>Union (inclusion–exclusion): \(P(A \cup B) = P(A) + P(B) - P(A \cap B)\).</div>
               <div class="ex">What is the chance of at least one 6 in two rolls? The complement is "no 6 at all", with probability \((5/6)^2 = 25/36\). So the answer is \(1 - 25/36 = 11/36\). Adding \(1/6 + 1/6 = 12/36\) overcounts, because the two events overlap at \((6,6)\).</div>
               <div class="tip">For any "at least one" question, compute the complement "none" and subtract from 1. It is usually one multiplication instead of many cases.</div>
@@ -24005,12 +24008,12 @@ bsearch(s, i, j, key) {     // search s[i..j]
             <div class="stack">
               <div class="def">The <span class="term">conditional probability</span> of \(A\) given \(B\) is
                 \[P(A \mid B) = \frac{P(A \cap B)}{P(B)}, \qquad P(B) \gt 0.\]
-                Knowing that \(B\) happened shrinks the sample space to \(B\). Only the part of \(A\) inside \(B\) still counts.</div>
+                Knowing that \(B\) happened shrinks the sample space to \(B\). Only the part of \(A\) inside \(B\) still counts.<div class="eg">Roll one die and learn it is even. Then \(P(6 \mid \text{even}) = (1/6)/(1/2) = 1/3\): the 6 is one of 3 even faces.</div></div>
               <div class="ex">Two dice are rolled and you learn the sum is 8. What is the chance of doubles? \(B = \{(2,6),(3,5),(4,4),(5,3),(6,2)\}\) and only \((4,4)\) is doubles, so \(P(\text{doubles} \mid \text{sum } 8) = 1/5\). Without the information, \(P(\text{doubles}) = 6/36 = 1/6\).</div>
               <div class="thm">Multiplication rule: \(P(A \cap B) = P(A) \cdot P(B \mid A)\).<br>Draw two cards without putting the first back. \(P(\text{both aces}) = \frac{4}{52} \cdot \frac{3}{51} = \frac{1}{221}\). The second factor is conditional, because one ace is already gone.</div>
             </div>
             <div class="stack">
-              <div class="def">\(A\) and \(B\) are <span class="term" data-term="independent events">independent</span> when \(P(A \cap B) = P(A) \cdot P(B)\), or equivalently \(P(A \mid B) = P(A)\). Learning that \(B\) happened tells you nothing about \(A\). Separate coin flips are independent. Cards drawn without replacement are not.</div>
+              <div class="def">\(A\) and \(B\) are <span class="term" data-term="independent events">independent</span> when \(P(A \cap B) = P(A) \cdot P(B)\), or equivalently \(P(A \mid B) = P(A)\). Learning that \(B\) happened tells you nothing about \(A\).<div class="eg">Two coin flips are independent: \(P(\text{both heads}) = 1/4 = 1/2 \cdot 1/2\). Two cards drawn without replacement are not, since a first ace makes a second ace less likely.</div></div>
               <div class="warn">Independent and mutually exclusive are different ideas. Mutually exclusive events with positive probabilities are always <i>dependent</i>: if one happens, the other's probability drops to 0. "First die shows 1" and "first die shows 2" are mutually exclusive. "First die shows 1" and "second die shows 2" are independent.</div>
               <div class="ai">A language model generates text one token at a time using conditional probabilities: \(P(\text{next token} \mid \text{all tokens so far})\). The probability of a whole sentence is the multiplication rule applied again and again: \(P(w_1) \cdot P(w_2 \mid w_1) \cdot P(w_3 \mid w_1, w_2) \cdots\)</div>
             </div>
@@ -24294,16 +24297,16 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">random variable</span> \(X\) assigns a number to every outcome. Its distribution lists \(P(X = x)\) for each value. Let \(X\) = the number of heads in 3 coin flips:
-                <table class="pb-dist"><tr><th>\(x\)</th><td>0</td><td>1</td><td>2</td><td>3</td></tr><tr><th>\(P(X = x)\)</th><td>1/8</td><td>3/8</td><td>3/8</td><td>1/8</td></tr></table></div>
+              <div class="def">A <span class="term">random variable</span> \(X\) assigns a number to every outcome. Its distribution lists \(P(X = x)\) for each value.<div class="eg">Let \(X\) = the number of heads in 3 coin flips:
+                <table class="pb-dist"><tr><th>\(x\)</th><td>0</td><td>1</td><td>2</td><td>3</td></tr><tr><th>\(P(X = x)\)</th><td>1/8</td><td>3/8</td><td>3/8</td><td>1/8</td></tr></table></div></div>
               <div class="def">The <span class="term">expected value</span> is the probability-weighted average
-                \[E[X] = \sum_x x \cdot P(X = x) = 0 \cdot \tfrac18 + 1 \cdot \tfrac38 + 2 \cdot \tfrac38 + 3 \cdot \tfrac18 = 1.5\]
-                No single game gives 1.5 heads. It is the long-run average over many repetitions.</div>
+                \[E[X] = \sum_x x \cdot P(X = x).\]
+                It is the long-run average over many repetitions.<div class="eg">For the 3 flips, \(E[X] = 0 \cdot \tfrac18 + 1 \cdot \tfrac38 + 2 \cdot \tfrac38 + 3 \cdot \tfrac18 = 1.5\), though no single game gives 1.5 heads.</div></div>
               <div class="ex">Pay $1 to roll a die and win $5 if it shows 6. Your net gain is $4 with probability 1/6 and −$1 with probability 5/6. \(E = 4 \cdot \frac16 - 1 \cdot \frac56 = -\frac16\). You lose about 17 cents per game on average, which is how casinos stay in business.</div>
             </div>
             <div class="stack">
               <div class="thm"><span class="term">Linearity of expectation</span>: \(E[X + Y] = E[X] + E[Y]\) and \(E[aX + b] = aE[X] + b\), always, even when \(X\) and \(Y\) are dependent. The expected sum of two dice is \(3.5 + 3.5 = 7\) with no table of 36 outcomes. The expected number of successes in \(n\) trials with chance \(p\) is \(np\).</div>
-              <div class="def"><span class="term">Variance</span> measures spread: \(\operatorname{Var}(X) = E[(X - \mu)^2] = E[X^2] - \mu^2\), where \(\mu = E[X]\). The standard deviation is \(\sigma = \sqrt{\operatorname{Var}(X)}\). For the 3 flips, \(E[X^2] = 3\), so \(\operatorname{Var}(X) = 3 - 1.5^2 = 0.75\) and \(\sigma \approx 0.87\).</div>
+              <div class="def"><span class="term">Variance</span> measures spread: \(\operatorname{Var}(X) = E[(X - \mu)^2] = E[X^2] - \mu^2\), where \(\mu = E[X]\). The standard deviation is \(\sigma = \sqrt{\operatorname{Var}(X)}\).<div class="eg">For the 3 flips, \(E[X^2] = (0 \cdot 1 + 1 \cdot 3 + 4 \cdot 3 + 9 \cdot 1)/8 = 3\), so \(\operatorname{Var}(X) = 3 - 1.5^2 = 0.75\) and \(\sigma \approx 0.87\).</div></div>
               <div class="ai">Training a model means minimizing its <i>expected loss</i>, estimated by the average loss over the training data. A reinforcement-learning agent picks the action with the highest expected reward. Variance matters too: two models with the same average accuracy can differ a lot in how much their results swing from run to run.</div>
             </div>
           </div>`,
@@ -25738,7 +25741,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">precondition</span> must be true <i>before</i> a function runs (the caller's promise). A <span class="term">postcondition</span> is guaranteed <i>after</i> it returns (the function's promise). An <span class="term">invariant</span> stays true throughout, for example at the start of every loop pass. Together they form the function's <span class="term">contract</span>.</div>
+              <div class="def">A <span class="term">precondition</span> must be true <i>before</i> a function runs (the caller's promise). A <span class="term">postcondition</span> is guaranteed <i>after</i> it returns (the function's promise). An <span class="term">invariant</span> stays true throughout, for example at the start of every loop pass. Together they form the function's <span class="term">contract</span>.<div class="eg"><code>max_of(xs)</code>: precondition "<code>xs</code> is not empty", postcondition "returns the max", invariant "<code>best</code> is the max so far".</div></div>
               <div class="thm">A <span class="term">Hoare triple</span> \(\{P\}\ S\ \{Q\}\) says: if \(P\) is true before statement \(S\) runs, and \(S\) finishes, then \(Q\) is true afterwards. Triples chain like links: if \(S_1\) takes \(P\) to \(Q\) and \(S_2\) takes \(Q\) to \(R\), then running them in order takes \(P\) to \(R\), so you can reason about a long program one statement at a time. A loop invariant is a condition the loop body takes back to itself.
                 \[\{x \ge 0\}\quad y = x + 1\quad \{y \ge 1\}\]</div>
               <table class="tt" style="width:100%">
@@ -25912,7 +25915,7 @@ bsearch(s, i, j, key) {     // search s[i..j]
           <div class="split">
             <div class="stack">
               <p class="lead">Two numbers decide whether a design survives real data: the size of the search space and the chance of a collision. You can compute both before writing any code.</p>
-              <div class="def">The <span class="term">search space</span> is the set of all candidates an algorithm might examine. Counting gives its size: \(k\) independent choices with \(m\) options each give \(m^k\) candidates, the orderings of \(n\) items number \(n!\), and the subsets number \(2^n\).</div>
+              <div class="def">The <span class="term">search space</span> is the set of all candidates an algorithm might examine. Counting gives its size: \(k\) independent choices with \(m\) options each give \(m^k\) candidates, the orderings of \(n\) items number \(n!\), and the subsets number \(2^n\).<div class="eg">A 3-digit lock has \(10^3 = 1000\) codes, 4 guests can line up in \(4! = 24\) orders, and 5 toppings make \(2^5 = 32\) possible pizzas.</div></div>
               <div class="ex">An 8-character password over 62 symbols (a-z, A-Z, 0-9) has \(62^8 \approx 2.2 \times 10^{14}\) possibilities. A GPU rig testing \(10^{10}\) per second tries them all in about 6 hours. At 12 characters there are \(62^{12} \approx 3.2 \times 10^{21}\): about 10,000 years.</div>
               <div class="warn">"One in a million per pair" is not rare overall. Ten thousand items form \(\binom{10000}{2} \approx 5 \times 10^7\) pairs, so expect about 50 matching pairs.</div>
             </div>

@@ -418,7 +418,7 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">proposition</span> is a sentence that is either true or false (T or F), but not both. We name propositions with letters such as \(p\), \(q\) and \(r\).</div>
+              <div class="def">A <span class="term">proposition</span> is a sentence that is either true or false (T or F), but not both. We name propositions with letters such as \(p\), \(q\) and \(r\).<div class="eg">\(p\): "10 is even" is a true proposition. \(q\): "\(3 \gt 8\)" is a false one.</div></div>
               <div class="split" style="gap:0.6rem">
                 <div class="box small"><span class="lbl ok">Propositions</span>"7 is prime." (T)<br>"\(2 + 2 = 5\)." (F)<br>"Every even number above 2 is a sum of two primes." (Nobody knows which, yet it is one of the two.)</div>
                 <div class="box small"><span class="lbl bad">Not propositions</span>"Close the door." (a command)<br>"Is it raining?" (a question)<br>"\(x + 1 = 3\)." (true or false only once \(x\) is chosen)</div>
@@ -447,13 +447,13 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">The <span class="term">conditional</span> \(p \to q\) reads "if \(p\), then \(q\)". \(p\) is the <b>hypothesis</b> (or antecedent) and \(q\) is the <b>conclusion</b> (or consequent). It is false in exactly one case: \(p\) true and \(q\) false.</div>
+              <div class="def">The <span class="term">conditional</span> \(p \to q\) reads "if \(p\), then \(q\)". \(p\) is the <b>hypothesis</b> (or antecedent) and \(q\) is the <b>conclusion</b> (or consequent). It is false in exactly one case: \(p\) true and \(q\) false.<div class="eg">"If it snows, then school closes": \(p\) is "it snows" and \(q\) is "school closes". Only snow with school open makes it false.</div></div>
               <div class="row" style="align-items:flex-start;gap:1rem;flex-wrap:nowrap">
                 ${TT_COND}
                 <p class="small">Think of \(p \to q\) as a promise. The highlighted row is the only way to break it. When the hypothesis is false, nothing was promised, so the conditional counts as true. We say it is <span class="term">vacuously true</span>.</p>
               </div>
-              <div class="ex">"If \(2 + 2 = 5\), then the moon is made of cheese" is true, because its hypothesis is false. "If 7 is prime, then \(2 + 2 = 4\)" is also true, even though the two parts have nothing to do with each other. Logic looks only at truth values; it never asks whether the parts are related.</div>
-              <div class="why">Every <code>if</code> in a program, every requirement in a specification ("if the input is valid, the output is sorted") and every step of a proof is a conditional. A test whose input never makes the hypothesis true can never catch a broken promise.</div>
+              <div class="ex">"If \(2 + 2 = 5\), then the moon is made of cheese" is true, because its hypothesis is false. "If 7 is prime, then \(2 + 2 = 4\)" is true too, though its parts are unrelated: logic looks only at truth values.</div>
+              <div class="why">Every <code>if</code> in a program, every spec rule ("if the input is valid, the output is sorted") and every proof step is a conditional. A test that never makes the hypothesis true can never catch a broken promise.</div>
             </div>
             <div class="card lg-promise"></div>
           </div>`,
@@ -515,7 +515,7 @@
                 </tbody>
               </table>
               <div class="warn">"You pass only if you submit the project" is pass \(\to\) submit. Submitting is necessary, not sufficient: you can submit and still fail.</div>
-              <div class="def">The <span class="term">biconditional</span> \(p \leftrightarrow q\) ("\(p\) if and only if \(q\)") is true when \(p\) and \(q\) have the same truth value. It equals \((p \to q) \land (q \to p)\): each is necessary and sufficient for the other.</div>
+              <div class="def">The <span class="term">biconditional</span> \(p \leftrightarrow q\) ("\(p\) if and only if \(q\)") is true when \(p\) and \(q\) have the same truth value. It equals \((p \to q) \land (q \to p)\): each is necessary and sufficient for the other.<div class="eg">"The light is on if and only if the switch is up" is false only on a mismatch: switch up and light off, or switch down and light on.</div></div>
             </div>
             <div class="stack">
               <table class="data small">
@@ -605,7 +605,7 @@
         html: String.raw`
           <div class="split-wide">
             <div class="stack">
-              <div class="def">A <span class="term">tautology</span> is true in every row, a <span class="term">contradiction</span> is false in every row, and anything else is a contingency. Two formulas are <span class="term">logically equivalent</span>, written \(P \equiv Q\), when they agree in every row. That is the same as saying \(P \leftrightarrow Q\) is a tautology.</div>
+              <div class="def">A <span class="term">tautology</span> is true in every row, a <span class="term">contradiction</span> is false in every row, and anything else is a contingency. Two formulas are <span class="term">logically equivalent</span>, written \(P \equiv Q\), when they agree in every row. That is the same as saying \(P \leftrightarrow Q\) is a tautology.<div class="eg">\(p \to p\) is a tautology, \(p \leftrightarrow \neg p\) a contradiction, and \(p \lor q\) a contingency (F only when both parts are F). \(p \land q \equiv q \land p\): their columns match.</div></div>
               <table class="tt" style="width:100%;font-size:0.84rem">
                 <thead><tr><th class="l">Law</th><th>Equivalence</th></tr></thead>
                 <tbody>
@@ -734,8 +734,8 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">A <span class="term">predicate</span> \(P(x)\) is a statement with a variable. It becomes a proposition once \(x\) takes a value from the <span class="term">domain of discourse</span> \(D\). With \(P(x)\): "\(x \gt 3\)", \(P(5)\) is true and \(P(1)\) is false.</div>
-              <div class="def" data-label="Quantifiers">The <span class="term">universal quantifier</span> \(\forall x\  P(x)\) ("for all \(x\)") is true when \(P(x)\) holds for <i>every</i> \(x\) in \(D\). The <span class="term">existential quantifier</span> \(\exists x\  P(x)\) ("there exists \(x\)") is true when <i>at least one</i> \(x\), a witness, makes \(P(x)\) true.</div>
+              <div class="def">A <span class="term">predicate</span> \(P(x)\) is a statement with a variable. It becomes a proposition once \(x\) takes a value from the <span class="term">domain of discourse</span> \(D\).<div class="eg">With \(P(x)\): "\(x \gt 3\)", \(P(5)\) is true, \(P(1)\) is false, and \(P(x)\) alone is neither.</div></div>
+              <div class="def" data-label="Quantifiers">The <span class="term">universal quantifier</span> \(\forall x\  P(x)\) ("for all \(x\)") is true when \(P(x)\) holds for <i>every</i> \(x\) in \(D\). The <span class="term">existential quantifier</span> \(\exists x\  P(x)\) ("there exists \(x\)") is true when <i>at least one</i> \(x\), a witness, makes \(P(x)\) true.<div class="eg">Over \(D = \{1, 2, 3\}\): \(\forall x\ (x \gt 0)\) is true; \(\exists x\ (x \gt 2)\) is true, with witness 3; \(\forall x\ (x \gt 2)\) is false, since 1 and 2 fail.</div></div>
               <div class="ex">The domain matters. \(\forall x\  (x^2 \ge x)\) is true over the integers \(\mathbb{Z}\), but false over the reals \(\mathbb{R}\): \(x = \tfrac12\) gives \(\tfrac14 \lt \tfrac12\).</div>
               <div class="warn">"Every circle is red" is \(\forall x\  (\text{Circle}(x) \to \text{Red}(x))\). With \(\land\) instead it would say every object is a red circle. "Some circle is red" uses \(\land\): \(\exists x\  (\text{Circle}(x) \land \text{Red}(x))\).</div>
             </div>
@@ -849,7 +849,7 @@
               </table>
             </div>
             <div class="stack">
-              <div class="def"><span class="term">Short-circuit evaluation</span>: Python evaluates <code>and</code> and <code>or</code> from left to right and stops as soon as the answer is known. In <code>a and b</code>, if <code>a</code> is false, <code>b</code> never runs.</div>
+              <div class="def"><span class="term">Short-circuit evaluation</span>: Python evaluates <code>and</code> and <code>or</code> from left to right and stops as soon as the answer is known.<div class="eg"><code>False and 1/0</code> gives <code>False</code> and <code>True or 1/0</code> gives <code>True</code>, with no error: <code>1/0</code> never runs.</div></div>
               <div class="ex">Guard first, then use: <code>if user is not None and user.is_admin:</code> never touches <code>user.is_admin</code> when there is no user. Swap the two sides and a missing user crashes the program.</div>
               <div class="ex" data-label="Refactoring with De Morgan"><code>if not (is_weekend or is_holiday):</code> tests the same thing as <code>if not is_weekend and not is_holiday:</code>, and the second version reads as "a normal working day".</div>
               <div class="ai">Data filtering in pandas and NumPy uses Boolean masks such as <code>df[(df.age &gt; 30) &amp; ~df.churned]</code>. There <code>&amp;</code>, <code>|</code> and <code>~</code> work row by row, and the parentheses are required because <code>&amp;</code> binds tighter than <code>&gt;</code>.</div>

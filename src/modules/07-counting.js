@@ -243,9 +243,9 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def" data-label="Product rule">If a task is a sequence of steps, step 1 can be done in \(n_1\) ways, step 2 in \(n_2\) ways, and so on, and each count does not depend on the earlier choices, then the whole task can be done in \(n_1 \cdot n_2 \cdots n_k\) ways. This is the <span class="term">product rule</span>.</div>
+              <div class="def" data-label="Product rule">If a task is a sequence of steps, step 1 can be done in \(n_1\) ways, step 2 in \(n_2\) ways, and so on, and each count does not depend on the earlier choices, then the whole task can be done in \(n_1 \cdot n_2 \cdots n_k\) ways. This is the <span class="term">product rule</span>.<div class="eg">A drink (3 kinds) and a sandwich (2 kinds): \(3 \cdot 2 = 6\) lunches.</div></div>
               <div class="ex">A license plate has 3 letters followed by 4 digits: \(26^3 \cdot 10^4 = 175{,}760{,}000\) plates. If the letters may not repeat, the letter choices shrink step by step: \(26 \cdot 25 \cdot 24 \cdot 10^4 = 156{,}000{,}000\).</div>
-              <div class="def" data-label="Sum rule">If a choice comes from one of several groups that do not overlap, with \(n_1, n_2, \dots\) options, then there are \(n_1 + n_2 + \cdots\) choices in all. This is the <span class="term">sum rule</span>.</div>
+              <div class="def" data-label="Sum rule">If a choice comes from one of several groups that do not overlap, with \(n_1, n_2, \dots\) options, then there are \(n_1 + n_2 + \cdots\) choices in all. This is the <span class="term">sum rule</span>.<div class="eg">A drink (3 kinds) or a sandwich (2 kinds): \(3 + 2 = 5\) choices.</div></div>
               <div class="ex">Bit strings of length at most 3: split them by length (the groups cannot overlap), then count each length with the product rule: \(2 + 4 + 8 = 14\).</div>
             </div>
             <div class="stack">
@@ -380,13 +380,13 @@
         html: String.raw`
           <div class="split">
             <div class="stack">
-              <div class="def">An <span class="term">r-permutation</span> of \(n\) distinct objects is an <i>ordered</i> arrangement of \(r\) of them. There are \(n\) choices for the first position, \(n - 1\) for the second, and so on, so by the product rule
+              <div class="def">An <span class="term">r-permutation</span> of \(n\) distinct objects is an <i>ordered</i> arrangement of \(r\) of them. The product rule (\(n\) choices, then \(n - 1\), …) gives
                 \[P(n, r) = n(n-1)\cdots(n-r+1) = \frac{n!}{(n-r)!}.\]
-                Here \(n! = n(n-1)\cdots 2 \cdot 1\) is \(n\) <span class="term">factorial</span>, and \(0! = 1\).</div>
+                Here \(n! = n(n-1)\cdots 2 \cdot 1\) is \(n\) <span class="term">factorial</span>, and \(0! = 1\).<div class="eg">Driver and passenger from 4 friends: \(P(4, 2) = 4 \cdot 3 = 12\).</div></div>
               <div class="ex">Gold, silver and bronze among 8 runners: \(P(8, 3) = 8 \cdot 7 \cdot 6 = 336\). Every order of 5 books on a shelf: \(5! = 120\).</div>
               <div class="def">An <span class="term">r-combination</span> is an <i>unordered</i> selection of \(r\) of the \(n\) objects. Their number is the <span class="term">binomial coefficient</span>
-                \[C(n, r) = \binom{n}{r} = \frac{n!}{r!\,(n-r)!}.\]</div>
-              <div class="ai">Picking 10 of 100 input features for a model gives \(C(100, 10) \approx 1.7 \times 10^{13}\) feature subsets, far too many to test one by one.</div>
+                \[C(n, r) = \binom{n}{r} = \frac{n!}{r!\,(n-r)!}.\]<div class="eg">Invite 2 of the 4 friends: \(C(4, 2) = 12/2! = 6\) pairs.</div></div>
+              <div class="ai">Picking 10 of 100 input features for a model gives \(C(100, 10) \approx 1.7 \times 10^{13}\) subsets, far too many to test one by one.</div>
             </div>
             <div class="stack">
               <div class="thm" data-label="The divide-by-r! idea">Each unordered group of \(r\) objects appears \(r!\) times in the list of ordered arrangements, once for each of its orders. So \(C(n, r) = P(n, r) / r!\).
@@ -760,7 +760,7 @@
       {
         title: 'Lab: the pigeonhole principle',
         kind: 'lab',
-        html: String.raw`<div class="split"><div class="def">The <span class="term">pigeonhole principle</span>. If \(n\) items go into \(k\) boxes and \(n \gt k\), then some box holds at least two items.</div><div class="thm" data-label="Generalized pigeonhole principle">If \(n\) items go into \(k\) boxes, some box holds at least \(\lceil n/k \rceil\) items. If every box held fewer, the total would be below \(k \cdot n/k = n\).</div></div>`,
+        html: String.raw`<div class="split"><div class="def">The <span class="term">pigeonhole principle</span>. If \(n\) items go into \(k\) boxes and \(n \gt k\), then some box holds at least two items.<div class="eg">Mail 3 letters to 2 mailboxes: one gets at least 2.</div></div><div class="thm" data-label="Generalized pigeonhole principle">If \(n\) items go into \(k\) boxes, some box holds at least \(\lceil n/k \rceil\) items. If every box held fewer, the total would be below \(k \cdot n/k = n\).</div></div>`,
         render(body, ctx) {
           const { h, s } = ctx;
           const SCEN = [

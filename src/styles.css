@@ -244,6 +244,9 @@ svg text { font-family: var(--font-body); }
 .def, .thm, .ex, .ai, .warn, .tip, .why { border-radius: var(--radius); padding: 0.55rem 0.85rem; border: 1px solid var(--rule); background: var(--sheet); }
 .def { border-left: 3px solid var(--accent); }
 .def::before { content: "Definition"; color: var(--accent); }
+/* the small example every definition box ends with: one concrete instance before any theory builds on it */
+.def .eg { margin-top: 0.3rem; padding-top: 0.28rem; border-top: 1px dashed var(--rule); }
+.def .eg::before { content: "Example"; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); margin-right: 0.5rem; }
 .thm { border-left: 3px solid var(--fnc); }
 .thm::before { content: "Theorem / Rule"; color: var(--fnc); }
 .ex { border-style: dashed; }
