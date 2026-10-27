@@ -198,14 +198,331 @@
     { sa: 6, sb: 8, ab: 0, at: 6, bt: 8 },
     { sa: 9, sb: 8, ab: 3, at: 6, bt: 11 },
   ];
-  // SVG elements for one snapshot of the shared network; o is pure step data:
-  // { flows, label: 'flow' | 'residual', path: [edge keys], cut: [edge keys], reachable: [vertices], shade, tagReach }
-  function exNetKids(s, o) {
+  /* ---------- worked-example generators: snapshot steps computed from a preset's edge list ---------- */
+  // Run the augmenting-path method on a preset's data ({ edges: [{ key, u, v, c }] }) and keep
+  // a flow snapshot after every push, so primary and variant steps come from the same code.
+  function flowRun(D, rule) {
+    const net = { s: 's', t: 't', edges: D.edges.map((e) => ({ u: e.u, v: e.v, c: e.c })) };
+    const flow = net.edges.map(() => 0);
+    const snap = () => { const o = {}; D.edges.forEach((e, i) => (o[e.key] = flow[i])); return o; };
+    const snaps = [{ flows: snap(), arcs: null, push: 0 }];
+    let p;
+    while ((p = findPath(net, flow, rule)) && snaps.length < 60) {
+      const push = Math.min(...p.map((a) => a.room));
+      p.forEach((a) => (flow[a.e] += a.dir * push));
+      snaps.push({ flows: snap(), arcs: p, push });
+    }
+    const value = net.edges.reduce((acc, e, i) => acc + (e.u === 's' ? flow[i] : 0), 0);
+    return { net, flow, snaps, value, S: reachable(net, flow) };
+  }
+  const flowVal = (D, flows) => D.edges.reduce((acc, e) => acc + (e.u === 's' ? flows[e.key] || 0 : 0), 0);
+  const cutOf = (D, S) => D.edges.filter((e) => S.has(e.u) && !S.has(e.v));
+  const midVerts = (D) => [...new Set(D.edges.flatMap((e) => [e.u, e.v]))].filter((x) => x !== 's' && x !== 't');
+  const consOf = (D, flows) => midVerts(D).map((x) => ({
+    x,
+    inn: D.edges.reduce((a, e) => a + (e.v === x ? flows[e.key] || 0 : 0), 0),
+    out: D.edges.reduce((a, e) => a + (e.u === x ? flows[e.key] || 0 : 0), 0),
+  }));
+  const otherSide = (D, S) => [...new Set(D.edges.flatMap((e) => [e.u, e.v]))].filter((x) => !S.has(x));
+
+  function flowStepsFor(D, rule, checkpoint) {
+    const run = flowRun(D, rule);
+    const steps = [{
+      flows: run.snaps[0].flows, label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false,
+      status: 'All flows 0 · labels read flow / capacity · flow value |f| = 0',
+      caption: 'Setup: every flow starts at 0, and a flow must respect each capacity and keep flow in equal to flow out at every vertex between s and t. We improve the flow one augmenting path at a time, always looking for spare room in the residual network.',
+    }];
+    run.snaps.slice(1).forEach((sn, i) => {
+      const prev = run.snaps[i].flows;
+      const arcs = sn.arcs;
+      const tight = arcs.filter((a) => a.room === sn.push)
+        .map((a) => (a.dir > 0 ? `${a.from} → ${a.to}` : `the backward step ${a.from} ⇢ ${a.to}`)).join(' and ');
+      const backs = arcs.filter((a) => a.dir < 0);
+      const newSat = D.edges.filter((e) => sn.flows[e.key] === e.c && e.c > 0 && (prev[e.key] || 0) < e.c)
+        .map((e) => `${edgeName(e)} is now saturated at ${e.c}/${e.c}`);
+      const val = flowVal(D, sn.flows);
+      steps.push({
+        flows: sn.flows, label: 'flow', path: arcs.map((a) => D.edges[a.e].key), cut: [], reachable: [], shade: false, tagReach: false,
+        status: `Path ${pathText(arcs)} · bottleneck min(${arcs.map((a) => a.room).join(', ')}) = ${sn.push} · push ${sn.push} · |f| = ${val}`,
+        caption: `Augment along ${pathText(arcs)}, whose bottleneck is min(${arcs.map((a) => a.room).join(', ')}) = ${sn.push}, set by ${tight}. Pushing ${sn.push} raises the flow value to ${val}${newSat.length ? `, and ${newSat.join(' and ')}` : ''}.${backs.map((a) => ` The dashed step ${a.from} ⇢ ${a.to} runs against edge ${a.to} → ${a.from}: it cancels ${sn.push} unit${sn.push > 1 ? 's' : ''} that edge was carrying, freeing that flow to take a better route.`).join('')}`,
+      });
+    });
+    const S = run.S, cut = cutOf(D, S), cutSum = cut.reduce((a, e) => a + e.c, 0);
+    const lastFlows = run.snaps[run.snaps.length - 1].flows;
+    steps.push({
+      flows: lastFlows, label: 'flow', path: [], cut: [], reachable: sortV(S), shade: true, tagReach: true,
+      status: `Residual reachability: ${sortV(S).join(', ')} reachable · the rest are not · no augmenting path remains`,
+      caption: `No augmenting path remains: in the residual network s can still reach only ${setText(sortV(S))}, because every forward edge from that set to the rest of the network is saturated, so no route to t survives. The reachable set therefore splits the network into a cut, and counting that cut in the answer step will prove that ${run.value} cannot be beaten.`,
+    });
+    const cons = consOf(D, lastFlows);
+    steps.push({
+      flows: lastFlows, label: 'flow', path: [], cut: cut.map((e) => e.key), reachable: sortV(S), shade: true, tagReach: false,
+      status: `Maximum flow = ${run.value} · cut (${setText(sortV(S))} | ${setText(sortV(otherSide(D, S)))}) capacity = ${cut.map((e) => e.c).join(' + ')} = ${cutSum}`,
+      answer: true,
+      banner: `Maximum flow = ${run.value} · check: conservation holds at ${cons.map((c) => `${c.x} (in ${c.inn}, out ${c.out})`).join(' and at ')}, and the cut (${setText(sortV(S))} | ${setText(sortV(otherSide(D, S)))}) has capacity ${cut.map((e) => e.c).join(' + ')} = ${cutSum}`,
+      caption: `Answer: the maximum flow is ${run.value}, and conservation checks out at ${cons.map((c) => `${c.x} (in ${c.inn}, out ${c.out})`).join(' and at ')}, with every capacity respected. The cut (${setText(sortV(S))} | ${setText(sortV(otherSide(D, S)))}) has capacity ${cut.map((e) => e.c).join(' + ')} = ${cutSum}, so a flow and a cut with equal values certify each other by the max-flow min-cut theorem and ${run.value} is provably maximal.`,
+    });
+    if (checkpoint) steps[checkpoint.at].checkpoint = checkpoint.text;
+    return steps;
+  }
+
+  function cutStepsFor(D, checkpoint) {
+    const run = flowRun(D, 'bfs');
+    const flows = run.snaps[run.snaps.length - 1].flows;
+    const S = run.S, cut = cutOf(D, S), cutSum = cut.reduce((a, e) => a + e.c, 0);
+    const rooms = D.edges.map((e) => ({ e, fwd: e.c - (flows[e.key] || 0) }));
+    const zero = rooms.filter((r) => r.fwd === 0);
+    const mids = midVerts(D);
+    const allCuts = [];
+    for (let mask = 0; mask < (1 << mids.length); mask++) {
+      const SS = new Set(['s', ...mids.filter((_, i) => mask & (1 << i))]);
+      allCuts.push(`${setText(sortV(SS))}: ${cutOf(D, SS).reduce((a, e) => a + e.c, 0)}`);
+    }
+    const steps = [
+      {
+        flows, label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false,
+        status: `Final flow · ${D.edges.map((e) => `${edgeName(e)} ${flows[e.key] || 0}/${e.c}`).join(' · ')} · |f| = ${run.value}`,
+        caption: 'Setup: start from a maximum flow of this network, whose value is the total leaving s, and build its residual network to see what can still move. The method is to mark every vertex reachable from s in that residual network, because those vertices will form the source side of the cut.',
+      },
+      {
+        flows, label: 'residual', path: [], cut: [], reachable: [], shade: false, tagReach: false,
+        status: 'Residual room · forward = capacity − flow · backward = flow · dashed edges have 0 forward room',
+        caption: `Compute the residual room on every edge: forward room is capacity minus flow, and backward room is the flow that could be canceled. The forward rooms are ${rooms.map((r) => `${edgeName(r.e)} ${r.fwd}`).join(', ')}, and the ${zero.length} edge${zero.length === 1 ? '' : 's'} with 0 forward room ${zero.length === 1 ? 'is' : 'are'} drawn dashed because nothing more can pass that way.`,
+      },
+      {
+        flows, label: 'residual', path: [], cut: [], reachable: sortV(S), shade: true, tagReach: true,
+        status: `Reachability walk: reachable set = ${setText(sortV(S))}`,
+        caption: `Walk the residual network from s, following every step that still has positive room. The walk reaches exactly ${setText(sortV(S))}: every original edge from that set to the other side is saturated (${cut.map((e) => `${edgeName(e)} carries ${flows[e.key] || 0}/${e.c}`).join(', ')}), so no residual step crosses to the other side and the walk stops there.`,
+      },
+      {
+        flows, label: 'flow', path: [], cut: cut.map((e) => e.key), reachable: sortV(S), shade: true, tagReach: false,
+        status: `Cut edges: ${cut.map((e) => `${edgeName(e)} (${e.c})`).join(' · ')} · total ${cut.map((e) => e.c).join(' + ')} = ${cutSum}`,
+        caption: `The cut edges are the original edges that run from the reachable side ${setText(sortV(S))} to the other side ${setText(sortV(otherSide(D, S)))}: ${cut.map(edgeName).join(', ')}, drawn dashed with an X. Adding only their capacities gives ${cut.map((e) => e.c).join(' + ')} = ${cutSum}, and edges that point back into ${setText(sortV(S))} are never counted.`,
+      },
+      {
+        flows, label: 'flow', path: [], cut: cut.map((e) => e.key), reachable: sortV(S), shade: true, tagReach: false,
+        status: `Minimum cut capacity = ${cutSum} · all ${allCuts.length} cuts: ${allCuts.join(' · ')}`,
+        answer: true,
+        banner: `Minimum cut capacity = ${cutSum} · check: cut (${setText(sortV(S))} | ${setText(sortV(otherSide(D, S)))}) = ${cut.map((e) => e.c).join(' + ')} = ${cutSum}, which equals the maximum flow`,
+        caption: `Answer: the minimum cut capacity is ${cutSum}. Checking all ${allCuts.length} cuts gives ${allCuts.join(', ')}, so the smallest is ${cutSum}, and it also equals the maximum flow of ${run.value} — exactly as the max-flow min-cut theorem promises. The edges of this cut are the links that truly limit the network.`,
+      },
+    ];
+    if (checkpoint) steps[checkpoint.at].checkpoint = checkpoint.text;
+    return steps;
+  }
+
+  /* ---------- Stage D: a flow audit, and an augmenting run that must cancel flow ---------- */
+  const AUD_POS = { s: [50, 120], a: [175, 40], b: [175, 200], c: [330, 120], t: [450, 120] };
+  const AUD_EDGES = [
+    { key: 'sa', u: 's', v: 'a', c: 9, f: 7 }, { key: 'sb', u: 's', v: 'b', c: 5, f: 3 }, { key: 'ab', u: 'a', v: 'b', c: 4, f: 2 },
+    { key: 'ac', u: 'a', v: 'c', c: 6, f: 5 }, { key: 'bc', u: 'b', v: 'c', c: 4, f: 4 }, { key: 'bt', u: 'b', v: 't', c: 6, f: 1 },
+    { key: 'ct', u: 'c', v: 't', c: 10, f: 9 },
+  ];
+  const AUD_VAR_EDGES = AUD_EDGES.map((e) => (e.key === 'ct' ? { ...e, f: 8 } : e));
+  const REV_POS = { s: [50, 120], a: [175, 40], b: [175, 200], c: [325, 40], d: [325, 200], t: [450, 120] };
+  const REV_EDGES = [
+    { key: 'sa', u: 's', v: 'a', c: 4 }, { key: 'sb', u: 's', v: 'b', c: 4 }, { key: 'ab', u: 'a', v: 'b', c: 3 },
+    { key: 'ac', u: 'a', v: 'c', c: 5 }, { key: 'bc', u: 'b', v: 'c', c: 3 }, { key: 'bd', u: 'b', v: 'd', c: 5 },
+    { key: 'cd', u: 'c', v: 'd', c: 2 }, { key: 'ct', u: 'c', v: 't', c: 5 }, { key: 'dt', u: 'd', v: 't', c: 4 },
+  ];
+  const REV_VAR_EDGES = REV_EDGES.map((e) => (e.key === 'dt' ? { ...e, c: 6 } : e));
+  const EX_AUDIT_DATA = { pos: AUD_POS, edges: AUD_EDGES };
+  const EX_AUDIT_VAR_DATA = { pos: AUD_POS, edges: AUD_VAR_EDGES };
+  const EX_REV_DATA = { pos: REV_POS, edges: REV_EDGES };
+  const EX_REV_VAR_DATA = { pos: REV_POS, edges: REV_VAR_EDGES };
+
+  // Audit a stated flow assignment: capacity on every edge, then conservation vertex by vertex.
+  // Every number in the captions is summed here from the preset's edge list.
+  function auditStepsFor(D) {
+    const flows = {}; D.edges.forEach((e) => (flows[e.key] = e.f));
+    const cons = consOf(D, flows);
+    const over = D.edges.filter((e) => e.f < 0 || e.f > e.c);
+    const bad = cons.filter((c) => c.inn !== c.out);
+    const valid = !over.length && !bad.length;
+    const valS = D.edges.reduce((a, e) => a + (e.u === 's' ? e.f : 0), 0);
+    const valT = D.edges.reduce((a, e) => a + (e.v === 't' ? e.f : 0), 0);
+    const tight = D.edges.reduce((a, e) => (e.c - e.f < a.c - a.f ? e : a), D.edges[0]);
+    const base = { flows, label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false, focus: null, bad: [] };
+    const steps = [{
+      ...base,
+      status: `Assigned flow · ${D.edges.map((e) => `${edgeName(e)} ${e.f}/${e.c}`).join(' · ')} · is it a valid flow, and what is its value?`,
+      caption: 'Setup: someone hands us a finished flow assignment, not a maximum-flow computation. Before trusting its value we audit it against the two flow rules from the first slide: capacity on every edge, then conservation at every vertex between s and t, summed independently from the edge list.',
+    }, {
+      ...base, path: D.edges.map((e) => e.key),
+      status: `Capacity audit · ${D.edges.map((e) => `${edgeName(e)} ${e.f} ≤ ${e.c} ${e.f <= e.c ? 'ok' : 'OVER'}`).join(' · ')} · tightest: ${edgeName(tight)} with room ${tight.c - tight.f}`,
+      caption: `Capacity audit: compare every flow with its capacity, edge by edge. ${over.length ? `The audit fails here: ${over.map((e) => `${edgeName(e)} carries ${e.f} over a capacity of ${e.c}`).join(', ')}.` : `All ${D.edges.length} edges satisfy 0 ≤ f ≤ c, so rule one holds.`} The tightest edge is ${edgeName(tight)} at ${tight.f}/${tight.c}${tight.f === tight.c ? ', completely saturated, so it is the edge to watch in the vertex checks' : ''}.`,
+    }];
+    cons.forEach((c) => {
+      const inc = D.edges.filter((e) => e.u === c.x || e.v === c.x).map((e) => e.key);
+      const inTxt = D.edges.filter((e) => e.v === c.x).map((e) => `${edgeName(e)} ${flows[e.key]}`).join(' + ');
+      const outTxt = D.edges.filter((e) => e.u === c.x).map((e) => `${edgeName(e)} ${flows[e.key]}`).join(' + ');
+      steps.push({
+        ...base, focus: c.x, path: inc, bad: c.inn === c.out ? [] : [c.x],
+        status: `Vertex ${c.x} · in: ${inTxt} = ${c.inn} · out: ${outTxt} = ${c.out} · ${c.inn === c.out ? 'conservation holds' : 'CONSERVATION FAILS'}`,
+        caption: c.inn === c.out
+          ? `Vertex ${c.x}: the inflow is ${inTxt} = ${c.inn} and the outflow is ${outTxt} = ${c.out}. They match, so nothing is created or lost at ${c.x} and conservation holds here${c.x === 'c' ? ` — and this is the tight check of the audit, because the saturated edge ${edgeName(tight)} feeds it` : ''}.`
+          : `Vertex ${c.x}: the inflow is ${inTxt} = ${c.inn} but the outflow is only ${outTxt} = ${c.out}. They do not match: ${Math.abs(c.inn - c.out)} unit${Math.abs(c.inn - c.out) > 1 ? 's' : ''} ${c.inn > c.out ? 'vanish' : 'appear'} at ${c.x}, so conservation fails at exactly this vertex and the whole assignment is not a flow, whatever the other checks said.`,
+      });
+    });
+    const last = cons[cons.length - 1];
+    steps[steps.length - 2].checkpoint = `Predict: the last vertex to audit is ${last.x}, which receives ${last.inn} units in total from its incoming edges. Will the audit find that ${last.x} sends exactly ${last.inn} units onward — or is this where the assignment breaks?`;
+    steps.push({
+      ...base, path: D.edges.filter((e) => e.u === 's' || e.v === 't').map((e) => e.key),
+      status: `Value from the ends · leaving s: ${valS} · entering t: ${valT} · ${valS === valT ? 'the two ends agree' : 'THE TWO ENDS DISAGREE'}`,
+      caption: valid
+        ? `Value: add the flow leaving s, ${valS}, and cross-check at the other end, where ${valT} enters t. Conservation at every middle vertex forces the two totals to agree, and they do, so the value of this flow is ${valS} — a statement about this assignment only, not a claim that no larger flow exists.`
+        : `Value: the flow leaving s totals ${valS}, but only ${valT} arrives at t. For a genuine flow conservation would force these to be equal; the gap of ${Math.abs(valS - valT)} is the same missing unit the vertex audit caught at ${bad.map((c) => c.x).join(', ')}, now visible from the ends of the network.`,
+    }, {
+      ...base, path: [], bad: bad.map((c) => c.x), answer: true,
+      status: valid ? `Valid flow · value |f| = ${valS}` : `Not a valid flow · conservation fails at ${bad.map((c) => c.x).join(', ')}`,
+      banner: valid
+        ? `Valid flow, value |f| = ${valS} · check: capacity holds on all ${D.edges.length} edges (${edgeName(tight)} is saturated at ${tight.c}/${tight.c}) and conservation holds at ${cons.map((c) => `${c.x} (${c.inn} in, ${c.out} out)`).join(', ')}`
+        : `Not a valid flow · check: capacity holds on every edge, but conservation fails at ${bad.map((c) => `${c.x} (${c.inn} in, ${c.out} out)`).join(', ')} — ${Math.abs(valS - valT)} unit is lost there, so only ${valT} of the ${valS} units leaving s reach t`,
+      caption: valid
+        ? `Answer: the assignment is a valid flow of value ${valS}. Every capacity is respected and conservation held at ${cons.map((c) => c.x).join(', ')}, checked by direct summation over the edge list. Notice what the audit does not say: ${valS} need not be the maximum, and proving maximality would take a cut of capacity ${valS}, which is a separate argument.`
+        : `Answer: the assignment is not a valid flow, and the audit names the exact failure: conservation at ${bad.map((c) => c.x).join(', ')} (${bad.map((c) => `${c.inn} in, ${c.out} out`).join('; ')}). Every other vertex balances and every capacity holds, which is the lesson — a flow can pass almost every check and still not be a flow, so the audit has to visit every vertex.`,
+    });
+    return steps;
+  }
+  function auditVerify(D, exp) {
+    const inn = {}, out = {};
+    for (const e of D.edges) { out[e.u] = (out[e.u] || 0) + e.f; inn[e.v] = (inn[e.v] || 0) + e.f; if (e.f < 0 || e.f > e.c) return false; }
+    const bad = [...new Set(D.edges.flatMap((e) => [e.u, e.v]))].filter((x) => x !== 's' && x !== 't' && (inn[x] || 0) !== (out[x] || 0));
+    return exp.valid ? bad.length === 0 && out.s === exp.value && inn.t === exp.value : bad.length === 1 && bad[0] === exp.at && out.s !== inn.t;
+  }
+
+  // Like flowStepsFor, but for the DFS run of a preset, recording which path edges are used
+  // backward and narrating the cancellation: why it is legal and what rerouting it buys.
+  function revStepsFor(D, checkpoint) {
+    const run = flowRun(D, 'dfs');
+    const steps = [{
+      flows: run.snaps[0].flows, label: 'flow', path: [], back: [], cut: [], reachable: [], shade: false, tagReach: false, focus: null, bad: [],
+      status: 'All flows 0 · depth-first search picks the first augmenting path it finds · watch the middle edges',
+      caption: 'Setup: run Ford–Fulkerson with a depth-first search, which grabs the first augmenting path it stumbles on instead of the shortest one. Greedy first choices can block the optimum, and this network is built so that they do: the only escape will be a backward residual step that cancels flow already sent.',
+    }];
+    run.snaps.slice(1).forEach((sn, i) => {
+      const prev = run.snaps[i].flows, arcs = sn.arcs;
+      const backs = arcs.filter((a) => a.dir < 0);
+      const val = flowVal(D, sn.flows);
+      steps.push({
+        flows: sn.flows, label: 'flow', path: arcs.map((a) => D.edges[a.e].key), back: backs.map((a) => D.edges[a.e].key), cut: [], reachable: [], shade: false, tagReach: false, focus: null, bad: [],
+        status: `Path ${pathText(arcs)} · bottleneck ${sn.push} · |f| = ${val}${backs.length ? ' · THIS PATH CANCELS FLOW' : ''}`,
+        caption: `Augment along ${pathText(arcs)} with bottleneck ${sn.push}, raising the flow value to ${val}.${backs.map((a) => { const e = D.edges[a.e]; return ` The step ${a.from} ⇢ ${a.to} is a backward residual step against edge ${edgeName(e)}: its room is exactly the ${prev[e.key]} unit${prev[e.key] > 1 ? 's' : ''} that edge is carrying, and pushing here subtracts ${sn.push} from it, leaving ${sn.flows[e.key]}. That is legal because the residual network only offers room that exists — canceling flow cannot break capacity, and at ${a.from} the inflow and the outflow both drop by ${sn.push}, so conservation survives. What it buys is rerouting: the units that were crossing ${edgeName(e)} are freed to leave ${e.u} another way, and the outgoing room at ${a.from} is handed to the flow arriving on this path instead.`; }).join('')}`,
+      });
+    });
+    const S = run.S, cut = cutOf(D, S), cutSum = cut.reduce((a, e) => a + e.c, 0);
+    const lastFlows = run.snaps[run.snaps.length - 1].flows;
+    steps.push({
+      flows: lastFlows, label: 'flow', path: [], back: [], cut: [], reachable: sortV(S), shade: true, tagReach: true, focus: null, bad: [],
+      status: `Residual reachability: only ${sortV(S).join(', ')} reachable · no augmenting path remains · |f| = ${run.value}`,
+      caption: `No augmenting path remains: from s every forward residual step is saturated, so the reachable set is just ${setText(sortV(S))}. ${run.snaps.some((sn) => sn.arcs && sn.arcs.some((a) => a.dir < 0)) ? 'A purely forward search would have stranded this flow below the maximum; it was the backward step, canceling an early greedy choice, that let the flow finish the job.' : 'This time every push was a plain forward push: the extra room on the last edge into t meant the greedy choices never painted the search into a corner, so no cancellation was needed.'}`,
+    }, {
+      flows: lastFlows, label: 'flow', path: [], back: [], cut: cut.map((e) => e.key), reachable: sortV(S), shade: true, tagReach: false, focus: null, bad: [], answer: true,
+      status: `Maximum flow = ${run.value} · cut (${setText(sortV(S))} | ${setText(sortV(otherSide(D, S)))}) capacity = ${cutSum}`,
+      banner: `Maximum flow = ${run.value} · check: conservation holds at ${consOf(D, lastFlows).map((c) => `${c.x} (in ${c.inn}, out ${c.out})`).join(', ')}, and the cut (${setText(sortV(S))} | ${setText(sortV(otherSide(D, S)))}) has capacity ${cut.map((e) => e.c).join(' + ')} = ${cutSum}`,
+      caption: `Answer: the maximum flow is ${run.value}, certified by the cut (${setText(sortV(S))} | ${setText(sortV(otherSide(D, S)))}) of capacity ${cutSum}. ${run.snaps.some((sn) => sn.arcs && sn.arcs.some((a) => a.dir < 0)) ? `The route to it mattered: the final flow carries ${lastFlows.cd} on c → d even though an intermediate flow carried ${Math.max(...run.snaps.map((sn) => sn.flows.cd))} there — the difference is exactly what the backward step canceled and rerouted.` : 'Comparing runs is the lesson: the same greedy search that needed a cancellation on the tighter network finishes cleanly here, because the bottleneck that forced the rerouting is gone.'}`,
+    });
+    if (checkpoint) steps[checkpoint.at].checkpoint = checkpoint.text;
+    return steps;
+  }
+  function revVerify(D, exp) {
+    const mids = midVerts(D);
+    let best = Infinity;
+    for (let mask = 0; mask < (1 << mids.length); mask++) {
+      const S = new Set(['s', ...mids.filter((_, i) => mask & (1 << i))]);
+      best = Math.min(best, cutOf(D, S).reduce((a, e) => a + e.c, 0));
+    }
+    const caps = {}; D.edges.forEach((e) => (caps[e.key] = e.c));
+    const okCaps = Object.keys(caps).every((k) => exp.flow[k] >= 0 && exp.flow[k] <= caps[k]);
+    const cons = consOf(D, exp.flow);
+    return best === exp.value && okCaps && cons.every((c) => c.inn === c.out) && flowVal(D, exp.flow) === exp.value;
+  }
+
+  // Kids for the two Stage D examples: like exNetKids, plus a focus ring, a bad-vertex fill,
+  // reachable halos, and a dashed overlay arrow for any backward (canceling) path step.
+  function exAuditKids(s, o, D) {
     const kids = [];
+    const edges = D.edges, pos = D.pos, flows = o.flows || {};
+    const path = o.path || [], cut = o.cut || [], reach = o.reachable || [], back = o.back || [], bad = o.bad || [];
+    for (const n of reach) kids.push(s('circle', { cx: pos[n][0], cy: pos[n][1], r: 27, fill: 'var(--accent-2)', opacity: 0.5, stroke: 'var(--accent)', 'stroke-width': 1.6, 'stroke-dasharray': '6 4' }));
+    for (const e of edges) {
+      const f = flows[e.key] || 0;
+      const sat = f === e.c && f > 0;
+      const isCut = cut.includes(e.key), isPath = path.includes(e.key), isBack = back.includes(e.key);
+      let col, w, dash;
+      if (isCut) { col = 'var(--false)'; w = 4.2; dash = '7 5'; }
+      else if (isBack) [col, w, dash] = EDGE.hotback;
+      else if (isPath) [col, w, dash] = EDGE.hot;
+      else if (sat) [col, w, dash] = EDGE.sat;
+      else if (f > 0) [col, w, dash] = EDGE.flow;
+      else[col, w, dash] = EDGE.base;
+      const g = geom(pos[e.u], pos[e.v], 20, 20, 0);
+      const head = 5 + w * 1.35;
+      const bx = g.x2 - g.ux * head, by = g.y2 - g.uy * head, hw = head * 0.55;
+      kids.push(s('line', { x1: r1(g.x1), y1: r1(g.y1), x2: r1(bx), y2: r1(by), stroke: col, 'stroke-width': w, fill: 'none', 'stroke-linecap': dash ? 'butt' : 'round', ...(dash ? { 'stroke-dasharray': dash } : {}) }));
+      kids.push(s('polygon', { points: `${r1(g.x2)},${r1(g.y2)} ${r1(bx + g.nx * hw)},${r1(by + g.ny * hw)} ${r1(bx - g.nx * hw)},${r1(by - g.ny * hw)}`, fill: col }));
+      if (isBack) {
+        const gb = geom(pos[e.v], pos[e.u], 24, 24, 9);
+        kids.push(s('line', { x1: r1(gb.x1), y1: r1(gb.y1), x2: r1(gb.x2), y2: r1(gb.y2), stroke: 'var(--kw)', 'stroke-width': 3, 'stroke-dasharray': '6 4', fill: 'none' }));
+        kids.push(s('polygon', { points: `${r1(gb.x2)},${r1(gb.y2)} ${r1(gb.x2 - gb.ux * 9 + gb.nx * 5)},${r1(gb.y2 - gb.uy * 9 + gb.ny * 5)} ${r1(gb.x2 - gb.ux * 9 - gb.nx * 5)},${r1(gb.y2 - gb.uy * 9 - gb.ny * 5)}`, fill: 'var(--kw)' }));
+      }
+      const text = `${f}/${e.c}${sat ? ' full' : ''}${isCut ? ' ✕' : ''}${isBack ? ' cancel' : ''}`;
+      const fs = 13, bw = text.length * fs * 0.6 + 10, bh = fs + 7;
+      const [bg, bd, ink] = LAB[isCut ? 'cut' : isPath || isBack ? 'hot' : 'plain'];
+      kids.push(s('rect', { x: r1(g.mx - bw / 2), y: r1(g.my - bh / 2), width: r1(bw), height: bh, rx: 4, fill: bg, stroke: bd, 'stroke-width': isPath || isCut || isBack ? 2 : 1 }));
+      kids.push(s('text', { x: r1(g.mx), y: r1(g.my + 1), 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': fs, fill: ink, text }));
+    }
+    for (const [n, p] of Object.entries(pos)) {
+      if (o.focus === n) kids.push(s('circle', { cx: p[0], cy: p[1], r: 26, fill: 'none', stroke: 'var(--kw)', 'stroke-width': 2.6, 'stroke-dasharray': '5 4' }));
+      const [fill, stroke, ink] = NODE[bad.includes(n) ? 'bad' : reach.includes(n) ? 'S' : 'plain'];
+      const term = n === 's' || n === 't';
+      kids.push(s('circle', { cx: p[0], cy: p[1], r: 20, fill, stroke, 'stroke-width': term ? 2.6 : 1.8 }));
+      kids.push(s('text', { x: p[0], y: p[1] + 1, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 16, 'font-weight': term ? 700 : 600, fill: ink, text: n }));
+      if (bad.includes(n)) kids.push(s('text', { x: p[0], y: p[1] + 38, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: 'var(--false)', text: 'in ≠ out' }));
+      if (o.tagReach) kids.push(s('text', { x: p[0], y: p[1] + 40, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: reach.includes(n) ? 'var(--accent)' : 'var(--ink-3)', text: reach.includes(n) ? 'reachable' : 'not reached' }));
+    }
+    return kids;
+  }
+  const exAuditDraw = (fallback) => function (stage, ctx, step, k, preset) {
+    const { h, s } = ctx;
+    const D = (preset && preset.data) || fallback;
+    const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exAuditKids(s, step, D));
+    stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+      h('div.small', h('b.mono', step.status)),
+      svg,
+      step.answer ? h('div.ex-answer', step.banner) : null));
+  };
+
+
+  /* ---------- worked-example preset data ---------- */
+  const EX_MAXFLOW_DATA = { pos: EX_NET_POS, edges: EX_NET_EDGES, rule: 'bfs' };
+  const EX_TRAP_DATA = {
+    pos: EX_NET_POS, rule: 'dfs',
+    edges: [
+      { key: 'sa', u: 's', v: 'a', c: 1 }, { key: 'sb', u: 's', v: 'b', c: 1 }, { key: 'ab', u: 'a', v: 'b', c: 1 },
+      { key: 'at', u: 'a', v: 't', c: 1 }, { key: 'bt', u: 'b', v: 't', c: 1 },
+    ],
+  };
+  const EX_MINCUT_DATA = { pos: EX_NET_POS, edges: EX_NET_EDGES };
+  const EX_MINCUT_VAR_DATA = {
+    pos: EX_NET_POS,
+    edges: [
+      { key: 'sa', u: 's', v: 'a', c: 4 }, { key: 'sb', u: 's', v: 'b', c: 9 }, { key: 'ab', u: 'a', v: 'b', c: 2 },
+      { key: 'at', u: 'a', v: 't', c: 7 }, { key: 'bt', u: 'b', v: 't', c: 8 },
+    ],
+  };
+
+  // SVG elements for one snapshot of a preset's network; o is pure step data:
+  // { flows, label: 'flow' | 'residual', path: [edge keys], cut: [edge keys], reachable: [vertices], shade, tagReach }
+  // D is the active preset's data ({ pos, edges }); every preset of these examples shares the layout.
+  function exNetKids(s, o, D) {
+    const kids = [];
+    const edges = (D && D.edges) || EX_NET_EDGES;
+    const pos = (D && D.pos) || EX_NET_POS;
     const flows = o.flows || {};
     const path = o.path || [], cut = o.cut || [], reach = o.reachable || [];
     if (o.shade) kids.push(s('ellipse', { cx: 135, cy: 85, rx: 128, ry: 60, transform: 'rotate(-25 135 85)', fill: 'var(--accent-2)', opacity: 0.55, stroke: 'var(--accent)', 'stroke-width': 2, 'stroke-dasharray': '8 5' }));
-    for (const e of EX_NET_EDGES) {
+    for (const e of edges) {
       const f = flows[e.key] || 0;
       const sat = f === e.c && f > 0;
       const isCut = cut.includes(e.key), isPath = path.includes(e.key);
@@ -216,7 +533,7 @@
       else if (sat) [col, w, dash] = EDGE.sat;
       else if (f > 0) [col, w, dash] = EDGE.flow;
       else[col, w, dash] = EDGE.base;
-      const g = geom(EX_NET_POS[e.u], EX_NET_POS[e.v], 20, 20, 0);
+      const g = geom(pos[e.u], pos[e.v], 20, 20, 0);
       const head = 5 + w * 1.35;
       const bx = g.x2 - g.ux * head, by = g.y2 - g.uy * head, hw = head * 0.55;
       kids.push(s('line', { x1: r1(g.x1), y1: r1(g.y1), x2: r1(bx), y2: r1(by), stroke: col, 'stroke-width': w, fill: 'none', 'stroke-linecap': dash ? 'butt' : 'round', ...(dash ? { 'stroke-dasharray': dash } : {}) }));
@@ -227,7 +544,7 @@
       kids.push(s('rect', { x: r1(g.mx - bw / 2), y: r1(g.my - bh / 2), width: r1(bw), height: bh, rx: 4, fill: bg, stroke: bd, 'stroke-width': isPath || isCut ? 2 : 1 }));
       kids.push(s('text', { x: r1(g.mx), y: r1(g.my + 1), 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': fs, fill: ink, text }));
     }
-    for (const [n, p] of Object.entries(EX_NET_POS)) {
+    for (const [n, p] of Object.entries(pos)) {
       const [fill, stroke, ink] = NODE[reach.includes(n) ? 'S' : 'plain'];
       const term = n === 's' || n === 't';
       kids.push(s('circle', { cx: p[0], cy: p[1], r: 20, fill, stroke, 'stroke-width': term ? 2.6 : 1.8 }));
@@ -1114,14 +1431,10 @@
         kind: 'example',
         id: 'ex-maxflow',
         problem: String.raw`<p>Find the maximum flow from \(s\) to \(t\) by the Ford–Fulkerson method, one augmenting path at a time, in the network with capacities \(s \to a = 10\), \(s \to b = 8\), \(a \to b = 3\), \(a \to t = 6\) and \(b \to t = 12\).</p>`,
-        steps: [
-          { flows: EX_NET_FLOWS[0], label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'All flows 0 · labels read flow / capacity · flow value |f| = 0', caption: 'Setup: every flow starts at 0, and a flow must respect each capacity and keep flow in equal to flow out at a and at b. We improve the flow one augmenting path at a time, always looking for spare room in the residual network.' },
-          { flows: EX_NET_FLOWS[1], label: 'flow', path: ['sa', 'at'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → a → t · bottleneck min(10, 6) = 6 · push 6 · |f| = 6', caption: 'Augment along s → a → t, whose bottleneck is min(10, 6) = 6, so we push 6 units along both edges. The total flow value rises to 6, and a → t is now saturated at 6/6 because its capacity is completely used.' },
-          { flows: EX_NET_FLOWS[2], label: 'flow', path: ['sb', 'bt'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → b → t · bottleneck min(8, 12) = 8 · push 8 · |f| = 14', caption: 'Augment along s → b → t, whose bottleneck is min(8, 12) = 8, so we push 8 more units through b. The total flow value rises to 14, and s → b is now saturated at 8/8, leaving b → t with 4 units of room.' },
-          { flows: EX_NET_FLOWS[3], label: 'flow', path: ['sa', 'ab', 'bt'], cut: [], reachable: [], shade: false, tagReach: false, status: 'Path s → a → b → t · bottleneck min(4, 3, 4) = 3 · push 3 · |f| = 17', caption: 'Augment along s → a → b → t, whose bottleneck is min(4, 3, 4) = 3, set by the untouched edge a → b. Pushing 3 makes s → a read 9/10 and a → b saturated at 3/3, while b → t rises to 11/12 and the total reaches 17.' },
-          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: [], reachable: ['s', 'a'], shade: true, tagReach: true, status: 'Residual reachability: s and a are reachable · b and t are not · no augmenting path remains', caption: 'No augmenting path remains, because in the residual network s can still reach a through 1 unit of forward room on s → a, but every forward edge out of a is saturated and s → b is full. The reachable set {s, a} therefore splits the network into a cut, and counting that cut in the answer step will prove that 17 cannot be beaten.' },
-          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Maximum flow = 17 · cut ({s, a} | {b, t}) capacity = 8 + 3 + 6 = 17', answer: true, caption: 'Answer: the maximum flow is 17, and conservation checks out at a (in 9, out 6 + 3 = 9) and at b (in 8 + 3 = 11, out 11), with every capacity respected. The cut ({s, a} | {b, t}) has capacity 8 + 3 + 6 = 17, so a flow and a cut with equal values certify each other by the max-flow min-cut theorem and 17 is provably maximal.' },
-        ],
+        id: 'ex-maxflow',
+        objective: 'Find a maximum flow by repeatedly pushing the bottleneck amount along an augmenting path, then certify the result with a cut of equal capacity.',
+        data: EX_MAXFLOW_DATA,
+        steps: flowStepsFor(EX_MAXFLOW_DATA, 'bfs', { at: 2, text: 'Predict: s → b is full and a → t is full, and the flow value is 14. Is 14 the maximum, or can more flow still reach t — and if so, along which route?' }),
         answer: 17,
         verify(M) {
           const cap = { s: { a: 10, b: 8 }, a: { b: 3, t: 6 }, b: { t: 12 }, t: {} };
@@ -1149,13 +1462,35 @@
           const value = f.sa + f.sb;
           return total === 17 && withinCaps && consA && consB && value === 17;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: the trap — a backward step',
+            problem: String.raw`<p>The same four-vertex network shrunk down: every capacity is now 1 — \(s \to a = 1\), \(s \to b = 1\), \(a \to b = 1\), \(a \to t = 1\) and \(b \to t = 1\). A depth-first search finds the path \(s \to a \to b \to t\) first. Find the maximum flow, and watch what the residual network has to do to escape that first choice.</p>`,
+            data: EX_TRAP_DATA,
+            steps: flowStepsFor(EX_TRAP_DATA, 'dfs', { at: 1, text: 'Predict: the flow value is 1 and the three edges of the first path are all full. Is 1 really the maximum, or can the residual network reopen a route to t?' }),
+            answer: 2,
+            verify(M) {
+              const cap = [['s', 'a', 1], ['s', 'b', 1], ['a', 'b', 1], ['a', 't', 1], ['b', 't', 1]];
+              let best = Infinity;
+              for (let mask = 0; mask < 4; mask++) {
+                const S = new Set(['s', ...['a', 'b'].filter((_, i) => mask & (1 << i))]);
+                best = Math.min(best, cap.filter(([u, v]) => S.has(u) && !S.has(v)).reduce((a, e) => a + e[2], 0));
+              }
+              const f = { sa: 1, sb: 1, ab: 0, at: 1, bt: 1 };
+              const caps = { sa: 1, sb: 1, ab: 1, at: 1, bt: 1 };
+              const valid = Object.keys(caps).every((k) => f[k] >= 0 && f[k] <= caps[k]) && f.sa === f.ab + f.at && f.sb + f.ab === f.bt;
+              return best === 2 && valid && f.sa + f.sb === 2;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h, s } = ctx;
-          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step));
+          const D = (preset && preset.data) || EX_MAXFLOW_DATA;
+          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step, D));
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
             h('div.small', h('b.mono', step.status)),
             svg,
-            step.answer ? h('div.ex-answer', 'Maximum flow = 17 · check: conservation holds at a (in 9, out 9) and at b (in 11, out 11), and the cut ({s, a} | {b, t}) has capacity 8 + 3 + 6 = 17') : null));
+            step.answer ? h('div.ex-answer', step.banner) : null));
         },
       },
       /* ---------------------------------------------------------------- worked example 2 */
@@ -1164,13 +1499,10 @@
         kind: 'example',
         id: 'ex-mincut',
         problem: String.raw`<p>For the same network — capacities \(s \to a = 10\), \(s \to b = 8\), \(a \to b = 3\), \(a \to t = 6\) and \(b \to t = 12\) — whose maximum flow is 17, from the previous example, find a minimum \(s\)-\(t\) cut by reading the final residual network.</p>`,
-        steps: [
-          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'Final flow · s → a 9/10 · s → b 8/8 · a → b 3/3 · a → t 6/6 · b → t 11/12 · |f| = 17', caption: 'Setup: start from the final flow of the previous example, which has value 17, and build its residual network to see what can still move. The method is to mark every vertex reachable from s in that residual network, because those vertices will form the source side of the cut.' },
-          { flows: EX_NET_FLOWS[3], label: 'residual', path: [], cut: [], reachable: [], shade: false, tagReach: false, status: 'Residual room · forward = capacity − flow · backward = flow · dashed edges have 0 forward room', caption: 'Compute the residual room on every edge: forward room is capacity minus flow, and backward room is the flow that could be canceled. The forward rooms are s → a 1, s → b 0, a → b 0, a → t 0 and b → t 1, and the three edges with 0 forward room are drawn dashed because nothing more can pass that way.' },
-          { flows: EX_NET_FLOWS[3], label: 'residual', path: [], cut: [], reachable: ['s', 'a'], shade: true, tagReach: true, status: 'Reachability walk: s → a only · reachable set = {s, a}', caption: 'Walk the residual network from s: the only usable residual edge out of s leads to a, since s → a still has 1 unit of forward room. From a every forward residual edge has 0 room, so the walk stops and the reachable set is exactly {s, a}.' },
-          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Cut edges: s → b (8) · a → b (3) · a → t (6) · total 8 + 3 + 6 = 17', caption: 'The cut edges are the original edges that run from the reachable side {s, a} to the other side {b, t}: s → b, a → b and a → t, drawn dashed with an X. Adding only their capacities gives 8 + 3 + 6 = 17, and edges that point back into {s, a} are never counted.' },
-          { flows: EX_NET_FLOWS[3], label: 'flow', path: [], cut: ['sb', 'ab', 'at'], reachable: ['s', 'a'], shade: true, tagReach: false, status: 'Minimum cut capacity = 17 · all four cuts: {s} 18 · {s, a} 17 · {s, b} 22 · {s, a, b} 18', answer: true, caption: 'Answer: the minimum cut capacity is 17, because every s-t path must cross one of the cut edges — it starts with s → a or s → b, and from a it must take a → b or a → t. Checking all four cuts gives {s}: 18, {s, a}: 17, {s, b}: 22 and {s, a, b}: 18, and 17 also equals the maximum flow, exactly as the max-flow min-cut theorem promises.' },
-        ],
+        id: 'ex-mincut',
+        objective: 'Read a minimum cut off the final residual network: mark the vertices reachable from s, then add the capacities of the edges leaving that set.',
+        data: EX_MINCUT_DATA,
+        steps: cutStepsFor(EX_MINCUT_DATA, { at: 1, text: 'Predict: following only the residual steps that still have positive room, which vertices will the walk from s reach — and will b be one of them?' }),
         answer: 17,
         verify(M) {
           const cap = [['s', 'a', 10], ['s', 'b', 8], ['a', 'b', 3], ['a', 't', 6], ['b', 't', 12]];
@@ -1184,14 +1516,82 @@
           }
           return count === 4 && best === 17 && bestSet === 'a,s';
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: the cheap cut sits near s',
+            problem: String.raw`<p>A reshaped version of the same network: capacities \(s \to a = 4\), \(s \to b = 9\), \(a \to b = 2\), \(a \to t = 7\) and \(b \to t = 8\), with maximum flow 12. The edges entering \(t\) look like the obvious bottleneck — check first. Find a minimum \(s\)-\(t\) cut by reading the final residual network.</p>`,
+            data: EX_MINCUT_VAR_DATA,
+            steps: cutStepsFor(EX_MINCUT_VAR_DATA, { at: 1, text: 'Predict: after the maximum flow, s → b still has residual room. Which vertices will the walk from s reach, and will the minimum cut sit next to s or next to t?' }),
+            answer: 12,
+            verify(M) {
+              const cap = [['s', 'a', 4], ['s', 'b', 9], ['a', 'b', 2], ['a', 't', 7], ['b', 't', 8]];
+              let count = 0, best = Infinity, bestSet = '';
+              for (let mask = 0; mask < 4; mask++) {
+                const S = new Set(['s', ...['a', 'b'].filter((_, i) => mask & (1 << i))]);
+                count++;
+                const sum = cap.filter(([u, v]) => S.has(u) && !S.has(v)).reduce((acc, e) => acc + e[2], 0);
+                if (sum < best) { best = sum; bestSet = [...S].sort().join(','); }
+              }
+              const sinkSide = cap.filter(([u, v]) => v === 't').reduce((a, e) => a + e[2], 0);
+              return count === 4 && best === 12 && bestSet === 'b,s' && sinkSide === 15 && best < sinkSide;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h, s } = ctx;
-          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step));
+          const D = (preset && preset.data) || EX_MINCUT_DATA;
+          const svg = s('svg', { viewBox: '0 0 500 240', class: 'nf-svg', role: 'img', 'aria-label': step.status, style: { width: '470px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...exNetKids(s, step, D));
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
             h('div.small', h('b.mono', step.status)),
             svg,
-            step.answer ? h('div.ex-answer', 'Minimum cut capacity = 17 · check: cut ({s, a} | {b, t}) = 8 + 3 + 6 = 17, which equals the maximum flow') : null));
+            step.answer ? h('div.ex-answer', step.banner) : null));
         },
+      },
+      /* ---------------------------------------------------------------- worked example 3 */
+      {
+        title: 'Worked example: auditing a flow, vertex by vertex',
+        kind: 'example',
+        id: 'ex-flow-audit',
+        problem: String.raw`<p>A network has capacities \(s \to a = 9\), \(s \to b = 5\), \(a \to b = 4\), \(a \to c = 6\), \(b \to c = 4\), \(b \to t = 6\) and \(c \to t = 10\). A teammate claims the assignment \(7, 3, 2, 5, 4, 1, 9\) on those edges (in the same order) is a valid flow. Audit it: check the capacity rule on every edge, then check conservation at \(a\), \(b\) and \(c\) one vertex at a time, and find the flow's value if it is valid.</p>`,
+        objective: 'Verify a stated flow assignment by auditing both flow rules directly: capacity on every edge, then inflow against outflow at each intermediate vertex, summed from the edge list.',
+        data: EX_AUDIT_DATA,
+        steps: auditStepsFor(EX_AUDIT_DATA),
+        answer: 10,
+        verify(M) { return auditVerify(EX_AUDIT_DATA, { valid: true, value: 10 }); },
+        variants: [
+          {
+            label: 'Variant: one vertex does not balance',
+            problem: String.raw`<p>The same network and almost the same assignment — \(7, 3, 2, 5, 4, 1\) on the first six edges as before — but now \(c \to t\) carries \(8\) instead of \(9\). Audit this assignment the same way: capacity on every edge, then conservation at \(a\), \(b\) and \(c\). Is it a valid flow, and if not, exactly where does it break?</p>`,
+            data: EX_AUDIT_VAR_DATA,
+            steps: auditStepsFor(EX_AUDIT_VAR_DATA),
+            answer: 'invalid at c',
+            verify(M) { return auditVerify(EX_AUDIT_VAR_DATA, { valid: false, at: 'c' }); },
+          },
+        ],
+        draw: exAuditDraw(EX_AUDIT_DATA),
+      },
+      /* ---------------------------------------------------------------- worked example 4 */
+      {
+        title: 'Worked example: the augmenting path that has to cancel flow',
+        kind: 'example',
+        id: 'ex-reverse-reroute',
+        problem: String.raw`<p>Find the maximum flow from \(s\) to \(t\) in the network with capacities \(s \to a = 4\), \(s \to b = 4\), \(a \to b = 3\), \(a \to c = 5\), \(b \to c = 3\), \(b \to d = 5\), \(c \to d = 2\), \(c \to t = 5\) and \(d \to t = 4\), using a depth-first search that always takes the first augmenting path it finds. The greedy early paths block the optimum; watch for the augmenting path that can only exist because the residual network lets it cancel flow on one edge and reroute that flow instead.</p>`,
+        objective: 'Run Ford–Fulkerson with depth-first path choices on a network where greedy choices block the optimum, and explain the backward residual step — why canceling flow is legal and what the rerouting buys.',
+        data: EX_REV_DATA,
+        steps: revStepsFor(EX_REV_DATA, { at: 4, text: 'Predict: the value is 6 and d → t is full, yet c → t still has room and s → b is not full. Is there one more augmenting path — and will it have to cancel flow on some edge to reach t?' }),
+        answer: 8,
+        verify(M) { return revVerify(EX_REV_DATA, { value: 8, flow: { sa: 4, sb: 4, ab: 3, ac: 1, bc: 3, bd: 4, cd: 0, ct: 4, dt: 4 } }); },
+        variants: [
+          {
+            label: 'Variant: a wider last link, no cancellation needed',
+            problem: String.raw`<p>The same network with one capacity changed: \(d \to t\) now has capacity \(6\) instead of \(4\). Run the same depth-first Ford–Fulkerson search. The pinch that forced a cancellation is wider now — find the maximum flow, and check whether any augmenting path still needs a backward step.</p>`,
+            data: EX_REV_VAR_DATA,
+            steps: revStepsFor(EX_REV_VAR_DATA, { at: 3, text: 'Predict: three pushes have raised the value to 4, and d → t (now capacity 6) still has room. Will finishing the job need a backward step this time, or can a plain forward path do it?' }),
+            answer: 8,
+            verify(M) { return revVerify(EX_REV_VAR_DATA, { value: 8, flow: { sa: 4, sb: 4, ab: 3, ac: 1, bc: 3, bd: 4, cd: 2, ct: 2, dt: 6 } }); },
+          },
+        ],
+        draw: exAuditDraw(EX_REV_DATA),
       },
       /* ---------------------------------------------------------------- 14 */
       {

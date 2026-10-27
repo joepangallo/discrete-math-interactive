@@ -120,34 +120,205 @@
     return parse('(p → q) ∧ ¬r');
   }
 
-  // ---- worked example: the truth table for [(p -> q) and (q -> r)] -> (p -> r), built column by column ----
-  const EX_TT_VARS = ['p', 'q', 'r'];
-  const EX_TT_ENVS = assignments(EX_TT_VARS);
-  const EX_TT_COLS = [
-    { tex: String.raw`p \to q`, f: (e) => !e.p || e.q },
-    { tex: String.raw`q \to r`, f: (e) => !e.q || e.r },
-    { tex: String.raw`(p \to q) \land (q \to r)`, f: (e) => (!e.p || e.q) && (!e.q || e.r) },
-    { tex: String.raw`\big[(p \to q) \land (q \to r)\big] \to (p \to r)`, f: (e) => { const pq = !e.p || e.q, qr = !e.q || e.r, pr = !e.p || e.r; return !(pq && qr) || pr; } },
+  /* ---- worked-example presets: steps are computed from these data objects by shared generators,
+     so the primary problem and its variant differ only in their input data ---- */
+  // truth table: build [(p -> q) and (q -> r)] -> (a conclusion), column by column
+  const EX_TT_COLS_BASE = [
+    { tex: String.raw`p \to q`, src: 'p -> q', name: 'p → q', hyp: 'p', con: 'q' },
+    { tex: String.raw`q \to r`, src: 'q -> r', name: 'q → r', hyp: 'q', con: 'r' },
+    { tex: String.raw`(p \to q) \land (q \to r)`, src: '(p -> q) & (q -> r)' },
   ];
-  // rows where the hypothesis of the whole formula holds: the only rows that could make it false
-  const EX_TT_DANGER = EX_TT_ENVS.map((e, i) => (EX_TT_COLS[2].f(e) ? i : -1)).filter((i) => i >= 0);
+  const EX_TT_MAIN = {
+    vars: ['p', 'q', 'r'],
+    cols: [...EX_TT_COLS_BASE, { tex: String.raw`\big[(p \to q) \land (q \to r)\big] \to (p \to r)`, src: '((p -> q) & (q -> r)) -> (p -> r)' }],
+    conclName: 'p → r',
+    banner: 'Answer: a tautology — T in all 8 rows',
+    note: 'This pattern is the hypothetical syllogism: if p → q and q → r both hold, then p → r must hold. The check in the previous step is the proof: every row that could have broken it was examined.',
+  };
+  const EX_TT_VARIANT = {
+    vars: ['p', 'q', 'r'],
+    cols: [...EX_TT_COLS_BASE, { tex: String.raw`\big[(p \to q) \land (q \to r)\big] \to (r \to p)`, src: '((p -> q) & (q -> r)) -> (r -> p)' }],
+    conclName: 'r → p',
+    banner: 'Answer: a contingency — T in 6 of 8 rows, F in rows 5 and 7',
+    note: 'Reversing the last arrow broke the syllogism: the chain p → q and q → r carries truth forward from p to r, but nothing carries it back from r to p. The false rows are counterexamples, and even one counterexample is enough to deny a tautology.',
+  };
+  const EX_TT_ENVS = assignments(EX_TT_MAIN.vars);
+  function ttValues(D) {
+    const envs = assignments(D.vars);
+    const trees = D.cols.map((c) => parse(c.src));
+    const vals = trees.map((t) => envs.map((e) => ev(t, e)));
+    const danger = envs.map((e, i) => (vals[2][i] ? i : -1)).filter((i) => i >= 0);
+    const falseRows = vals[3].map((v, i) => (v ? -1 : i)).filter((i) => i >= 0);
+    const nT = vals[3].filter(Boolean).length;
+    const cls = nT === envs.length ? 'tautology' : nT === 0 ? 'contradiction' : 'contingency';
+    return { envs, vals, danger, falseRows, nT, cls };
+  }
+  function stepsForTt(D) {
+    const { envs, danger, falseRows, nT, cls } = ttValues(D);
+    const rowList = (idxs) => idxs.map((i) => `row ${i + 1} (${envText(D.vars, envs[i])})`).join(' and ');
+    const broken = danger.filter((i) => falseRows.includes(i));
+    return [
+      { cols: 0, caption: `Start with the inputs. Three variables have 2 × 2 × 2 = ${envs.length} combinations of T and F, so the table needs ${envs.length} rows. Writing every combination first matters: one missing row could hide the single case that breaks the formula.` },
+      { cols: 1, caption: `Work inside-out, smallest piece first: ${D.cols[0].name}. A conditional is false in exactly one situation — hypothesis true, conclusion false — so this column is F exactly in the rows with ${D.cols[0].hyp} = T and ${D.cols[0].con} = F, and T everywhere else.` },
+      { cols: 2, caption: `The next piece is ${D.cols[1].name}, the same rule with the roles shifted: F only where ${D.cols[1].hyp} = T and ${D.cols[1].con} = F. Building one column at a time means every entry can be checked against a single rule.` },
+      { cols: 3, checkpoint: `Predict: the hypothesis column is true in ${danger.length} rows. Will ${D.conclName} hold in every one of those rows, making the whole formula true everywhere — or will one row break it?`, caption: 'Combine the two finished columns with ∧. A conjunction is true only where both of its pieces are true. This column is also the hypothesis of the whole formula, so it marks the rows that could possibly make the formula false.' },
+      { cols: 4, caption: `Finish with the whole formula: hypothesis → (${D.conclName}). It fails only in a row where the hypothesis is true and ${D.conclName} is false. Read down the new column: ${falseRows.length === 0 ? 'there is no F in it.' : `there ${falseRows.length === 1 ? 'is an F' : 'are Fs'} in ${rowList(falseRows)}, where the hypothesis holds but ${D.conclName} fails.`}` },
+      cls === 'tautology'
+        ? { cols: 4, check: true, caption: `Check the dangerous rows — the highlighted ones, where the hypothesis is true. In each of them the conclusion ${D.conclName} is true as well, which is exactly why the implication survived. The other rows pass automatically, because a conditional with a false hypothesis is true.` }
+        : { cols: 4, check: true, caption: `Check the dangerous rows — the highlighted ones, where the hypothesis is true. ${broken.length} of them break the formula: in ${rowList(broken)} the conclusion ${D.conclName} is false while the hypothesis is true, so the whole formula is false there. The remaining dangerous rows pass because ${D.conclName} holds in them, and every other row passes automatically, because a conditional with a false hypothesis is true.` },
+      { cols: 4, check: true, answer: true, caption: `Answer: the formula is a ${cls} — ${cls === 'tautology' ? `true in all ${envs.length} rows` : cls === 'contradiction' ? `false in all ${envs.length} rows` : `true in ${nT} of ${envs.length} rows and false in ${falseRows.length}`}. ${D.note}` },
+    ];
+  }
 
-  // ---- worked example: rewriting the negated conditional ¬(p -> q) as p ∧ ¬q, one named law per line ----
-  const EX_NC_VARS = ['p', 'q'];
-  const EX_NC_ALL = assignments(EX_NC_VARS);
-  // the revealing row (p = T, q = F) comes first, then the remaining rows in textbook order,
-  // so both formula columns read T, F, F, F from top to bottom
-  const EX_NC_ENVS = [EX_NC_ALL[1], EX_NC_ALL[0], EX_NC_ALL[2], EX_NC_ALL[3]];
-  const EX_NC_COLS = [
-    { tex: String.raw`\neg(p \to q)`, f: (e) => !(!e.p || e.q) },
-    { tex: String.raw`p \land \neg q`, f: (e) => e.p && !e.q },
-  ];
-  const EX_NC_LINES = [
-    { tex: String.raw`\neg(p \to q)`, law: 'starting formula' },
-    { tex: String.raw`\neg(\neg p \lor q)`, law: String.raw`implication law: \(p \to q \equiv \neg p \lor q\)` },
-    { tex: String.raw`\neg\neg p \land \neg q`, law: String.raw`De Morgan's law: \(\neg(X \lor Y) \equiv \neg X \land \neg Y\)` },
-    { tex: String.raw`p \land \neg q`, law: String.raw`double negation: \(\neg\neg p \equiv p\)` },
-  ];
+  // rewriting a negated formula one named law per line, then checking it against a truth table.
+  // envOrder puts the one revealing row first, then the remaining rows in textbook order, so both
+  // formula columns read T, F, F, F from top to bottom in each preset.
+  const EX_NC_MAIN = {
+    vars: ['p', 'q'],
+    envOrder: [1, 0, 2, 3],
+    startName: '¬(p → q)', finalName: 'p ∧ ¬q',
+    plan: 'turn the conditional into a disjunction first, because the implication law is the only law that removes a →. Each later law then has the shape it needs to apply.',
+    lawsNote: 'Laws we will use: the implication law, the De Morgan law, and double negation — in that order, because each law creates the shape the next one needs.',
+    lines: [
+      { tex: String.raw`\neg(p \to q)`, law: 'starting formula' },
+      { tex: String.raw`\neg(\neg p \lor q)`, law: String.raw`implication law: \(p \to q \equiv \neg p \lor q\)`, caption: 'Apply the implication law, p → q ≡ ¬p ∨ q, inside the outer negation, so the formula becomes ¬(¬p ∨ q). The arrow is gone, but the outer ¬ still covers the whole disjunction, so one more law is needed to move it inside.' },
+      { tex: String.raw`\neg\neg p \land \neg q`, law: String.raw`De Morgan's law: \(\neg(X \lor Y) \equiv \neg X \land \neg Y\)`, caption: 'Apply De Morgan\'s law, ¬(X ∨ Y) ≡ ¬X ∧ ¬Y: the ∨ flips to ∧ and each part is negated, giving ¬¬p ∧ ¬q. Pushing ¬ inside is what turns "not a conditional" into a positive claim about p and q.' },
+      { tex: String.raw`p \land \neg q`, law: String.raw`double negation: \(\neg\neg p \equiv p\)`, caption: 'Apply double negation, ¬¬p ≡ p, to clean up the first part, and the formula becomes p ∧ ¬q. The rewrite is done — no → and no outer ¬ remain — but a chain of rewrites still has to be checked against the original.' },
+    ],
+    cols: [
+      { tex: String.raw`\neg(p \to q)`, src: '~(p -> q)' },
+      { tex: String.raw`p \land \neg q`, src: 'p & ~q' },
+    ],
+    checkpoint: 'Predict: which single row of the table will make both formulas true — and will the other three rows agree with each other as well?',
+    revealEnv: 'p = T and q = F',
+    revealOriginal: '¬(T → F) = ¬F = T',
+    revealRewritten: 'T ∧ ¬F = T ∧ T = T',
+    revealNote: String.raw`Revealing row: \(p = \mathrm{T}\) and \(q = \mathrm{F}\) give \(\neg(\mathrm{T} \to \mathrm{F}) = \neg\mathrm{F} = \mathrm{T}\) and \(\mathrm{T} \land \neg\mathrm{F} = \mathrm{T} \land \mathrm{T} = \mathrm{T}\). The other rows are still unchecked.`,
+    inWords: 'the only way to break the promise p → q is for p to be true and q false, and the table is the check that nothing else breaks it',
+    banner: 'Answer: ¬(p → q) ≡ p ∧ ¬q · check: both columns agree in all 4 rows — T, F, F, F',
+  };
+  const EX_NC_VARIANT = {
+    vars: ['p', 'q'],
+    envOrder: [2, 0, 1, 3],
+    startName: '¬(p ∨ ¬q)', finalName: '¬p ∧ q',
+    plan: 'push the outer negation inside first, because De Morgan\'s law is the law that acts on a negated disjunction. The double negation it leaves behind is then cleaned up by the last law.',
+    lawsNote: 'Laws we will use: De Morgan\'s law and double negation — in that order, because De Morgan is what creates the double negation for the second law to remove.',
+    lines: [
+      { tex: String.raw`\neg(p \lor \neg q)`, law: 'starting formula' },
+      { tex: String.raw`\neg p \land \neg\neg q`, law: String.raw`De Morgan's law: \(\neg(X \lor Y) \equiv \neg X \land \neg Y\)`, caption: 'Apply De Morgan\'s law, ¬(X ∨ Y) ≡ ¬X ∧ ¬Y: the ∨ flips to ∧ and each part is negated, giving ¬p ∧ ¬¬q. The outer negation is gone, split into one negation per part, but the second part is now negated twice, so one cleanup law remains.' },
+      { tex: String.raw`\neg p \land q`, law: String.raw`double negation: \(\neg\neg q \equiv q\)`, caption: 'Apply double negation, ¬¬q ≡ q, to clean up the second part, and the formula becomes ¬p ∧ q. The rewrite is done — the ∨ and the double negation are both gone — but a chain of rewrites still has to be checked against the original.' },
+    ],
+    cols: [
+      { tex: String.raw`\neg(p \lor \neg q)`, src: '~(p | ~q)' },
+      { tex: String.raw`\neg p \land q`, src: '~p & q' },
+    ],
+    checkpoint: 'Predict: which single row of the table will make both formulas true — a row where p is true, or the row where p is false and q is true?',
+    revealEnv: 'p = F and q = T',
+    revealOriginal: '¬(F ∨ ¬T) = ¬(F ∨ F) = ¬F = T',
+    revealRewritten: '¬F ∧ T = T ∧ T = T',
+    revealNote: String.raw`Revealing row: \(p = \mathrm{F}\) and \(q = \mathrm{T}\) give \(\neg(\mathrm{F} \lor \neg\mathrm{T}) = \neg(\mathrm{F} \lor \mathrm{F}) = \neg\mathrm{F} = \mathrm{T}\) and \(\neg\mathrm{F} \land \mathrm{T} = \mathrm{T} \land \mathrm{T} = \mathrm{T}\). The other rows are still unchecked.`,
+    inWords: 'saying "not (p or not q)" amounts to demanding that p fail and q hold at the same time, and the table is the check that no other row slips through',
+    banner: 'Answer: ¬(p ∨ ¬q) ≡ ¬p ∧ q · check: both columns agree in all 4 rows — T, F, F, F',
+  };
+  function stepsForNc(D) {
+    const all = assignments(D.vars);
+    const envs = D.envOrder.map((i) => all[i]);
+    const trees = D.cols.map((c) => parse(c.src));
+    const pattern = envs.map((e) => (ev(trees[0], e) ? 'T' : 'F')).join(', ');
+    const steps = [{ lines: 1, table: 0, caption: `Start with ${D.startName} and the plan: ${D.plan}` }];
+    D.lines.slice(1).forEach((ln, i) => steps.push({ lines: i + 2, table: 0, caption: ln.caption }));
+    steps[steps.length - 1].checkpoint = D.checkpoint;
+    steps.push({ lines: D.lines.length, table: 1, caption: `Check the one revealing row, ${D.revealEnv}: the original gives ${D.revealOriginal}, and the rewrite gives ${D.revealRewritten}. This row matters most because it is the only row where either formula is true, so agreement here carries the proof.` });
+    steps.push({ lines: D.lines.length, table: 2, answer: true, caption: `Answer: ${D.startName} ≡ ${D.finalName}, because the two columns agree in all ${envs.length} rows, reading ${pattern}. In words, ${D.inWords}.` });
+    return steps;
+  }
+
+  // argument validity: keep only the rows where every premise is true, then test the conclusion in those rows
+  const EX_ARG_MAIN = {
+    vars: ['p', 'q', 'r'],
+    premises: [
+      { tex: String.raw`p \to q`, src: 'p -> q', name: 'p → q' },
+      { tex: String.raw`q \to r`, src: 'q -> r', name: 'q → r' },
+      { tex: String.raw`r`, src: 'r', name: 'r' },
+    ],
+    concl: { tex: String.raw`p`, src: 'p', name: 'p' },
+    banner: 'Answer: invalid — the highlighted row is a counterexample: every premise true, the conclusion false',
+    note: 'Nothing in the premises forces p itself to be true: the chain runs forward from p, so truth can enter at q or r without p ever holding. An argument with even one counterexample row is invalid, however many rows pass.',
+  };
+  const EX_ARG_VARIANT = {
+    vars: ['p', 'q', 'r'],
+    premises: [
+      { tex: String.raw`p \to q`, src: 'p -> q', name: 'p → q' },
+      { tex: String.raw`q \to r`, src: 'q -> r', name: 'q → r' },
+      { tex: String.raw`\neg r`, src: '~r', name: '¬r' },
+    ],
+    concl: { tex: String.raw`\neg p`, src: '~p', name: '¬p' },
+    banner: 'Answer: valid — every premise-true row also makes the conclusion true, so no counterexample exists',
+    note: 'This is modus tollens chained through the syllogism: the third premise with q → r forces q false, and that with p → q forces p false. The search proves validity because it checked every row the premises allow and found the conclusion true in all of them.',
+  };
+  function argRows(D) {
+    const envs = assignments(D.vars);
+    const trees = D.premises.map((p) => parse(p.src));
+    const ct = parse(D.concl.src);
+    return envs.map((e) => { const pv = trees.map((t) => ev(t, e)); const all = pv.every(Boolean); const cv = ev(ct, e); return { e, pv, all, cv, cex: all && !cv }; });
+  }
+  function stepsForArg(D) {
+    const rows = argRows(D);
+    const kept = rows.filter((r) => r.all);
+    const cex = rows.filter((r) => r.cex);
+    const valid = cex.length === 0;
+    const rn = (r) => `row ${rows.indexOf(r) + 1} (${envText(D.vars, r.e)})`;
+    const premNames = D.premises.map((p) => p.name).join(', ');
+    return [
+      { stage: 0, caption: `An argument is valid when there is no row where the premises are all true and the conclusion is false. With three variables there are ${rows.length} rows to search, and the premises here are ${premNames}, with conclusion ${D.concl.name}.` },
+      { stage: 1, caption: `Evaluate the premises first, one column at a time, using the same inside-out rule as any truth table. A row survives the search only if it earns a T in every premise column at once, so these columns tell us where a counterexample could possibly hide.` },
+      { stage: 2, checkpoint: `Predict: ${kept.length} rows make every premise true. Will the conclusion ${D.concl.name} be true in all of those rows, or will one of them be a counterexample?`, caption: `Now narrow the search: keep only the ${kept.length} rows where every premise is true, namely ${kept.map(rn).join(' and ')}. Rows with a false premise can never be counterexamples, because a counterexample needs the premises to hold while the conclusion fails.` },
+      { stage: 3, caption: valid
+        ? `Test the conclusion ${D.concl.name} in each kept row: it is true in every one of them. No kept row breaks the argument, so the search has found no counterexample — and it looked at every row that could possibly have been one.`
+        : `Test the conclusion ${D.concl.name} in each kept row: it fails in ${cex.map(rn).join(' and ')}. In ${cex.length === 1 ? 'that row' : 'those rows'} every premise is true while the conclusion is false, which is exactly the shape of a counterexample.` },
+      { stage: 4, caption: valid
+        ? `Look once more at the full kept set, ${kept.map(rn).join(' and ')}: the premises pin the values down so tightly that ${D.concl.name} has no room to fail. Exhausting the premise-true rows without a counterexample is a complete proof of validity, not a sampling.`
+        : `Zoom in on ${rn(cex[0])}: the premises ${premNames} are all true there, yet the conclusion ${D.concl.name} is false. One such row is enough — an argument is invalid as soon as a single counterexample exists, no matter how the other rows behave.` },
+      { stage: 5, answer: true, caption: `Answer: the argument is ${valid ? 'valid' : 'invalid'} — ${valid ? `the ${kept.length} premise-true rows all make ${D.concl.name} true, and the search covered every row` : `${cex.map(rn).join(' and ')} ${cex.length === 1 ? 'is a counterexample' : 'are counterexamples'} with all premises true and the conclusion false`}. ${D.note}` },
+    ];
+  }
+
+  // quantifiers over a finite domain: evaluate the predicate element by element, then flip the quantifier to negate
+  const QUANT_PREDS = {
+    even: { label: 'x is even', short: 'even', test: (x) => x % 2 === 0 },
+    gt5: { label: 'x is greater than 5', short: 'greater than 5', test: (x) => x > 5 },
+  };
+  const EX_QUANT_MAIN = {
+    dom: [2, 3, 4, 6], pred: 'even', quant: 'forall',
+    stmtTex: String.raw`\forall x\ P(x)`, negTex: String.raw`\exists x\ \neg P(x)`,
+    banner: 'Answer: the statement is false (3 is a counterexample) and its negation is true (3 is a witness)',
+  };
+  const EX_QUANT_VARIANT = {
+    dom: [2, 3, 4, 6], pred: 'gt5', quant: 'exists',
+    stmtTex: String.raw`\exists x\ P(x)`, negTex: String.raw`\forall x\ \neg P(x)`,
+    banner: 'Answer: the statement is true (6 is a witness) and its negation is false (6 breaks it)',
+  };
+  function stepsForQuant(D) {
+    const P = QUANT_PREDS[D.pred];
+    const vals = D.dom.map((x) => P.test(x));
+    const all = D.quant === 'forall';
+    const truth = all ? vals.every(Boolean) : vals.some(Boolean);
+    const decIdx = all ? vals.indexOf(false) : vals.indexOf(true);
+    const negDecIdx = all ? vals.indexOf(false) : vals.indexOf(true);
+    const qSym = all ? '∀' : '∃';
+    const fSym = all ? '∃' : '∀';
+    const valList = D.dom.map((x, i) => `P(${x}) is ${vals[i] ? 'T' : 'F'}`).join(', ');
+    return [
+      { stage: 0, caption: `The domain is {${D.dom.join(', ')}} and the predicate is P(x): "${P.label}". A quantified statement over a finite domain is checked by testing the predicate on each element in turn, so the first job is to lay the domain out where every element can be tested.` },
+      { stage: 1, checkpoint: `Predict: the predicate values are about to be filled in. Will the statement ${qSym}x P(x) come out true or false once the quantifier is applied to them?`, caption: `Evaluate the predicate element by element: ${valList}. No quantifier has been applied yet — this row of values is the raw evidence that both the statement and, later, its negation will be judged from.` },
+      { stage: 2, caption: all
+        ? `Apply the universal quantifier: it demands that every element pass, but ${D.dom[decIdx]} fails, since P(${D.dom[decIdx]}) is F. One counterexample is enough to make a universal statement false, so this statement is false.`
+        : `Apply the existential quantifier: it needs only one witness, and ${D.dom[decIdx]} is one, since P(${D.dom[decIdx]}) is T. A single passing element is enough, so this statement is true.` },
+      { stage: 3, caption: `Negate the statement by the quantifier rules: negating ${qSym}x P(x) gives ${fSym}x with the negation pushed inside onto P. The quantifier flips and the predicate is negated — and the flipped statement must now be checked against this same table of values, not taken on faith.` },
+      { stage: 4, caption: `Evaluate the negation on the same elements: negating P flips each value, giving ${D.dom.map((x, i) => `the negation at ${x} is ${vals[i] ? 'F' : 'T'}`).join(', ')}. ${all ? `The element ${D.dom[negDecIdx]} makes the negated predicate true, so it witnesses the existential negation` : `The element ${D.dom[negDecIdx]} makes the negated predicate false, so it is a counterexample to the universal negation`}, and the negation comes out ${truth ? 'false' : 'true'} — exactly opposite to the original statement, as a negation must.` },
+      { stage: 5, answer: true, caption: `Answer: the statement ${qSym}x P(x) over {${D.dom.join(', ')}} is ${truth ? 'true' : 'false'}, and its negation ${fSym}x with negated P is ${truth ? 'false' : 'true'}. Both were checked against the same predicate table, and the quantifier flip is what made the negation mechanical instead of a guess.` },
+    ];
+  }
 
   DM.module({
     id: 'logic',
@@ -844,34 +1015,48 @@
         title: 'Worked example: a truth table, column by column',
         kind: 'example',
         id: 'ex-truth-table',
+        objective: 'Build a truth table column by column, from the smallest sub-formulas outward, and classify the formula as a tautology, a contradiction, or a contingency.',
         problem: String.raw`<p>Build the truth table for \(\big[(p \to q) \land (q \to r)\big] \to (p \to r)\) and classify it: tautology, contradiction, or contingency?</p>`,
-        steps: [
-          { cols: 0, caption: 'Start with the inputs. Three variables have 2 × 2 × 2 = 8 combinations of T and F, so the table needs 8 rows. Writing every combination first matters: one missing row could hide the single case that breaks the formula.' },
-          { cols: 1, caption: 'Work inside-out, smallest piece first: p → q. A conditional is false in exactly one situation — hypothesis true, conclusion false — so this column is F exactly in the rows with p = T and q = F, and T everywhere else.' },
-          { cols: 2, caption: 'The next piece is q → r, the same rule with the roles shifted: F only where q = T and r = F. Building one column at a time means every entry can be checked against a single rule.' },
-          { cols: 3, caption: 'Combine the two finished columns with ∧. A conjunction is true only where both of its pieces are true. This column is also the hypothesis of the whole formula, so it marks the rows that could possibly make the formula false.' },
-          { cols: 4, caption: 'Finish with the whole formula: hypothesis → (p → r). It fails only in a row where the hypothesis is true and p → r is false. Read down the new column: there is no F in it.' },
-          { cols: 4, check: true, caption: 'Check the dangerous rows — the highlighted ones, where the hypothesis is true. In each of them the conclusion p → r is true as well, which is exactly why the implication survived. The other rows pass automatically, because a conditional with a false hypothesis is true.' },
-          { cols: 4, check: true, answer: true, caption: 'Answer: the formula is a tautology — true in all 8 rows. This pattern is the hypothetical syllogism: if p → q and q → r both hold, then p → r must hold. The check in the previous step is the proof: every row that could have broken it was examined.' },
-        ],
+        steps: stepsForTt(EX_TT_MAIN),
+        data: EX_TT_MAIN,
         answer: 'tautology',
         verify() {
           const direct = EX_TT_ENVS.every((e) => { const pq = !e.p || e.q, qr = !e.q || e.r, pr = !e.p || e.r; return !(pq && qr) || pr; });
           const tree = parse('((p -> q) & (q -> r)) -> (p -> r)');
           return direct && EX_TT_ENVS.every((e) => ev(tree, e));
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: reversed conclusion',
+            problem: String.raw`<p>Build the truth table for \(\big[(p \to q) \land (q \to r)\big] \to (r \to p)\) — the same chain of conditionals as the main problem, but with the final arrow reversed — and classify it: tautology, contradiction, or contingency?</p>`,
+            steps: stepsForTt(EX_TT_VARIANT),
+            data: EX_TT_VARIANT,
+            answer: 'contingency',
+            verify() {
+              const envs = assignments(['p', 'q', 'r']);
+              const direct = envs.filter((e) => { const pq = !e.p || e.q, qr = !e.q || e.r, rp = !e.r || e.p; return !(pq && qr) || rp; }).length;
+              const tree = parse('((p -> q) & (q -> r)) -> (r -> p)');
+              const byTree = envs.filter((e) => ev(tree, e)).length;
+              return direct === 6 && byTree === 6;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
+          const D = (preset && preset.data) || EX_TT_MAIN;
+          const envs = assignments(D.vars);
+          const trees = D.cols.map((c) => parse(c.src));
+          const danger = envs.map((e, i) => (ev(trees[2], e) ? i : -1)).filter((i) => i >= 0);
           const shown = step.cols;
-          const head = EX_TT_VARS.map((v) => h('th', { html: `\\(${v}\\)` }))
-            .concat(EX_TT_COLS.map((c, ci) => h('th', { html: `\\(${c.tex}\\)`, class: ci < shown ? (ci === shown - 1 && !step.check ? 'cur' : '') : 'muted' })));
-          const rows = EX_TT_ENVS.map((e, ri) => h('tr', { class: step.check && EX_TT_DANGER.includes(ri) ? 'hit' : '' },
-            EX_TT_VARS.map((v) => h('td', tf(e[v]))),
-            EX_TT_COLS.map((c, ci) => (ci < shown ? h('td', { class: ci === shown - 1 && !step.check ? 'cur' : '' }, tf(c.f(e))) : h('td.muted', '·')))));
+          const head = D.vars.map((v) => h('th', { html: `\\(${v}\\)` }))
+            .concat(D.cols.map((c, ci) => h('th', { html: `\\(${c.tex}\\)`, class: ci < shown ? (ci === shown - 1 && !step.check ? 'cur' : '') : 'muted' })));
+          const rows = envs.map((e, ri) => h('tr', { class: step.check && danger.includes(ri) ? 'hit' : '' },
+            D.vars.map((v) => h('td', tf(e[v]))),
+            D.cols.map((c, ci) => (ci < shown ? h('td', { class: ci === shown - 1 && !step.check ? 'cur' : '' }, tf(ev(trees[ci], e))) : h('td.muted', '·')))));
           const table = h('table.tt', h('thead', h('tr', head)), h('tbody', rows));
           stage.append(h('div.stack', { style: { alignItems: 'center' } },
             table,
-            step.answer ? h('div.ex-answer', 'Answer: a tautology — T in all 8 rows') : null,
+            step.answer ? h('div.ex-answer', D.banner) : null,
             step.check && !step.answer ? h('p.small', { style: { textAlign: 'center' } }, 'Highlighted rows: the hypothesis is true, so these are the rows that had to be checked.') : null));
         },
       },
@@ -880,15 +1065,10 @@
         title: 'Worked example: rewriting a negated conditional',
         kind: 'example',
         id: 'ex-negated-conditional',
+        objective: 'Rewrite a negated formula by applying named equivalence laws one step at a time, then prove the rewrite by comparing truth-table columns.',
         problem: String.raw`<p>Rewrite \(\neg(p \to q)\) as a formula with no \(\to\) and no outer \(\neg\), naming the law used at each step, and prove that the result is equivalent to the original formula.</p>`,
-        steps: [
-          { lines: 1, table: 0, caption: 'Start with ¬(p → q) and the plan: turn the conditional into a disjunction first, because the implication law is the only law that removes a →. Each later law then has the shape it needs to apply.' },
-          { lines: 2, table: 0, caption: 'Apply the implication law, p → q ≡ ¬p ∨ q, inside the outer negation, so the formula becomes ¬(¬p ∨ q). The arrow is gone, but the outer ¬ still covers the whole disjunction, so one more law is needed to move it inside.' },
-          { lines: 3, table: 0, caption: 'Apply De Morgan\'s law, ¬(X ∨ Y) ≡ ¬X ∧ ¬Y: the ∨ flips to ∧ and each part is negated, giving ¬¬p ∧ ¬q. Pushing ¬ inside is what turns "not a conditional" into a positive claim about p and q.' },
-          { lines: 4, table: 0, caption: 'Apply double negation, ¬¬p ≡ p, to clean up the first part, and the formula becomes p ∧ ¬q. The rewrite is done — no → and no outer ¬ remain — but a chain of rewrites still has to be checked against the original.' },
-          { lines: 4, table: 1, caption: 'Check the one revealing row, p = T and q = F: the original gives ¬(T → F) = ¬F = T, and the rewrite gives T ∧ ¬F = T ∧ T = T. This row matters most because it is the only row where either formula is true, so agreement here carries the proof.' },
-          { lines: 4, table: 2, answer: true, caption: 'Answer: ¬(p → q) ≡ p ∧ ¬q, because the two columns agree in all 4 rows, reading T, F, F, F. In words, the only way to break the promise p → q is for p to be true and q false, and the table is the check that nothing else breaks it.' },
-        ],
+        steps: stepsForNc(EX_NC_MAIN),
+        data: EX_NC_MAIN,
         answer: 'p ∧ ¬q',
         verify(M) {
           const byLaw = sameMeaning('~(p -> q)', 'p & ~q');
@@ -899,9 +1079,31 @@
           const byHand = envs.every((e) => (!(!e.p || e.q)) === (e.p && !e.q));
           return byLaw && byTrees && byHand;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: negated disjunction',
+            problem: String.raw`<p>Rewrite \(\neg(p \lor \neg q)\) as a formula whose negations sit on single variables only, naming the law used at each step, and prove that the result is equivalent to the original formula.</p>`,
+            steps: stepsForNc(EX_NC_VARIANT),
+            data: EX_NC_VARIANT,
+            answer: '¬p ∧ q',
+            verify(M) {
+              const byLaw = sameMeaning('~(p | ~q)', '~p & q');
+              const original = parse('~(p | ~q)');
+              const rewritten = parse('~p & q');
+              const envs = assignments(['p', 'q']);
+              const byTrees = envs.every((e) => ev(original, e) === ev(rewritten, e));
+              const byHand = envs.every((e) => (!(e.p || !e.q)) === (!e.p && e.q));
+              return byLaw && byTrees && byHand;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const lineEls = EX_NC_LINES.slice(0, step.lines).map((ln, i) => {
+          const D = (preset && preset.data) || EX_NC_MAIN;
+          const all = assignments(D.vars);
+          const envs = D.envOrder.map((i) => all[i]);
+          const trees = D.cols.map((c) => parse(c.src));
+          const lineEls = D.lines.slice(0, step.lines).map((ln, i) => {
             const isNew = i === step.lines - 1;
             return h('div', { class: isNew ? '' : 'muted', style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.2rem 1rem' } },
               h('span', { html: `\\(${ln.tex}\\)`, style: { fontSize: step.table ? '1.02rem' : isNew ? '1.2rem' : '1.05rem', fontWeight: isNew ? '600' : '400' } }),
@@ -909,23 +1111,134 @@
           });
           let table = null;
           if (step.table) {
-            const head = EX_NC_VARS.map((v) => h('th', { html: `\\(${v}\\)` }))
-              .concat(EX_NC_COLS.map((c) => h('th', { html: `\\(${c.tex}\\)`, class: step.table === 1 ? 'cur' : '' })));
-            const rows = EX_NC_ENVS.map((e, ri) => {
+            const head = D.vars.map((v) => h('th', { html: `\\(${v}\\)` }))
+              .concat(D.cols.map((c) => h('th', { html: `\\(${c.tex}\\)`, class: step.table === 1 ? 'cur' : '' })));
+            const rows = envs.map((e, ri) => {
               const revealing = ri === 0;
               const shown = step.table === 2 || revealing;
               return h('tr', { class: step.table === 1 && revealing ? 'hit' : '' },
-                EX_NC_VARS.map((v) => h('td', tf(e[v]))),
-                EX_NC_COLS.map((c) => (shown ? h('td', { class: step.table === 1 && revealing ? 'cur' : '' }, tf(c.f(e))) : h('td.muted', '·'))));
+                D.vars.map((v) => h('td', tf(e[v]))),
+                D.cols.map((c, ci) => (shown ? h('td', { class: step.table === 1 && revealing ? 'cur' : '' }, tf(ev(trees[ci], e))) : h('td.muted', '·'))));
             });
             table = h('table.tt', h('thead', h('tr', head)), h('tbody', rows));
           }
           stage.append(h('div.stack', { style: { alignItems: 'stretch', gap: '0.4rem', width: 'min(38rem, 100%)' } },
             ...lineEls,
-            step.lines === 1 ? h('p.small.muted', 'Laws we will use: the implication law, the De Morgan law, and double negation — in that order, because each law creates the shape the next one needs.') : null,
+            step.lines === 1 ? h('p.small.muted', D.lawsNote) : null,
             table ? h('div', { style: { display: 'flex', justifyContent: 'center' } }, table) : null,
-            step.table === 1 ? h('div.small', { html: String.raw`Revealing row: \(p = \mathrm{T}\) and \(q = \mathrm{F}\) give \(\neg(\mathrm{T} \to \mathrm{F}) = \neg\mathrm{F} = \mathrm{T}\) and \(\mathrm{T} \land \neg\mathrm{F} = \mathrm{T} \land \mathrm{T} = \mathrm{T}\). The other rows are still unchecked.` }) : null,
-            step.answer ? h('div.ex-answer', 'Answer: ¬(p → q) ≡ p ∧ ¬q · check: both columns agree in all 4 rows — T, F, F, F') : null));
+            step.table === 1 ? h('div.small', { html: D.revealNote }) : null,
+            step.answer ? h('div.ex-answer', D.banner) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 3 */
+      {
+        title: 'Worked example: is this argument valid?',
+        kind: 'example',
+        id: 'ex-argument-validity',
+        objective: 'Test an argument for validity by searching its truth table for a counterexample: a row where every premise is true and the conclusion is false.',
+        problem: String.raw`<p>Premises: \(p \to q\), \(q \to r\), and \(r\). Conclusion: \(p\). Is this argument valid? Search the truth table row by row for a counterexample.</p>`,
+        steps: stepsForArg(EX_ARG_MAIN),
+        data: EX_ARG_MAIN,
+        answer: 'invalid',
+        verify() {
+          const rows = [];
+          for (const p of [true, false]) for (const q of [true, false]) for (const r of [true, false]) rows.push({ p, q, r });
+          const bad = rows.filter((e) => (!e.p || e.q) && (!e.q || e.r) && e.r && !e.p);
+          return rows.length === 8 && bad.length >= 1 && bad.some((e) => !e.p && e.q && e.r);
+        },
+        variants: [
+          {
+            label: 'Variant: a valid argument',
+            problem: String.raw`<p>Premises: \(p \to q\), \(q \to r\), and \(\neg r\). Conclusion: \(\neg p\). Is this argument valid? Search the truth table row by row for a counterexample.</p>`,
+            steps: stepsForArg(EX_ARG_VARIANT),
+            data: EX_ARG_VARIANT,
+            answer: 'valid',
+            verify() {
+              const rows = [];
+              for (const p of [true, false]) for (const q of [true, false]) for (const r of [true, false]) rows.push({ p, q, r });
+              const premiseTrue = rows.filter((e) => (!e.p || e.q) && (!e.q || e.r) && !e.r);
+              const bad = premiseTrue.filter((e) => e.p);
+              return premiseTrue.length >= 1 && bad.length === 0;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_ARG_MAIN;
+          const rows = argRows(D);
+          const head = D.vars.map((v) => h('th', { html: `\\(${v}\\)` }))
+            .concat(step.stage >= 1 ? D.premises.map((p) => h('th', { html: `\\(${p.tex}\\)` })) : [])
+            .concat(step.stage >= 3 ? [h('th', { html: `\\(${D.concl.tex}\\)`, class: 'fin' })] : []);
+          const body = rows.map((r) => {
+            const cls = step.stage >= 4 && r.cex ? 'hit' : step.stage >= 2 && step.stage < 4 && r.all ? 'hit' : '';
+            const dim = step.stage >= 2 && !r.all;
+            return h('tr', { class: cls, style: dim ? { opacity: 0.45 } : {} },
+              D.vars.map((v) => h('td', tf(r.e[v]))),
+              step.stage >= 1 ? r.pv.map((v) => h('td', tf(v))) : [],
+              step.stage >= 3 ? [h('td', { class: 'fin' }, tf(r.cv))] : []);
+          });
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } },
+            h('div.small', { style: { textAlign: 'center' }, html: `Premises: ${D.premises.map((p) => `\\(${p.tex}\\)`).join(', ')} &nbsp;·&nbsp; Conclusion: \\(${D.concl.tex}\\)` }),
+            h('table.tt', h('thead', h('tr', head)), h('tbody', body)),
+            step.stage === 2 ? h('p.small', { style: { textAlign: 'center' } }, 'Highlighted rows: every premise is true. Only these rows can be counterexamples.') : null,
+            step.stage >= 4 && !step.answer ? h('p.small', { style: { textAlign: 'center' } }, rows.some((r) => r.cex) ? 'The highlighted row has every premise true and the conclusion false.' : 'Every highlighted row also makes the conclusion true: the search is exhausted.') : null,
+            step.answer ? h('div.ex-answer', D.banner) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 4 */
+      {
+        title: 'Worked example: quantifiers and negation on a small domain',
+        kind: 'example',
+        id: 'ex-quantifier-negation',
+        objective: 'Evaluate a quantified statement element by element over a finite domain, then form its negation by flipping the quantifier and check the negation on the same table.',
+        problem: String.raw`<p>Let the domain be \(\{2, 3, 4, 6\}\) and let \(P(x)\) mean "\(x\) is even". Is \(\forall x\ P(x)\) true or false? Then write its negation and check the negation on the same domain.</p>`,
+        steps: stepsForQuant(EX_QUANT_MAIN),
+        data: EX_QUANT_MAIN,
+        answer: 'statement false, negation true',
+        verify() {
+          const dom = [2, 3, 4, 6];
+          let allEven = true, someNot = false;
+          for (const x of dom) { if (x % 2 !== 0) { allEven = false; someNot = true; } }
+          return allEven === false && someNot === true;
+        },
+        variants: [
+          {
+            label: 'Variant: an existential statement',
+            problem: String.raw`<p>Let the domain be \(\{2, 3, 4, 6\}\) and let \(P(x)\) mean "\(x\) is greater than 5". Is \(\exists x\ P(x)\) true or false? Then write its negation and check the negation on the same domain.</p>`,
+            steps: stepsForQuant(EX_QUANT_VARIANT),
+            data: EX_QUANT_VARIANT,
+            answer: 'statement true, negation false',
+            verify() {
+              const dom = [2, 3, 4, 6];
+              let someGt = false, allNot = true;
+              for (const x of dom) { if (x > 5) { someGt = true; allNot = false; } }
+              return someGt === true && allNot === false;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_QUANT_MAIN;
+          const P = QUANT_PREDS[D.pred];
+          const vals = D.dom.map((x) => P.test(x));
+          const all = D.quant === 'forall';
+          const truth = all ? vals.every(Boolean) : vals.some(Boolean);
+          const decIdx = all ? vals.indexOf(false) : vals.indexOf(true);
+          const chip = (x, i, neg) => {
+            const v = neg ? !vals[i] : vals[i];
+            const hot = (step.stage === 2 && !neg && i === decIdx) || (step.stage >= 4 && neg && i === decIdx);
+            return h('div', { style: { border: hot ? '2px solid var(--ink)' : '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.35rem 0.55rem', background: hot ? 'var(--mark)' : 'var(--sheet)', textAlign: 'center', minWidth: '4.2rem' } },
+              h('div.mono', { style: { fontWeight: 700 } }, String(x)),
+              h('div.small', neg ? 'negated P' : 'P(x)'), h('div', { html: tf(v) }));
+          };
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } },
+            h('div.small', { style: { textAlign: 'center' }, html: `Domain \\(\\{${D.dom.join(', ')}\\}\\), \\(P(x)\\): "${P.label}" &nbsp;·&nbsp; statement \\(${D.stmtTex}\\)` }),
+            h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' } }, D.dom.map((x, i) => (step.stage >= 1 ? chip(x, i, false) : h('div', { style: { border: '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.35rem 0.55rem', background: 'var(--sheet)', textAlign: 'center', minWidth: '4.2rem' } }, h('div.mono', { style: { fontWeight: 700 } }, String(x)), h('div.small.muted', 'P(x) not tested yet'))))),
+            step.stage >= 2 ? h('div', h('span.lg-badge', { class: truth ? 't' : 'f' }, `statement ${truth ? 'true' : 'false'}`), ' ', h('span.small', all ? (truth ? 'every element passed' : `${D.dom[decIdx]} is a counterexample`) : (truth ? `${D.dom[decIdx]} is a witness` : 'no witness exists'))) : null,
+            step.stage >= 3 ? h('div.small', { style: { textAlign: 'center' }, html: `Negation: \\(${D.negTex}\\) — the quantifier flips and the negation moves inside. Checking it on the same elements:` }) : null,
+            step.stage >= 3 ? h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' } }, D.dom.map((x, i) => chip(x, i, true))) : null,
+            step.stage >= 4 ? h('div', h('span.lg-badge', { class: !truth ? 't' : 'f' }, `negation ${!truth ? 'true' : 'false'}`), ' ', h('span.small', 'exactly opposite to the statement, as a negation must be')) : null,
+            step.answer ? h('div.ex-answer', D.banner) : null));
         },
       },
       /* ---------------------------------------------------------------- 14 */

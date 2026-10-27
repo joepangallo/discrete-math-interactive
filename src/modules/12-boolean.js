@@ -457,6 +457,145 @@
     { i: 3, a: 1, b: 0, cin: 1, sum: 0, cout: 1 },
   ];
 
+  /* ---------- worked-example generators: steps computed from each preset's data ---------- */
+  // K-map preset data: the minterm list plus the groups the module's own minimizer finds for it.
+  function kmapData(ones) {
+    const terms = minimize(3, ones).terms.map(withLits);
+    return { names: ['a', 'b', 'c'], ones: ones.slice(), terms, groups: terms.map((t) => ({ cells: t.cells.slice(), mask: t.mask, val: t.val })) };
+  }
+  const sizeWord = (n) => ({ 1: 'single cell', 2: 'pair', 4: 'quad', 8: 'group of 8' })[n] || `group of ${n}`;
+  const groupFixed = (g) => {
+    const fixed = [], free = [];
+    for (let i = 0; i < 3; i++) { const bit = 1 << (2 - i); if (g.mask & bit) fixed.push({ name: ['a', 'b', 'c'][i], val: (g.val & bit) ? 1 : 0 }); else free.push(['a', 'b', 'c'][i]); }
+    return { fixed, free };
+  };
+  function kmapStepsFor(D, checkpointText) {
+    const sop = sopStr(D.terms, D.names), sopP = sop.replace(/'/g, '′');
+    const lits = D.terms.reduce((a, t) => a + t.lits, 0);
+    const steps = [
+      { groups: 0, plotted: false, caption: 'The map has one row for each value of a and one column for each value of bc, listed in Gray order 00, 01, 11, 10. Gray order matters because neighboring cells then differ in exactly one variable, even across the wrap-around edges, and that is what lets neighboring 1s merge into bigger groups.' },
+      { groups: 0, plotted: true, caption: `Now transfer the truth table into the map: a 1 goes in each of the ${D.ones.length} minterm cells ${listJoin(D.ones.map((m) => 'm' + m))}, and a 0 goes everywhere else. Nothing about the function changes here; only its layout changes, from a list of rows into a picture where patterns become visible.` },
+    ];
+    D.groups.forEach((g, gi) => {
+      const { fixed, free } = groupFixed(g);
+      const wraps = g.cells.some((m) => (m & 3) === GRAY[0]) && g.cells.some((m) => (m & 3) === GRAY[3]);
+      steps.push({
+        groups: gi + 1, plotted: true,
+        caption: `Circle the ${sizeWord(g.cells.length)} ${listJoin(g.cells.map((m) => 'm' + m))}, shown with the ${gi === 0 ? 'dashed' : 'solid'} outline.${gi > 0 ? ' Cells may repeat from an earlier group, because overlap is allowed.' : ''} In every cell of the group ${fixed.map((f) => `${f.name} = ${f.val}`).join(' and ')} while ${listJoin(free)} change${free.length === 1 ? 's' : ''}, so ${listJoin(free)} drop${free.length === 1 ? 's' : ''} out and the group gives the term ${termStr(g, D.names).replace(/'/g, '′')}.${wraps ? ' The group wraps around the left and right edges of the map, which is allowed because those edges are neighbors in Gray order.' : ''}`,
+      });
+    });
+    steps.push({
+      groups: D.groups.length, plotted: true, expr: true,
+      caption: `Read the ${D.groups.length === 1 ? 'group' : `${D.groups.length} groups`} off as a sum of products: f = ${sopP}. Every 1 on the map is covered and each group is as large as it can possibly be, which is exactly what minimal means here: ${D.terms.length} term${D.terms.length === 1 ? '' : 's'} and ${lits} literal${lits === 1 ? '' : 's'} instead of ${D.ones.length} full minterms.`,
+    });
+    steps.push({
+      groups: D.groups.length, plotted: true, expr: true, check: true, answer: true,
+      banner: `Answer: f = ${sopP} — check: ${sopP} is 1 exactly on {${D.ones.join(', ')}}, matching the given minterms`,
+      caption: `Answer: f = ${sopP}. The check is in the strip below the map: evaluating ${sopP} on all eight inputs gives 1 exactly on rows ${listJoin(D.ones.map((m) => m.toString(2).padStart(3, '0')))}, which is precisely the minterm list {${D.ones.join(', ')}} we started with.`,
+    });
+    if (checkpointText) steps[1].checkpoint = checkpointText;
+    return steps;
+  }
+  const EX_KMAP_DATA = kmapData(EX_KMAP_ONES);
+  const EX_KMAP_VAR_DATA = kmapData([1, 3, 5, 7]);
+
+  // Adder preset data: the two addends and the per-column table the bit-wise generator produces.
+  function adderCols(A, B) {
+    const cols = [];
+    let carry = 0;
+    for (let i = 0; i < 4; i++) {
+      const a = (parseInt(A, 2) >> i) & 1, b = (parseInt(B, 2) >> i) & 1;
+      const t = a + b + carry;
+      cols.push({ i, a, b, cin: carry, sum: t & 1, cout: t >> 1 });
+      carry = t >> 1;
+    }
+    return cols;
+  }
+  function adderStepsFor(D, checkpointText) {
+    const steps = [{ bits: 0, caption: `Line the two numbers up in columns, ${D.A} over ${D.B}, with an empty carry row above them. A ripple-carry adder is just a chain of full adders, and each column must wait for the carry from its right neighbor, so the work has to go from right to left, starting at bit 0.` }];
+    D.cols.forEach((c) => {
+      const ones = c.a + c.b + c.cin;
+      steps.push({
+        bits: c.i + 1,
+        caption: `Bit ${c.i}: the full adder receives a${c.i} = ${c.a}, b${c.i} = ${c.b} and the ${c.i === 0 ? 'starting carry c0 = 0' : `carry c${c.i} = ${c.cin} passed from bit ${c.i - 1}`}, a total of ${['no', 'one', 'two', 'three'][ones]} 1${ones === 1 ? '' : 's'}. The sum bit is the parity of the three inputs, so s${c.i} = ${c.sum}, and the carry-out is 1 only when at least two inputs are 1, so c${c.i + 1} = ${c.cout}${c.cout ? ', which ripples into the next column to the left' : ''}.`,
+      });
+    });
+    const low = D.cols.map((c) => c.sum).reverse().join('');
+    steps.push({
+      bits: 5,
+      caption: D.cols[3].cout
+        ? `The leftover carry c4 = 1 becomes a fifth sum bit, s4 = 1, sitting to the left of s3. The full result now reads 1${low}, and dropping that final carry would have lost the most valuable bit of the answer.`
+        : `No carry leaves bit 3, so the answer fits in the four drawn columns: ${low}. The carry row above bit 3 stays 0, and nothing is lost by stopping there.`,
+    });
+    const dec = parseInt(D.answer, 2);
+    steps.push({
+      bits: 5, answer: true,
+      banner: `Answer: ${D.A} + ${D.B} = ${D.answer} (${dec}) — check: ${parseInt(D.A, 2)} + ${parseInt(D.B, 2)} = ${dec}, and each sum bit was the parity of its three inputs`,
+      caption: `Answer: ${D.A} + ${D.B} = ${D.answer}, which is ${dec} in decimal. The check agrees two ways: ${parseInt(D.A, 2)} plus ${parseInt(D.B, 2)} is ${dec}, and every sum bit above was the parity of its three inputs while every carry was their majority, recomputed column by column.`,
+    });
+    if (checkpointText) steps[4].checkpoint = checkpointText;
+    return steps;
+  }
+  const EX_ADD_DATA = { A: '1011', B: '0110', cols: EX_ADD_COLS, answer: '10001' };
+  const EX_ADD_VAR_DATA = { A: '1111', B: '0001', cols: adderCols('1111', '0001'), answer: '10000' };
+
+  // Truth-table preset data: the list of rows where f is 1 and the full minterm of each such row.
+  function ttData(ones) {
+    return { names: ['x', 'y', 'z'], ones: ones.slice(), terms: ones.map((m) => withLits(minterm(m, 3))) };
+  }
+  const EX_TT = ttData([2, 3, 5, 7]);
+  const EX_TT_VAR = ttData([6]); // boundary case: a single 1-row, so the canonical form has one term
+  const bits3 = (m) => m.toString(2).padStart(3, '0');
+  const prime = (t, names) => termStr(t, names).replace(/'/g, '′');
+  function ttStepsFor(D, cpText) {
+    const sopP = D.terms.map((t) => prime(t, D.names)).join(' + ');
+    const k = D.ones.length;
+    const steps = [{ shown: 0, phase: 0, caption: `The table defines the function completely: f is 1 on the ${k === 1 ? 'single row' : `${k} rows`} ${D.ones.map(bits3).join(', ')} and 0 on the other ${8 - k}. The sum-of-minterms recipe turns each 1-row into one product term; the 0-rows contribute nothing, because a term that fires on a 0-row would corrupt the output there.` }];
+    D.ones.forEach((m, j) => {
+      const [x, y, z] = bitsOf(m, 3);
+      steps.push({ shown: j + 1, phase: 0, caption: `${j === 0 ? 'The first 1-row is' : 'The next 1-row is'} ${bits3(m)}: x = ${x}, y = ${y}, z = ${z} with f = 1, so this row contributes a minterm. Write the plain variable where the bit is 1 and the complement where the bit is 0, giving ${prime(D.terms[j], D.names)}. That product is 1 on this row alone and 0 on every other row, which is why one term per 1-row can rebuild the whole function.` });
+    });
+    steps[steps.length - 1].checkpoint = cpText;
+    steps.push({ shown: k, phase: 1, caption: `Join the ${k} minterm${k === 1 ? '' : 's'} with + signs, which is Boolean OR: f = ${sopP}. This is the canonical sum of minterms: ${k} term${k === 1 ? '' : 's'} and ${3 * k} literals, one full three-literal product per 1-row. It is correct by construction, even though a Karnaugh map might shrink it later; the canonical form is the guaranteed starting point.` });
+    const oneRow = D.ones[0], zeroRow = range(8).find((m) => !D.ones.includes(m));
+    steps.push({ shown: k, phase: 2, caption: `Spot-check two rows before trusting the expression. On row ${bits3(oneRow)} the minterm ${prime(D.terms[0], D.names)} has every literal true, so the sum is 1, matching the table. On row ${bits3(zeroRow)} every minterm contains at least one false literal, so each product is 0 and the sum is 0, matching the table again.` });
+    steps.push({ shown: k, phase: 2, answer: true, banner: `Answer: f = ${sopP} = Σm(${D.ones.join(', ')}) — check: the sum is 1 exactly on rows ${D.ones.join(', ')}`, caption: `Answer: f = ${sopP}, that is, Σm(${D.ones.join(', ')}). The strip below the table evaluates the sum on all eight input rows and reproduces the table's f column exactly, so the expression and the table define the same function.` });
+    return steps;
+  }
+
+  // Simplification preset data: a chain of expressions, each reached from the previous one by the
+  // named law, with a short note saying what that law does to this particular expression.
+  function simpData(chain, fin) {
+    return { names: ['x', 'y', 'z'], chain, fin };
+  }
+  const EX_SIMP = simpData([
+    ["xy + xy′ + x′z", '', ''],
+    ["x(y + y′) + x′z", 'distributive', 'the first two terms share the factor x, so factor it out'],
+    ["x · 1 + x′z", 'complement', 'y + y′ is 1 no matter what y is, so the parentheses collapse to 1'],
+    ["x + x′z", 'identity', 'x · 1 is just x, since multiplying by 1 changes nothing'],
+    ["(x + x′)(x + z)", 'distributive', 'the other distributive law, x + yz = (x + y)(x + z), turns the sum into a product of sums'],
+    ["1 · (x + z)", 'complement', 'x + x′ is 1 no matter what x is, so the first factor collapses to 1'],
+    ["x + z", 'identity', '1 times anything is that thing, so the leading 1 disappears'],
+  ], 'x + z');
+  const EX_SIMP_VAR = simpData([
+    ["xy + xy + x′z′ + z′", '', ''],
+    ["xy + x′z′ + z′", 'idempotent', 'xy + xy is the same term written twice, and one copy already does all of its work'],
+    ["xy + z′", 'absorption', 'z′ absorbs x′z′: every row that makes x′z′ true already makes z′ true, so the longer term adds no new 1-rows'],
+  ], "xy + z′");
+  const countLits = (e) => (e.match(/[xyz]/g) || []).length;
+  function simpStepsFor(D, cpText, cpShown) {
+    const orig = D.chain[0][0], fin = D.fin;
+    const steps = [{ shown: 0, caption: `The goal is the smallest expression equivalent to f = ${orig}. The method is patience: apply exactly one named law at a time, so every equality in the chain is justified and the final form is provably the same function, not just a plausible guess that happens to fit a few rows.` }];
+    D.chain.slice(1).forEach(([expr, law, note], i) => {
+      const st = { shown: i + 1, caption: `Apply the ${law} law: ${note}. The expression becomes ${expr}. Nothing else changes in this step, which is what makes the whole chain checkable line by line, and each step either shrinks the expression or reshapes it so a later law can shrink it.` };
+      if (i + 1 === cpShown) st.checkpoint = cpText;
+      steps.push(st);
+    });
+    steps.push({ shown: D.chain.length - 1, check: true, caption: `Before calling it minimal, check equivalence the blunt way: the strip below evaluates the original ${orig} and the final ${fin} on all eight input rows. The two expressions are the same function exactly when no row separates them, so all eight rows must agree.` });
+    steps.push({ shown: D.chain.length - 1, check: true, answer: true, banner: `Answer: f = ${fin} — check: original and simplified agree on all 8 rows, ${countLits(orig)} literals down to ${countLits(fin)}`, caption: `Answer: f = ${fin}, down from ${countLits(orig)} literals to ${countLits(fin)}. No law shrinks it further, and both remaining terms are needed: deleting either one changes the value on at least one row of the check strip, so this is the minimal form.` });
+    return steps;
+  }
+
   DM.module({
     id: 'boolean',
     num: 12,
@@ -1384,14 +1523,9 @@
         kind: 'example',
         id: 'ex-kmap',
         problem: String.raw`<p>A function \(f(a, b, c)\) is 1 exactly for the minterms \(m_0, m_2, m_4, m_5, m_6\) — that is, \((a, b, c)\) is one of \(000, 010, 100, 101, 110\). Use a Karnaugh map to find a minimal sum of products for \(f\).</p>`,
-        steps: [
-          { groups: 0, plotted: false, caption: 'The map has one row for each value of a and one column for each value of bc, listed in Gray order 00, 01, 11, 10. Gray order matters because neighboring cells then differ in exactly one variable, even across the wrap-around edges, and that is what lets neighboring 1s merge into bigger groups.' },
-          { groups: 0, plotted: true, caption: 'Now transfer the truth table into the map: a 1 goes in each of the five minterm cells m0, m2, m4, m5 and m6, and a 0 goes everywhere else. Nothing about the function changes here; only its layout changes, from a list of rows into a picture where patterns become visible.' },
-          { groups: 1, plotted: true, caption: 'Circle the four cells m0, m2, m4 and m6 as one quad, shown with the dashed outline. The group wraps around the left and right edges of the map, which is allowed because those edges are neighbors in Gray order, and in all four cells c stays 0 while a and b change, so the quad gives the single literal c′.' },
-          { groups: 2, plotted: true, caption: 'Next circle the pair m4 and m5, shown with the solid outline; m4 already belongs to the quad, and overlap is allowed. Across the pair a = 1 and b = 0 stay constant while c changes, so c drops out of this term and the pair gives ab′.' },
-          { groups: 2, plotted: true, expr: true, caption: 'Read the two groups off as a sum of products: f = c′ + ab′. Every 1 on the map is covered and each group is as large as it can possibly be, which is exactly what minimal means here: two terms and three literals instead of five full minterms.' },
-          { groups: 2, plotted: true, expr: true, check: true, answer: true, caption: 'Answer: f = c′ + ab′. The check is in the strip below the map: evaluating c′ + ab′ on all eight inputs gives 1 exactly on rows 000, 010, 100, 101 and 110, which is precisely the minterm list {0, 2, 4, 5, 6} we started with.' },
-        ],
+        objective: 'Use a Karnaugh map to merge neighboring 1s into the largest possible groups and read off a minimal sum of products.',
+        data: EX_KMAP_DATA,
+        steps: kmapStepsFor(EX_KMAP_DATA, 'Predict: the five 1s are placed. What is the largest group you can circle first, and which single literal will that group give?'),
         answer: "c′ + ab′",
         verify() {
           const fromSet = (m) => (EX_KMAP_ONES.includes(m) ? 1 : 0);
@@ -1401,17 +1535,32 @@
           const pairOk = EX_KMAP_PAIR.every((m) => (m >> 2) === 1 && ((m >> 1) & 1) === 0 && EX_KMAP_ONES.includes(m));
           return allRows && quadOk && pairOk;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: one group of 4',
+            problem: String.raw`<p>A different function \(g(a, b, c)\) is 1 exactly for the minterms \(m_1, m_3, m_5, m_7\) — that is, \((a, b, c)\) is one of \(001, 011, 101, 111\). Use a Karnaugh map to find a minimal sum of products for \(g\).</p>`,
+            data: EX_KMAP_VAR_DATA,
+            steps: kmapStepsFor(EX_KMAP_VAR_DATA, 'Predict: the four 1s all sit where c = 1. Will the minimal form need one term or several, and which variables will survive in it?'),
+            answer: 'c',
+            verify() {
+              const ones = [1, 3, 5, 7];
+              const rowsOk = range(8).every((m) => ((m & 1) === 1) === ones.includes(m));
+              const cubeCells = range(8).filter((m) => (m & 1) === 1);
+              return rowsOk && cubeCells.join(',') === '1,3,5,7' && ones.length === 4;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const inQuad = (m) => step.groups >= 1 && EX_KMAP_QUAD.includes(m);
-          const inPair = (m) => step.groups >= 2 && EX_KMAP_PAIR.includes(m);
+          const D = (preset && preset.data) || EX_KMAP_DATA;
+          const inGroup = (gi, m) => step.groups > gi && !!D.groups[gi] && D.groups[gi].cells.includes(m);
           const cell = (r, c) => {
             const m = EX_KMAP_CELL(r, c);
-            const v = EX_KMAP_ONES.includes(m) ? 1 : 0;
+            const v = D.ones.includes(m) ? 1 : 0;
             const st = {};
-            if (inQuad(m)) { st.border = '3px dashed var(--accent)'; st.background = 'var(--accent-2)'; }
-            if (inPair(m)) { st.border = '3px solid var(--true)'; st.background = 'var(--true-bg)'; if (inQuad(m)) st.boxShadow = 'inset 0 0 0 3px var(--accent)'; }
-            const cls = [inQuad(m) ? 'grp1' : '', inPair(m) ? 'grp2' : ''].join(' ').trim();
+            if (inGroup(0, m)) { st.border = '3px dashed var(--accent)'; st.background = 'var(--accent-2)'; }
+            if (inGroup(1, m)) { st.border = '3px solid var(--true)'; st.background = 'var(--true-bg)'; if (inGroup(0, m)) st.boxShadow = 'inset 0 0 0 3px var(--accent)'; }
+            const cls = [inGroup(0, m) ? 'grp1' : '', inGroup(1, m) ? 'grp2' : ''].join(' ').trim();
             return h('td', { class: cls, style: st },
               h('div', { style: { fontSize: '0.62rem', color: 'var(--ink-3)' } }, `m${m}`),
               h('div', { style: { fontSize: '1.1rem', fontWeight: step.plotted && v ? 700 : 400 } }, step.plotted ? String(v) : '·'));
@@ -1419,19 +1568,19 @@
           const table = h('table.tt',
             h('thead', h('tr', h('th', 'a \\ bc'), GRAY.map((g) => h('th', g.toString(2).padStart(2, '0'))))),
             h('tbody', [0, 1].map((r) => h('tr', h('th', String(r)), GRAY.map((_, c) => cell(r, c))))));
+          const sop = sopStr(D.terms, D.names);
           const checkStrip = step.check ? h('table.tt.bl-sm',
             h('thead', h('tr', h('th.l', 'abc'), range(8).map((m) => h('th', m.toString(2).padStart(3, '0'))))),
             h('tbody',
-              h('tr', h('th.l', 'f (minterms)'), range(8).map((m) => h('td', String(EX_KMAP_ONES.includes(m) ? 1 : 0)))),
-              h('tr', h('th.l', "c′ + ab′"), range(8).map((m) => { const a = m >> 2, b = (m >> 1) & 1, c = m & 1; return h('td', String((!c || (a && !b)) ? 1 : 0)); })))) : null;
+              h('tr', h('th.l', 'f (minterms)'), range(8).map((m) => h('td', String(D.ones.includes(m) ? 1 : 0)))),
+              h('tr', h('th.l', sop.replace(/'/g, '′')), range(8).map((m) => h('td', String(sopValue(D.terms, m))))))) : null;
           stage.append(h('div.stack', { style: { alignItems: 'center' } },
             table,
-            h('p.small.mono', 'f(a, b, c) = Σm(0, 2, 4, 5, 6)'),
-            step.groups >= 1 ? h('p.small', 'Dashed outline (grp1): the quad m0, m2, m4, m6 wraps around the left and right edges — c = 0 in every cell, giving c′.') : null,
-            step.groups >= 2 ? h('p.small', 'Solid outline (grp2): the pair m4, m5 — a = 1 and b = 0 in both cells, giving ab′.') : null,
-            step.expr ? h('div.big-math', { html: String.raw`\(f = c' + ab'\)` }) : null,
+            h('p.small.mono', `f(a, b, c) = Σm(${D.ones.join(', ')})`),
+            ...D.groups.map((g, gi) => (step.groups > gi ? h('p.small', `${gi === 0 ? 'Dashed' : 'Solid'} outline (grp${gi + 1}): the ${sizeWord(g.cells.length)} ${listJoin(g.cells.map((m) => 'm' + m))} — ${groupFixed(g).fixed.map((f) => `${f.name} = ${f.val}`).join(' and ')} in every cell, giving ${termStr(g, D.names).replace(/'/g, '′')}.`) : null)),
+            step.expr ? h('div.big-math', { html: String.raw`\(f = ${sop}\)` }) : null,
             checkStrip,
-            step.answer ? h('div.ex-answer', "Answer: f = c′ + ab′ — check: c′ + ab′ is 1 exactly on {0, 2, 4, 5, 6}, matching the given minterms") : null));
+            step.answer ? h('div.ex-answer', step.banner) : null));
         },
       },
       /* ---------------------------------------------------------------- 15 */
@@ -1440,15 +1589,9 @@
         kind: 'example',
         id: 'ex-adder-eval',
         problem: String.raw`<p>The ripple-carry adder of this module adds \(1011_2\) (eleven) and \(0110_2\) (six). Evaluate it bit by bit from the least significant bit, tracking every carry, the way the circuit does.</p>`,
-        steps: [
-          { bits: 0, caption: 'Line the two numbers up in columns, 1011 over 0110, with an empty carry row above them. A ripple-carry adder is just a chain of full adders, and each column must wait for the carry from its right neighbor, so the work has to go from right to left, starting at bit 0.' },
-          { bits: 1, caption: 'Bit 0: the full adder receives a0 = 1, b0 = 0 and the starting carry c0 = 0, a total of one 1. The sum bit is the parity of the three inputs, so s0 = 1, and the carry-out is 1 only when at least two inputs are 1, so c1 = 0.' },
-          { bits: 2, caption: 'Bit 1: a1 = 1, b1 = 1 and c1 = 0 give two 1s, an even count. The parity rule makes s1 = 0, and because at least two inputs are 1 the majority rule sends a carry out, so c2 = 1, passed on to the next column.' },
-          { bits: 3, caption: 'Bit 2: a2 = 0, b2 = 1 and the incoming carry c2 = 1 also give two 1s. So s2 = 0 by parity and c3 = 1 by majority, and that carry ripples one more column to the left.' },
-          { bits: 4, caption: 'Bit 3: a3 = 1, b3 = 0 and c3 = 1 give two 1s for the third time in a row. The sum bit is s3 = 0 and the carry-out is c4 = 1, but now there is no next full adder to receive that carry.' },
-          { bits: 5, caption: 'The leftover carry c4 = 1 becomes a fifth sum bit, s4 = 1, sitting to the left of s3. The full result now reads 10001, and dropping that final carry would have lost the most valuable bit of the answer.' },
-          { bits: 5, answer: true, caption: 'Answer: 1011 + 0110 = 10001, which is 17 in decimal. The check agrees two ways: eleven plus six is seventeen, and every sum bit above was the parity of its three inputs while every carry was their majority, recomputed column by column.' },
-        ],
+        objective: 'Evaluate a ripple-carry adder one column at a time from the least significant bit, tracking every carry, until the full sum including the final carry-out is known.',
+        data: EX_ADD_DATA,
+        steps: adderStepsFor(EX_ADD_DATA, 'Predict: bit 3 sends out one more carry, but the drawn adder has no fifth column. Where does that last carry end up in the final answer?'),
         answer: '10001',
         verify() {
           const sumOk = (0b1011 + 0b0110) === 17 && parseInt('10001', 2) === 17;
@@ -1466,29 +1609,167 @@
           });
           return sumOk && bits === '10001' && chainOk && colsOk;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: a carry in every column',
+            problem: String.raw`<p>The same ripple-carry adder now adds \(1111_2\) (fifteen) and \(0001_2\) (one). Evaluate it bit by bit from the least significant bit, tracking every carry, the way the circuit does.</p>`,
+            data: EX_ADD_VAR_DATA,
+            steps: adderStepsFor(EX_ADD_VAR_DATA, 'Predict: adding 1 to 1111 has already carried through bits 0, 1 and 2. Will bit 3 carry out too, and what single pattern will the sum bits show?'),
+            answer: '10000',
+            verify() {
+              let carry = 0, bits = '';
+              for (let i = 0; i < 4; i++) {
+                const a = (0b1111 >> i) & 1, b = (0b0001 >> i) & 1;
+                bits = String(a ^ b ^ carry) + bits;
+                carry = (a + b + carry) >= 2 ? 1 : 0;
+              }
+              bits = String(carry) + bits;
+              const chainOk = EX_ADD_VAR_DATA.cols.every((c, i) => c.cin === (i === 0 ? 0 : EX_ADD_VAR_DATA.cols[i - 1].cout) && c.cout === 1);
+              return (0b1111 + 0b0001) === 16 && parseInt('10000', 2) === 16 && bits === '10000' && chainOk;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
+          const D = (preset && preset.data) || EX_ADD_DATA;
+          const cols = D.cols;
           const POS = [4, 3, 2, 1, 0]; // display order, most significant column first
           const active = step.bits >= 1 && step.bits <= 4 ? step.bits - 1 : step.bits === 5 ? 4 : -1;
           const cur = (i) => (i === active ? 'cur' : '');
-          const carryIn = (i) => (i === 4 ? EX_ADD_COLS[3].cout : EX_ADD_COLS[i].cin);
+          const carryIn = (i) => (i === 4 ? cols[3].cout : cols[i].cin);
           const carryShown = (i) => (i === 4 ? step.bits >= 5 : i <= step.bits);
           const row = (label, fn) => h('tr', h('th.l', label), POS.map((i) => h('td', { class: cur(i) }, fn(i))));
           const table = h('table.tt',
             h('thead', h('tr', h('th', ''), POS.map((i) => h('th', { class: cur(i) }, `bit ${i}`)))),
             h('tbody',
               row('carry in', (i) => (carryShown(i) ? String(carryIn(i)) : '·')),
-              row('a = 1011', (i) => (i === 4 ? '—' : String(EX_ADD_COLS[i].a))),
-              row('b = 0110', (i) => (i === 4 ? '—' : String(EX_ADD_COLS[i].b))),
-              row('sum', (i) => (i === 4 ? (step.bits >= 5 ? '1' : '·') : i < step.bits ? String(EX_ADD_COLS[i].sum) : '·'))));
-          const col = step.bits >= 1 && step.bits <= 4 ? EX_ADD_COLS[step.bits - 1] : null;
+              row(`a = ${D.A}`, (i) => (i === 4 ? '—' : String(cols[i].a))),
+              row(`b = ${D.B}`, (i) => (i === 4 ? '—' : String(cols[i].b))),
+              row('sum', (i) => (i === 4 ? (step.bits >= 5 ? String(cols[3].cout) : '·') : i < step.bits ? String(cols[i].sum) : '·'))));
+          const col = step.bits >= 1 && step.bits <= 4 ? cols[step.bits - 1] : null;
           stage.append(h('div.stack', { style: { alignItems: 'center' } },
             table,
             step.bits === 0 ? h('p.small', 'Columns are numbered from bit 0 at the right. c0 = 0: no carry enters the first column.') : null,
             col ? h('p.small.mono', `bit ${col.i}: ${col.a} + ${col.b} + ${col.cin} = ${col.cout}${col.sum} in binary — write s${col.i} = ${col.sum}, carry c${col.i + 1} = ${col.cout} to the next column`) : null,
-            step.bits === 5 && !step.answer ? h('p.small.mono', 'c4 = 1 becomes s4 = 1: the result is 10001') : null,
-            step.answer ? h('p.small', 'Check: 1011 is 11 and 0110 is 6, and 11 + 6 = 17, which is 10001 in binary.') : null,
-            step.answer ? h('div.ex-answer', 'Answer: 1011 + 0110 = 10001 (17) — check: 11 + 6 = 17, and each sum bit was the parity of its three inputs') : null));
+            step.bits === 5 && !step.answer ? h('p.small.mono', `c4 = ${cols[3].cout} becomes s4 = ${cols[3].cout}: the result is ${D.answer}`) : null,
+            step.answer ? h('p.small', `Check: ${D.A} is ${parseInt(D.A, 2)} and ${D.B} is ${parseInt(D.B, 2)}, and ${parseInt(D.A, 2)} + ${parseInt(D.B, 2)} = ${parseInt(D.answer, 2)}, which is ${D.answer} in binary.`) : null,
+            step.answer ? h('div.ex-answer', step.banner) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- 17 */
+      {
+        title: 'Worked example: from a truth table to a sum of minterms',
+        kind: 'example',
+        id: 'ex-truth-table-sop',
+        problem: String.raw`<p>A function \(f(x, y, z)\) is given by its truth table: \(f\) is 1 exactly on the input rows \(010\), \(011\), \(101\) and \(111\), and 0 on the other four rows. Write the canonical sum of minterms for \(f\), reading one minterm off each 1-row.</p>`,
+        objective: 'Turn a truth table into the canonical sum of minterms by writing one full product term for each row where the function is 1.',
+        data: EX_TT,
+        steps: ttStepsFor(EX_TT, 'Predict: every 1-row now has its minterm written beside it. When the minterms are joined with + signs, how many terms and how many literals will the canonical form have?'),
+        answer: "x′yz′ + x′yz + xy′z + xyz",
+        verify() {
+          const ones = [2, 3, 5, 7];
+          const fromTerms = range(8).every((m) => sopValue(EX_TT.terms, m) === (ones.includes(m) ? 1 : 0));
+          const parsed = parseSOP("x'yz' + x'yz + xy'z + xyz", ['x', 'y', 'z']);
+          const fromParse = !!parsed && range(8).every((m) => sopValue(parsed, m) === (ones.includes(m) ? 1 : 0));
+          const eachFiresOnce = EX_TT.terms.every((t) => range(8).filter((m) => sopValue([t], m) === 1).length === 1);
+          return fromTerms && fromParse && eachFiresOnce && EX_TT.terms.length === 4;
+        },
+        variants: [
+          {
+            label: 'Variant: a single 1-row',
+            problem: String.raw`<p>A different function \(g(x, y, z)\) is 1 only on the single input row \(110\) and 0 on the other seven rows. Write the canonical sum of minterms for \(g\), reading one minterm off each 1-row.</p>`,
+            data: EX_TT_VAR,
+            steps: ttStepsFor(EX_TT_VAR, 'Predict: this function has just one 1-row and its minterm is written. How many terms will its canonical sum of minterms have, and can a canonical form for a nonzero function ever have fewer?'),
+            answer: "xyz′",
+            verify() {
+              const fromTerms = range(8).every((m) => sopValue(EX_TT_VAR.terms, m) === (m === 6 ? 1 : 0));
+              const parsed = parseSOP("xyz'", ['x', 'y', 'z']);
+              const fromParse = !!parsed && range(8).every((m) => sopValue(parsed, m) === (m === 6 ? 1 : 0));
+              return fromTerms && fromParse && EX_TT_VAR.terms.length === 1;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_TT;
+          const table = h('table.tt.bl-sm',
+            h('thead', h('tr', h('th', 'x'), h('th', 'y'), h('th', 'z'), h('th', 'f'), h('th.l', 'minterm'))),
+            h('tbody', range(8).map((m) => {
+              const j = D.ones.indexOf(m);
+              const shown = j >= 0 && j < step.shown;
+              return h('tr', { class: shown ? 'hit' : '' },
+                bitsOf(m, 3).map((b) => h('td', String(b))),
+                h('td', h('b', String(j >= 0 ? 1 : 0))),
+                h('td.l.mono', j >= 0 ? (shown ? prime(D.terms[j], D.names) : '·') : '—'));
+            })));
+          const strip = step.phase >= 2 ? h('table.tt.bl-sm',
+            h('thead', h('tr', h('th.l', 'xyz'), range(8).map((m) => h('th', bits3(m))))),
+            h('tbody',
+              h('tr', h('th.l', 'f (from the table)'), range(8).map((m) => h('td', String(D.ones.includes(m) ? 1 : 0)))),
+              h('tr', h('th.l', 'the sum of minterms'), range(8).map((m) => h('td', String(sopValue(D.terms, m))))))) : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            table,
+            step.shown > 0 ? h('p.small.mono', `minterms so far: ${D.terms.slice(0, step.shown).map((t) => prime(t, D.names)).join(', ')}`) : null,
+            step.phase >= 1 ? h('div.big-math', `f = ${D.terms.map((t) => prime(t, D.names)).join(' + ')}`) : null,
+            strip,
+            step.answer ? h('div.ex-answer', step.banner) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- 18 */
+      {
+        title: 'Worked example: simplifying an expression law by law',
+        kind: 'example',
+        id: 'ex-simplify-laws',
+        problem: String.raw`<p>Simplify \(f = xy + xy' + x'z\) as far as the laws of Boolean algebra allow. Name the law used at every step, and confirm at the end that the simplified expression agrees with the original on every input row.</p>`,
+        objective: 'Simplify a Boolean expression by applying one named algebra law at a time until no law can shrink it further, then confirm the equivalence on every truth-table row.',
+        data: EX_SIMP,
+        steps: simpStepsFor(EX_SIMP, 'Predict: the expression is now 1 · (x + z). A single law removes the leading 1 — which law is it, and what final two-literal expression remains?', 5),
+        answer: 'x + z',
+        verify() {
+          const names = ['x', 'y', 'z'];
+          const orig = parseSOP("xy + xy' + x'z", names), fin = parseSOP('x + z', names);
+          if (!orig || !fin) return false;
+          const agree = range(8).every((m) => sopValue(orig, m) === sopValue(fin, m));
+          const direct = range(8).every((m) => sopValue(fin, m) === (((m >> 2) & 1) | (m & 1)));
+          return agree && direct && EX_SIMP.chain.length === 7 && EX_SIMP.chain[6][0] === 'x + z';
+        },
+        variants: [
+          {
+            label: 'Variant: idempotent first',
+            problem: String.raw`<p>Simplify \(f = xy + xy + x'z' + z'\) as far as the laws of Boolean algebra allow. Name the law used at every step, and confirm at the end that the simplified expression agrees with the original on every input row.</p>`,
+            data: EX_SIMP_VAR,
+            steps: simpStepsFor(EX_SIMP_VAR, 'Predict: in xy + x′z′ + z′ one term is redundant, because a shorter term already covers every row it covers. Which term disappears next, and which law removes it?', 1),
+            answer: "xy + z′",
+            verify() {
+              const names = ['x', 'y', 'z'];
+              const orig = parseSOP("xy + xy + x'z' + z'", names), fin = parseSOP("xy + z'", names);
+              if (!orig || !fin) return false;
+              const agree = range(8).every((m) => sopValue(orig, m) === sopValue(fin, m));
+              const direct = range(8).every((m) => { const x = (m >> 2) & 1, y = (m >> 1) & 1, z = m & 1; return sopValue(fin, m) === ((x & y) | (1 - z)); });
+              return agree && direct && EX_SIMP_VAR.chain.length === 3 && EX_SIMP_VAR.chain[2][0] === "xy + z′";
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_SIMP;
+          const ladder = h('div.stack', { style: { gap: '0.3rem', minWidth: 'min(26rem, 100%)' } },
+            D.chain.slice(0, step.shown + 1).map(([expr, law], i) => h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 7.5rem', gap: '0.6rem', alignItems: 'baseline', padding: '0.22rem 0.5rem', borderRadius: '0.3rem', background: i === step.shown ? 'var(--accent-2)' : 'var(--sheet)', border: '1px solid var(--rule)' } },
+              h('span.mono', { style: { fontSize: '1.02rem', fontWeight: i === step.shown ? 700 : 400 } }, (i === 0 ? 'f = ' : '= ') + expr),
+              h('span.small.muted', i === 0 ? 'start' : `${law} law`))));
+          let strip = null;
+          if (step.check) {
+            const orig = parseSOP(D.chain[0][0].replace(/′/g, "'"), D.names), fin = parseSOP(D.fin.replace(/′/g, "'"), D.names);
+            strip = h('table.tt.bl-sm',
+              h('thead', h('tr', h('th.l', 'xyz'), range(8).map((m) => h('th', bits3(m))))),
+              h('tbody',
+                h('tr', h('th.l', 'original'), range(8).map((m) => h('td', String(sopValue(orig, m))))),
+                h('tr', h('th.l', D.fin), range(8).map((m) => h('td', String(sopValue(fin, m)))))));
+          }
+          stage.append(h('div.stack', { style: { alignItems: 'center' } },
+            ladder,
+            strip,
+            step.answer ? h('div.ex-answer', step.banner) : null));
         },
       },
       /* ---------------------------------------------------------------- 16 */

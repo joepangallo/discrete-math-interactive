@@ -10,6 +10,7 @@
   const inverse = (a, n) => { const [g, s] = egcd(mod(a, n), n); return g === 1 ? mod(s, n) : null; };
   const euclidRows = (a, b) => { const rows = []; while (b !== 0) { const q = Math.floor(a / b), r = a - q * b; rows.push({ a, b, q, r }); [a, b] = [b, r]; } return { rows, g: a }; };
   const EX_GCD = euclidRows(252, 198); // the worked example below, computed once: 4 division rows, gcd 18
+
   const neg = (x) => String(x).replace('-', '−'); // typographic minus for plain text
   const par = (x) => (x < 0 ? `(${x})` : String(x)); // parenthesize negatives inside TeX
   const DIG = '0123456789ABCDEF';
@@ -19,6 +20,217 @@
   const PCOL = { 2: 'var(--accent)', 3: 'var(--fnc)', 5: 'var(--num)', 7: 'var(--kw)', 11: 'var(--str)', 13: 'var(--warn)' };
   const STEPCOL = ['var(--accent)', 'var(--fnc)', 'var(--num)', 'var(--kw)', 'var(--str)', 'var(--warn)', 'var(--false)'];
   const parseIntSafe = (v) => { const t = String(v).trim().replace(/[−–]/g, '-'); return /^-?\d+$/.test(t) ? parseInt(t, 10) : NaN; };
+/* Euclid steps, computed from a preset's data ({ a, b, rows, g }) by the euclidRows generator
+     above. The same builder narrates the primary pair (252, 198) and the variant pair (84, 210),
+     whose first number is smaller than the second, so its first division has quotient 0 and the
+     pair simply swaps — the boundary case the captions call out when q is 0. */
+  function euclidStepsFor(D) {
+    const { rows, g } = D;
+    const steps = [{ shown: 0, caption: `The plan: replace the pair (a, b) by (b, the remainder when a is divided by b). The gcd survives every replacement, because any common divisor of a and b also divides that remainder — and the numbers shrink each time, so the process must stop. Here the starting pair is (${D.a}, ${D.b}).` }];
+    rows.forEach((r, i) => {
+      const caption = r.r === 0
+        ? `${r.a} = ${r.q} · ${r.b} + 0. This time ${r.b} fits exactly and nothing is left over. A remainder of 0 is the stop signal: dividing further is impossible, and the last nonzero remainder is the answer.`
+        : r.q === 0
+          ? `${r.a} = 0 · ${r.b} + ${r.a}. No copy of ${r.b} fits into ${r.a} at all, because the first number is smaller than the second, so the quotient is 0 and the remainder is ${r.a} itself. The pair simply swaps: gcd(${r.a}, ${r.b}) = gcd(${r.b}, ${r.a}), and the algorithm carries on with the numbers in the usual order.`
+          : `${r.a} = ${r.q} · ${r.b} + ${r.r}. ${r.q === 1 ? 'One copy' : `${r.q} copies`} of ${r.b} fit${r.q === 1 ? 's' : ''} into ${r.a} and ${r.r} is left over, so gcd(${r.a}, ${r.b}) = gcd(${r.b}, ${r.r}): the same question about smaller numbers. Each step keeps only the remainder, which is why the algorithm is fast.`;
+      steps.push({ shown: i + 1, caption });
+    });
+    if (rows.length >= 2) {
+      steps[1].checkpoint = `Predict: the next division divides ${rows[1].a} by ${rows[1].b} — how many whole copies of ${rows[1].b} fit into ${rows[1].a}, and what remainder will be left over?`;
+    }
+    steps.push({ shown: rows.length, answer: true, caption: `Answer: gcd(${D.a}, ${D.b}) = ${g}. Check: ${D.a} = ${g} · ${D.a / g} and ${D.b} = ${g} · ${D.b / g}, so ${g} divides both numbers — and ${D.a / g} and ${D.b / g} share no factor bigger than 1, so no number larger than ${g} can divide both. That confirms ${g} is the greatest common divisor.` });
+    return steps;
+  }
+  const EX_GCD_DATA = { a: 252, b: 198, rows: EX_GCD.rows, g: EX_GCD.g };
+  const EX_GCD_VAR = (() => { const r = euclidRows(84, 210); return { a: 84, b: 210, rows: r.rows, g: r.g }; })();
+
+  /* Linear-combination formatting for the inverse example: fmtLin(3, 26, -11, 7) is "3 · 26 − 11 · 7",
+     with a coefficient of 1 or −1 leaving just the number itself. */
+  const fmtTerm = (c, x) => (Math.abs(c) === 1 ? `${x}` : `${Math.abs(c)} · ${x}`);
+  const fmtLin = (c1, x1, c2, x2) => `${c1 < 0 ? '−' : ''}${fmtTerm(c1, x1)} ${c2 < 0 ? '−' : '+'} ${fmtTerm(c2, x2)}`;
+
+  /* Symbolic back-substitution for the case gcd(a, n) = 1. Walks the remainder chain
+     R[0] = n, R[1] = a, R[2], … down to the gcd, starting from the division that produced it
+     and substituting one remainder at a time, exactly as a student would by hand. Returns the
+     display-line parts (with the substituted piece flagged for highlighting) and, per back step,
+     the facts the step captions are built from. */
+  function backSub(a, n) {
+    const { rows } = euclidRows(n, a);
+    const R = [n, a], Q = [];
+    for (const r of rows) { Q.push(r.q); R.push(r.r); }
+    let m = R.length - 1;
+    while (R[m] === 0) m--;
+    const g = R[m];
+    const d0 = m - 2; // the division R[d0] = Q[d0] · R[d0 + 1] + g that produced the gcd
+    let x = R[d0], y = R[d0 + 1], cx = 1, cy = -Q[d0], xi = d0, yi = d0 + 1;
+    const infos = [{ sub: null, parts: [[`${g} = ${fmtLin(cx, x, cy, y)}`, false]], result: fmtLin(cx, x, cy, y) }];
+    while (xi > 0 || yi > 1) {
+      // substitute whichever atom sits later in the remainder chain (the smaller remainder)
+      if (yi > xi) {
+        const i = yi, S = fmtLin(1, R[i - 2], -Q[i - 2], R[i - 1]);
+        const ncx = cx - cy * Q[i - 2];
+        const prefix = `${g} = ${cx < 0 ? '−' : ''}${fmtTerm(cx, x)} ${cy < 0 ? '−' : '+'} ${Math.abs(cy) === 1 ? '' : `${Math.abs(cy)}`}`;
+        const raw = `${cx < 0 ? '−' : ''}${fmtTerm(cx, x)} ${cy < 0 ? '−' : '+'} ${Math.abs(cy) === 1 ? '' : `${Math.abs(cy)}`}(${S})`;
+        const result = fmtLin(ncx, x, cy, R[i - 2]);
+        infos.push({ sub: { atom: y, expr: S, from: [R[i - 2], Q[i - 2], R[i - 1]] }, parts: [[prefix, false], [`(${S})`, true], [` = ${result}`, false]], raw, result, atomsAfter: [x, R[i - 2]] });
+        y = R[i - 2]; yi = i - 2; cx = ncx;
+      } else {
+        const i = xi, S = fmtLin(1, R[i - 2], -Q[i - 2], R[i - 1]);
+        const ncy = cy - cx * Q[i - 2];
+        const prefix = `${g} = ${cx < 0 ? '−' : ''}${Math.abs(cx) === 1 ? '' : Math.abs(cx)}`;
+        const raw = `${cx < 0 ? '−' : ''}${Math.abs(cx) === 1 ? '' : Math.abs(cx)}(${S}) ${cy < 0 ? '−' : '+'} ${fmtTerm(cy, y)}`;
+        const result = fmtLin(cx, R[i - 2], ncy, y);
+        infos.push({ sub: { atom: x, expr: S, from: [R[i - 2], Q[i - 2], R[i - 1]] }, parts: [[prefix, false], [`(${S})`, true], [` ${cy < 0 ? '−' : '+'} ${fmtTerm(cy, y)} = ${result}`, false]], raw, result, atomsAfter: [R[i - 2], y] });
+        x = R[i - 2]; xi = i - 2; cy = ncy;
+      }
+    }
+    return { R, Q, g, infos, coeffs: [cx, cy] }; // final combination: g = coeffs[0] · n + coeffs[1] · a
+  }
+
+  /* Display lines for the inverse example, computed from the preset's (a, n). Invertible presets
+     get forward lines plus the back-substitution lines; a non-invertible preset gets its forward
+     lines plus the gcd combination and the reason no combination can reach 1. */
+  function invLinesFor(a, n) {
+    const [g] = egcd(a, n);
+    const { rows } = euclidRows(n, a);
+    if (g === 1) {
+      const fwd = rows.filter((r) => r.r > 0).map((r) => ({ tag: 'Forward', parts: [[`${r.a} = ${r.q} · ${r.b} + ${r.r}`, false]] }));
+      const back = backSub(a, n).infos.map((inf) => ({ tag: 'Back', parts: inf.parts }));
+      const [cn, ca] = backSub(a, n).coeffs;
+      return [...fwd, ...back, { tag: 'Read off', parts: [[`${neg(ca)} · ${a} ≡ 1 (mod ${n}), and ${neg(ca)} + ${n} = ${mod(ca, n)}`, false]] }];
+    }
+    return [
+      ...rows.map((r) => ({ tag: 'Forward', parts: [[`${r.a} = ${r.q} · ${r.b} + ${r.r}`, false]] })),
+      { tag: 'GCD', parts: [[`${rows[0].r} = ${fmtLin(1, n, -rows[0].q, a)}`, false]] },
+      { tag: 'Why', parts: [[`every combination s · ${n} + t · ${a} is a multiple of ${g}, so none can equal 1`, false]] },
+    ];
+  }
+
+  /* Steps for the inverse example, computed from the preset's data ({ a, n }): the invertible
+     branch follows Euclid forward, back-substitutes to a Bézout combination and reads off the
+     inverse; the non-invertible branch follows Euclid to a gcd bigger than 1 and shows the
+     algorithm itself detecting that no inverse exists. */
+  function invStepsFor(D) {
+    const a = D.a, n = D.n;
+    const [g, sA, tN] = egcd(a, n); // g = sA · a + tN · n
+    const { rows } = euclidRows(n, a);
+    if (g === 1) {
+      const inv = mod(sA, n);
+      const fwdRows = rows.filter((r) => r.r > 0);
+      const bs = backSub(a, n);
+      const steps = [
+        { lines: 0, phase: 'setup', caption: `Setup: an inverse of ${a} modulo ${n} is a number x with ${a}x ≡ 1 (mod ${n}), and it can exist only because gcd(${a}, ${n}) = 1. The plan is to run Euclid forward to remainder 1, then work backward to write 1 as a combination of ${n} and ${a}.` },
+        { lines: fwdRows.length, phase: 'forward', caption: `Forward pass: ${fwdRows.map((r) => `${r.a} = ${r.q} · ${r.b} + ${r.r}`).join(', then ')}, so the ${fwdRows.length} division lines are now on the page. We run Euclid only until remainder 1 appears, because 1 is exactly the number the backward pass has to express.` },
+      ];
+      bs.infos.forEach((inf, j) => {
+        const lines = fwdRows.length + j + 1;
+        if (!inf.sub) {
+          steps.push({ lines, phase: 'back', caption: `Back-substitution starts by rearranging the last division, ${fwdRows[fwdRows.length - 1].a} = ${fwdRows[fwdRows.length - 1].q} · ${fwdRows[fwdRows.length - 1].b} + 1, into 1 = ${inf.result}. Every backward step replaces a remainder by the expression the forward pass gave for it, so the value stays equal to 1 throughout.` });
+        } else {
+          const lastSub = j === bs.infos.length - 1;
+          steps.push({ lines, phase: 'back', caption: `Replace the remainder ${inf.sub.atom} by ${inf.sub.expr}, rearranging ${inf.sub.from[0]} = ${inf.sub.from[1]} · ${inf.sub.from[2]} + ${inf.sub.atom}, giving 1 = ${inf.raw} = ${inf.result} after the terms are collected. The highlighted piece is the substitution itself, and now only the remainders ${inf.atomsAfter[0]} and ${inf.atomsAfter[1]} remain in the expression${lastSub ? ` — the original numbers ${n} and ${a} themselves` : ''}.` });
+        }
+      });
+      const finalBackIdx = steps.length - 1;
+      const fin = bs.infos[bs.infos.length - 1];
+      steps[finalBackIdx - 1].checkpoint = `Predict: one substitution is left, replacing ${fin.sub.atom} by ${fin.sub.expr} — will the coefficient of ${a} in the final combination turn out positive or negative?`;
+      const totalLines = fwdRows.length + bs.infos.length + 1;
+      steps.push({ lines: totalLines, phase: 'read', caption: `Read off the inverse: modulo ${n} the term ${tN} · ${n} is 0, so ${neg(sA)} · ${a} ≡ 1 (mod ${n}) and the coefficient of ${a} is the inverse, still in negative form. Adding ${n} turns ${neg(sA)} into the standard residue ${inv}, because residues are named by a number from 0 to ${n - 1}.` });
+      steps.push({ lines: totalLines, phase: 'answer', answer: true, caption: `Answer: ${a}⁻¹ ≡ ${inv} (mod ${n}). Check: ${a} · ${inv} = ${a * inv} = ${Math.floor((a * inv) / n)} · ${n} + 1, so ${a * inv} ≡ 1 (mod ${n}) and the inverse works, with no smaller positive candidate left to test because an inverse modulo n is unique when it exists.` });
+      return steps;
+    }
+    const residues = [...new Set(rows.length ? Array.from({ length: n }, (_, x) => mod(a * x, n)) : [])].sort((p, q) => p - q);
+    const steps = [{ lines: 0, phase: 'setup', caption: `Setup: an inverse of ${a} modulo ${n} would be a number x with ${a}x ≡ 1 (mod ${n}), and one exists only when gcd(${a}, ${n}) = 1. This time that condition is exactly what is in doubt, so the plan is to run Euclid forward first and let the gcd itself decide whether an inverse can exist at all.` }];
+    rows.forEach((r, i) => {
+      const caption = r.r === 0
+        ? `${r.a} = ${r.q} · ${r.b} + 0. This time ${r.b} fits exactly, so the remainder is 0 and the algorithm stops: the last nonzero remainder is the gcd, gcd(${a}, ${n}) = ${g}, which is not 1. The invertibility test has failed — no back-substitution can fix that, because the backward pass can only ever produce combinations of ${n} and ${a}.`
+        : `${r.a} = ${r.q} · ${r.b} + ${r.r}. ${r.q === 1 ? 'One copy' : `${r.q} copies`} of ${r.b} fit${r.q === 1 ? 's' : ''} into ${r.a}, leaving ${r.r}, so gcd(${r.a}, ${r.b}) = gcd(${r.b}, ${r.r}). The remainder ${r.r} is already bigger than 1, which is a warning sign: an inverse needs the chain to reach remainder 1 exactly.`;
+      const st = { lines: i + 1, phase: 'forward', caption };
+      if (i === 0 && rows.length >= 2) st.checkpoint = `Predict: the next division divides ${rows[1].a} by ${rows[1].b} — will it leave remainder 1, which would keep an inverse possible, or remainder 0 with gcd ${rows[1].b}, which would rule an inverse out?`;
+      steps.push(st);
+    });
+    steps.push({ lines: rows.length + 1, phase: 'back', caption: `Why ${g} blocks everything: rearranging the first division gives ${rows[0].r} = ${fmtLin(1, n, -rows[0].q, a)}, an explicit combination of ${n} and ${a} that equals the gcd ${g}. Every combination s · ${n} + t · ${a} is a multiple of ${g}, since each term is, so Bézout combinations can produce ${g} but never 1 — and producing 1 is exactly what an inverse would require.` });
+    steps.push({ lines: rows.length + 2, phase: 'read', caption: `Brute-force confirmation: the values ${a}x mod ${n} for x from 0 to ${n - 1} are exactly {${residues.join(', ')}}, every one a multiple of ${g}. The value 1 never appears, so the equation ${a}x ≡ 1 (mod ${n}) has no solution at all: it is not merely hard to solve, it is impossible.` });
+    steps.push({ lines: rows.length + 2, phase: 'answer', answer: true, caption: `Answer: ${a} has no inverse modulo ${n}. Check: gcd(${a}, ${n}) = ${g} ≠ 1, and the exhaustive residue check confirms that no x satisfies ${a}x ≡ 1 (mod ${n}) — ${a}x is always a multiple of ${g} while 1 is not, so ${a}x − 1 can never be a multiple of ${n}.` });
+    return steps;
+  }
+  const EX_INV_DATA = { a: 7, n: 26, header: '7x ≡ 1 (mod 26)', emptyText: 'Forward work will appear here: divide 26 by 7, then keep dividing remainders until 1 appears.', readNote: 'Modulo 26, the term 3 · 26 counts as 0, so only −11 · 7 remains.', answerBanner: '7⁻¹ ≡ 15 (mod 26) · check: 7 · 15 = 105 = 4 · 26 + 1, so 105 ≡ 1 (mod 26)', lines: invLinesFor(7, 26) };
+  const EX_INV_VAR_DATA = { a: 4, n: 26, header: '4x ≡ 1 (mod 26)', emptyText: 'Forward work will appear here: divide 26 by 4, then keep dividing remainders until the gcd shows itself.', readNote: 'Combinations of 26 and 4 are always multiples of their gcd 2, so none of them can ever equal 1.', answerBanner: '4 has no inverse modulo 26 · check: gcd(4, 26) = 2 ≠ 1, and 4x mod 26 is always even, never 1', lines: invLinesFor(4, 26) };
+
+  /* Repeated squaring: the chain of powers b^(2^j) mod m, the bits of e that select from it,
+     and the running product of the selected powers, computed once per preset. One generator
+     narrates both presets: a mixed bit pattern, and a power-of-two exponent whose binary
+     form has a single 1-bit, so only one square survives into the product. */
+  function powChainFor(b, e, m) {
+    const bits = e.toString(2).split('').reverse().map(Number);
+    const powers = []; let x = mod(b, m);
+    bits.forEach(() => { powers.push(x); x = (x * x) % m; });
+    const used = bits.map((bit, j) => (bit ? j : -1)).filter((j) => j >= 0);
+    const prodSteps = []; let prod = 1 % m;
+    for (const j of used) { prod = (prod * powers[j]) % m; prodSteps.push(prod); }
+    return { b, e, m, bits, powers, used, prodSteps, ans: prod };
+  }
+  function powStepsFor(D) {
+    const { b, e, m, bits, powers, used, ans } = D;
+    const bin = e.toString(2);
+    const steps = [{ shown: 0, phase: 'setup', caption: `Setup: compute ${b}^${e} mod ${m} without ever forming the enormous number ${b}^${e} itself. Write the exponent in binary, ${e} = (${bin})₂ = ${used.map((j) => 2 ** j).reverse().join(' + ')}, square the base repeatedly to get the powers ${b}^1, ${b}^2, ${b}^4, … mod ${m}, and multiply in only the powers that match the 1-bits.` }];
+    powers.forEach((p, j) => {
+      steps.push({ shown: j + 1, phase: 'square', caption: j === 0
+        ? `First power: ${b}^1 mod ${m} = ${p}, just the base reduced mod ${m}. This value anchors the whole chain, because every later power is the square of the one before it, reduced at once, so no entry in the table ever reaches ${m}².`
+        : `Square the previous power: ${b}^${2 ** j} = (${b}^${2 ** (j - 1)})² ≡ ${powers[j - 1]}² = ${powers[j - 1] * powers[j - 1]} ≡ ${p} (mod ${m}). Reducing right after squaring is what keeps the method fast: the arithmetic stays tiny no matter how large the exponent grows.` });
+    });
+    const skipped = bits.map((bit, j) => (bit ? -1 : j)).filter((j) => j >= 0);
+    steps.push({ shown: powers.length, phase: 'select', caption: `Read the bits of ${e} = (${bin})₂ from the right: the 1-bits sit at positions ${used.join(', ')}, so the powers that belong in the answer are ${used.map((j) => `${b}^${2 ** j} ≡ ${powers[j]}`).join(', ')}${skipped.length ? `, while the power${skipped.length === 1 ? '' : 's'} at bit position${skipped.length === 1 ? '' : 's'} ${skipped.join(', ')} (bit 0) are skipped` : ''}. Only ${used.length} of the ${bits.length} squares survive into the product.`,
+      checkpoint: `Predict: multiply just the kept powers ${used.map((j) => powers[j]).join(' · ')} together, reducing mod ${m} after each multiplication — what single residue from 0 to ${m - 1} will be left at the end?` });
+    const chain = []; let run = 1 % m;
+    used.forEach((j, t) => { const before = run; run = D.prodSteps[t]; chain.push(t === 0 || before === 1 ? `1 · ${powers[j]} = ${run}` : `${before} · ${powers[j]} = ${before * powers[j]} ≡ ${run}`); });
+    steps.push({ shown: powers.length, phase: 'multiply', caption: `Multiply the kept powers in, reducing after each step: ${chain.join(', then ')}. Reducing at every step gives the same final residue as reducing once at the end — the multiplication rule for congruences guarantees it — but the intermediate numbers stay below ${m} · ${m} the whole way.` });
+    steps.push({ shown: powers.length, phase: 'answer', answer: true, caption: `Answer: ${b}^${e} ≡ ${ans} (mod ${m}). Check: multiplying ${b} by itself ${e} times, reducing mod ${m} after every single multiplication, also ends at ${ans} — repeated squaring reached the same residue with just ${bits.length - 1} squarings and ${Math.max(0, used.length - 1)} extra multiplication${used.length === 2 ? '' : 's'} instead of ${e - 1} multiplications.` });
+    return steps;
+  }
+  const EX_POW_DATA = powChainFor(5, 11, 13);
+  const EX_POW_VAR_DATA = powChainFor(3, 16, 7);
+
+  /* The sieve as data: one pass per prime p with p² ≤ N, each recording the numbers it newly
+     crosses out (multiples from p² up, the same rule the sieve lab uses), plus the survivors. */
+  function sieveDataFor(N) {
+    const crossed = new Array(N + 1).fill(0); const passes = [];
+    for (let p = 2; p * p <= N; p++) {
+      if (crossed[p]) continue;
+      const newly = [];
+      for (let x = p * p; x <= N; x += p) if (!crossed[x]) { crossed[x] = p; newly.push(x); }
+      passes.push({ p, crossed: newly });
+    }
+    const primes = []; for (let x = 2; x <= N; x++) if (!crossed[x]) primes.push(x);
+    return { N, passes, primes };
+  }
+  function sieveStepsFor(D) {
+    const { N, passes, primes } = D;
+    const steps = [{ shown: 0, phase: 'setup', caption: `Setup: find every prime up to ${N} with the sieve, which needs no division at all. Every number from 2 to ${N} starts out standing; each pass takes the smallest number still standing — which must be prime — and crosses out its multiples, and whatever is left standing at the end is exactly the list of primes.` }];
+    let crossedCount = 0;
+    passes.forEach((ps, j) => {
+      crossedCount += ps.crossed.length;
+      const standing = N - 1 - crossedCount;
+      const list = ps.crossed.length > 6 ? `${ps.crossed.slice(0, 5).join(', ')}, … (${ps.crossed.length} in all)` : ps.crossed.join(', ');
+      steps.push({ shown: j + 1, phase: 'pass', caption: `Pass p = ${ps.p}: ${ps.p} is the smallest number still standing, so it is prime, because a smaller prime factor would already have crossed it out. Cross out its multiples starting at ${ps.p}² = ${ps.p * ps.p}, since every smaller multiple of ${ps.p} is either ${ps.p} itself or has a smaller prime factor and fell earlier: this pass newly crosses ${list}. Now ${standing} numbers are still standing.` });
+    });
+    if (passes.length >= 2) steps[1].checkpoint = `Predict: the next pass takes p = ${passes[1].p}, the smallest number still standing, and starts crossing at ${passes[1].p}² = ${passes[1].p * passes[1].p} — will that starting number still be standing when the pass begins, and will it fall in this pass?`;
+    const nextP = primes[passes.length];
+    steps.push({ shown: passes.length, phase: 'collect', caption: `Stop: the next candidate would be ${nextP}, and ${nextP}² = ${nextP * nextP} > ${N}, so every composite up to ${N} already lost a prime factor at or below √${N} ≈ ${Math.sqrt(N).toFixed(1)} in an earlier pass. Everything still standing is therefore prime: ${primes.join(', ')}.` });
+    steps.push({ shown: passes.length, phase: 'answer', answer: true, caption: `Answer: the primes up to ${N} are ${primes.join(', ')} — ${primes.length} primes in all. Check: trial division, a different method, tests each number from 2 to ${N} against divisors up to its own square root and finds exactly these ${primes.length} primes, and every composite in the range was crossed by its smallest prime factor during the passes.` });
+    return steps;
+  }
+  const EX_SIEVE_DATA = sieveDataFor(30);
+  const EX_SIEVE_VAR_DATA = sieveDataFor(50);
+  const sieveCheck = (D, M) => {
+    const want = []; for (let x = 2; x <= D.N; x++) if (M.isPrime(x)) want.push(x);
+    const crossedAll = D.passes.flatMap((ps) => ps.crossed);
+    return JSON.stringify(want) === JSON.stringify(D.primes)
+      && crossedAll.length + D.primes.length === D.N - 1
+      && new Set(crossedAll).size === crossedAll.length
+      && D.passes.every((ps) => ps.crossed.every((x) => x % ps.p === 0 && x >= ps.p * ps.p && !M.isPrime(x)));
+  };
+
 
   DM.module({
     id: 'numbers',
@@ -977,30 +1189,36 @@
       },
       /* ---------------------------------------------------------------- worked example */
       {
-        title: 'Worked example: Euclid\u2019s algorithm for gcd(252, 198)',
+        title: 'Worked example: Euclid’s algorithm for gcd(252, 198)',
         kind: 'example',
         id: 'ex-euclid-gcd',
         problem: String.raw`<p>Use Euclid's algorithm to find \(\gcd(252, 198)\), showing every division.</p>`,
-        steps: [
-          { shown: 0, caption: 'The plan: replace the pair (a, b) by (b, the remainder when a is divided by b). The gcd survives every replacement, because any common divisor of a and b also divides that remainder — and the numbers shrink each time, so the process must stop.' },
-          { shown: 1, caption: '252 = 1 · 198 + 54. One copy of 198 fits into 252 and 54 is left over, so gcd(252, 198) = gcd(198, 54): the same question about smaller numbers.' },
-          { shown: 2, caption: '198 = 3 · 54 + 36. Three copies of 54 fit into 198, leaving 36, so gcd(198, 54) = gcd(54, 36). Each step keeps only the remainder, which is why the algorithm is fast.' },
-          { shown: 3, caption: '54 = 1 · 36 + 18. One copy of 36 fits, leaving 18, so gcd(54, 36) = gcd(36, 18). The remainder is now smaller than the number we will divide by next.' },
-          { shown: 4, caption: '36 = 2 · 18 + 0. This time 18 fits exactly and nothing is left over. A remainder of 0 is the stop signal: dividing further is impossible, and the last nonzero remainder is the answer.' },
-          { shown: 4, answer: true, caption: 'Answer: gcd(252, 198) = 18. Check: 252 = 18 · 14 and 198 = 18 · 11, so 18 divides both numbers — and 14 and 11 share no factor bigger than 1, so no number larger than 18 can divide both. That confirms 18 is the greatest common divisor.' },
-        ],
+        objective: 'Use Euclid’s algorithm to find the gcd of two integers by repeated division, and justify the answer by dividing both original numbers by the result.',
+        data: EX_GCD_DATA,
+        steps: euclidStepsFor(EX_GCD_DATA),
         answer: 18,
         verify(M) { return M.gcd(252, 198) === 18 && EX_GCD.g === 18 && 252 % 18 === 0 && 198 % 18 === 0 && M.gcd(14, 11) === 1; },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: first number smaller',
+            problem: String.raw`<p>Use Euclid's algorithm to find \(\gcd(84, 210)\), showing every division. Here the first number is smaller than the second — watch what the first division does with that.</p>`,
+            data: EX_GCD_VAR,
+            steps: euclidStepsFor(EX_GCD_VAR),
+            answer: 42,
+            verify(M) { return M.gcd(84, 210) === 42 && EX_GCD_VAR.g === 42 && EX_GCD_VAR.rows[0].q === 0 && 84 % 42 === 0 && 210 % 42 === 0 && M.gcd(2, 5) === 1; },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const rows = EX_GCD.rows.slice(0, step.shown).map((r, i) => h('tr', { class: i === step.shown - 1 && !step.answer ? 'hit' : '' },
+          const D = (preset && preset.data) || EX_GCD_DATA;
+          const rows = D.rows.slice(0, step.shown).map((r, i) => h('tr', { class: i === step.shown - 1 && !step.answer ? 'hit' : '' },
             h('td', String(r.a)), h('td', String(r.q)), h('td', String(r.b)), h('td', String(r.r)),
             h('td.l.mono', `${r.a} = ${r.q} · ${r.b} + ${r.r}`)));
-          const pair = step.shown === 0 ? 'gcd(252, 198) = ?' : step.answer ? 'gcd(252, 198) = 18' : `gcd(${EX_GCD.rows[step.shown - 1].b}, ${EX_GCD.rows[step.shown - 1].r})`;
+          const pair = step.shown === 0 ? `gcd(${D.a}, ${D.b}) = ?` : step.answer ? `gcd(${D.a}, ${D.b}) = ${D.g}` : `gcd(${D.rows[step.shown - 1].b}, ${D.rows[step.shown - 1].r})`;
           stage.append(h('div.stack', { style: { alignItems: 'center' } },
             h('div.big-math.mono', pair),
             rows.length ? h('table.tt', h('thead', h('tr', h('th', 'a'), h('th', 'q'), h('th', 'b'), h('th', 'r'), h('th.l', 'division'))), h('tbody', rows)) : h('p.small.muted', 'No divisions yet — press Step to divide.'),
-            step.answer ? h('div.ex-answer', 'gcd(252, 198) = 18 · check: 18 · 14 = 252 and 18 · 11 = 198, with gcd(14, 11) = 1') : null));
+            step.answer ? h('div.ex-answer', `gcd(${D.a}, ${D.b}) = ${D.g} · check: ${D.g} · ${D.a / D.g} = ${D.a} and ${D.g} · ${D.b / D.g} = ${D.b}, with gcd(${D.a / D.g}, ${D.b / D.g}) = 1`) : null));
         },
       },
       /* ---------------------------------------------------------------- worked example 2 */
@@ -1009,15 +1227,9 @@
         kind: 'example',
         id: 'ex-mod-inverse',
         problem: String.raw`<p>Find the modular inverse of \(7\) modulo \(26\) — the number \(x\) with \(7x \equiv 1 \pmod{26}\) — by running Euclid's algorithm forward and then back-substituting.</p>`,
-        steps: [
-          { lines: 0, phase: 'setup', caption: 'Setup: an inverse of 7 modulo 26 is a number x with 7x ≡ 1 (mod 26), and it can exist only because gcd(7, 26) = 1. The plan is to run Euclid forward to remainder 1, then work backward to write 1 as a combination of 26 and 7.' },
-          { lines: 3, phase: 'forward', caption: 'Forward pass: 26 = 3 · 7 + 5, then 7 = 1 · 5 + 2, then 5 = 2 · 2 + 1, so the three division lines are now on the page. We run Euclid only until remainder 1 appears, because 1 is exactly the number the backward pass has to express.' },
-          { lines: 4, phase: 'back', caption: 'Back-substitution starts by rearranging the last division, 5 = 2 · 2 + 1, into 1 = 5 − 2 · 2. Every backward step replaces a remainder by the expression the forward pass gave for it, so the value stays equal to 1 throughout.' },
-          { lines: 5, phase: 'back', caption: 'Replace the remainder 2 by 7 − 1 · 5, giving 1 = 5 − 2(7 − 5) = 3 · 5 − 2 · 7 after the terms in 5 are collected. The highlighted piece is the substitution itself, and now only the remainders 5 and 7 remain in the expression.' },
-          { lines: 6, phase: 'back', caption: 'Replace the remainder 5 by 26 − 3 · 7, giving 1 = 3(26 − 3 · 7) − 2 · 7 = 3 · 26 − 11 · 7. The highlighted piece is this second substitution, and now 1 is written using only the original numbers 26 and 7.' },
-          { lines: 7, phase: 'read', caption: 'Read off the inverse: modulo 26 the term 3 · 26 is 0, so −11 · 7 ≡ 1 (mod 26) and the coefficient of 7 is the inverse, still in negative form. Adding 26 turns −11 into the standard residue 15, because residues are named by a number from 0 to 25.' },
-          { lines: 7, phase: 'answer', answer: true, caption: 'Answer: 7⁻¹ ≡ 15 (mod 26). Check: 7 · 15 = 105 = 4 · 26 + 1, so 105 ≡ 1 (mod 26) and the inverse works, with no smaller positive candidate left to test because an inverse modulo n is unique when it exists.' },
-        ],
+        objective: 'Find a modular inverse by running Euclid’s algorithm forward and back-substituting to a Bézout combination, and recognize the gcd test that decides whether an inverse exists at all.',
+        data: EX_INV_DATA,
+        steps: invStepsFor(EX_INV_DATA),
         answer: 15,
         verify(M) {
           const [g, s, t] = egcd(7, 26);
@@ -1026,18 +1238,24 @@
           for (let x = 1; x < 26; x++) if (M.mod(7 * x, 26) === 1) { count++; found = x; }
           return M.mod(7 * 15, 26) === 1 && inverse(7, 26) === 15 && g === 1 && s * 7 + t * 26 === g && M.mod(s, 26) === 15 && fwd.g === 1 && fwd.rows.length === 4 && count === 1 && found === 15;
         },
-        draw(stage, ctx, step, k) {
+        variants: [
+          {
+            label: 'Variant: no inverse exists',
+            problem: String.raw`<p>Try to find the modular inverse of \(4\) modulo \(26\) — a number \(x\) with \(4x \equiv 1 \pmod{26}\) — by running Euclid's algorithm forward first, and let the gcd decide whether the search can succeed.</p>`,
+            data: EX_INV_VAR_DATA,
+            steps: invStepsFor(EX_INV_VAR_DATA),
+            answer: 'no inverse',
+            verify(M) {
+              let count = 0;
+              for (let x = 0; x < 26; x++) if (M.mod(4 * x, 26) === 1) count++;
+              return M.gcd(4, 26) === 2 && inverse(4, 26) === null && count === 0;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const fwd = euclidRows(26, 7).rows.slice(0, 3).map((r) => `${r.a} = ${r.q} · ${r.b} + ${r.r}`);
-          const all = [
-            { tag: 'Forward', parts: [[fwd[0], false]] },
-            { tag: 'Forward', parts: [[fwd[1], false]] },
-            { tag: 'Forward', parts: [[fwd[2], false]] },
-            { tag: 'Back', parts: [['1 = 5 − 2 · 2', false]] },
-            { tag: 'Back', parts: [['1 = 5 − 2', false], ['(7 − 5)', true], [' = 3 · 5 − 2 · 7', false]] },
-            { tag: 'Back', parts: [['1 = 3', false], ['(26 − 3 · 7)', true], [' − 2 · 7 = 3 · 26 − 11 · 7', false]] },
-            { tag: 'Read off', parts: [['−11 · 7 ≡ 1 (mod 26), and −11 + 26 = 15', false]] },
-          ];
+          const D = (preset && preset.data) || EX_INV_DATA;
+          const all = D.lines;
           const shown = all.slice(0, step.lines);
           const lineEls = shown.map((ln, i) => {
             const isNew = i === shown.length - 1 && !step.answer;
@@ -1046,12 +1264,118 @@
               ...ln.parts.map(([txt, hl]) => (hl ? h('span.hl', txt) : txt)));
           });
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem', maxWidth: '46rem', width: '100%' } },
-            h('div.big-math.mono', '7x ≡ 1 (mod 26)'),
+            h('div.big-math.mono', D.header),
             step.lines === 0
-              ? h('div.small.muted', { style: { border: '1px dashed var(--rule)', borderRadius: 'var(--radius)', padding: '0.5rem 0.8rem', textAlign: 'center' } }, 'Forward work will appear here: divide 26 by 7, then keep dividing remainders until 1 appears.')
+              ? h('div.small.muted', { style: { border: '1px dashed var(--rule)', borderRadius: 'var(--radius)', padding: '0.5rem 0.8rem', textAlign: 'center' } }, D.emptyText)
               : h('div.stack', { style: { gap: '0.12rem', alignItems: 'stretch' } }, ...lineEls),
-            step.phase === 'read' || step.answer ? h('div.small', 'Modulo 26, the term 3 · 26 counts as 0, so only −11 · 7 remains.') : null,
-            step.answer ? h('div.ex-answer', '7⁻¹ ≡ 15 (mod 26) · check: 7 · 15 = 105 = 4 · 26 + 1, so 105 ≡ 1 (mod 26)') : null));
+            step.phase === 'read' || step.answer ? h('div.small', D.readNote) : null,
+            step.answer ? h('div.ex-answer', D.answerBanner) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 3 */
+      {
+        title: 'Worked example: 5^11 mod 13 by repeated squaring',
+        kind: 'example',
+        id: 'ex-fast-power',
+        problem: String.raw`<p>Compute \(5^{11} \bmod 13\) by repeated squaring: expand \(11\) in binary, build the squaring chain \(5^1, 5^2, 5^4, 5^8 \bmod 13\), and multiply in only the powers the 1-bits select.</p>`,
+        objective: 'Compute a modular power by repeated squaring: expand the exponent in binary, square the base step by step while reducing mod m, and multiply in only the powers selected by the 1-bits.',
+        data: EX_POW_DATA,
+        steps: powStepsFor(EX_POW_DATA),
+        answer: EX_POW_DATA.ans,
+        verify(M) {
+          const D = EX_POW_DATA;
+          let r = 1 % D.m; for (let i = 0; i < D.e; i++) r = (r * D.b) % D.m;
+          const chainOk = D.powers.every((p, j) => { let q = 1 % D.m; for (let t = 0; t < 2 ** j; t++) q = (q * D.b) % D.m; return q === p; });
+          return r === D.ans && D.ans === 8 && powmod(D.b, D.e, D.m) === D.ans && chainOk && M.mod(5 * 8, 13) === 1;
+        },
+        variants: [
+          {
+            label: 'Variant: exponent is a power of two',
+            problem: String.raw`<p>Compute \(3^{16} \bmod 7\) by repeated squaring. The exponent \(16\) is itself a power of two, so its binary form has a single 1-bit — watch what that does to the squaring chain and to the final product.</p>`,
+            data: EX_POW_VAR_DATA,
+            steps: powStepsFor(EX_POW_VAR_DATA),
+            answer: EX_POW_VAR_DATA.ans,
+            verify(M) {
+              const D = EX_POW_VAR_DATA;
+              let r = 1 % D.m; for (let i = 0; i < D.e; i++) r = (r * D.b) % D.m;
+              const chainOk = D.powers.every((p, j) => { let q = 1 % D.m; for (let t = 0; t < 2 ** j; t++) q = (q * D.b) % D.m; return q === p; });
+              return r === D.ans && D.ans === 4 && powmod(D.b, D.e, D.m) === D.ans && chainOk && D.used.length === 1 && D.bits.join('') === '00001';
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_POW_DATA;
+          const revealBits = step.phase === 'select' || step.phase === 'multiply' || !!step.answer;
+          const status = step.phase === 'setup' ? `Goal: ${D.b}^${D.e} mod ${D.m} · exponent ${D.e} = (${D.e.toString(2)})₂ · no powers computed yet`
+            : step.phase === 'square' ? `Squaring chain: ${step.shown} of ${D.bits.length} powers computed`
+              : step.phase === 'select' ? `Bits read: the 1-bits keep ${D.used.map((j) => `${D.b}^${2 ** j}`).join(', ')}`
+                : step.phase === 'multiply' ? `Kept powers multiplied in: running product = ${D.ans}`
+                  : `Done: ${D.b}^${D.e} ≡ ${D.ans} (mod ${D.m})`;
+          const tbl = h('table.nt-ladder', h('tbody',
+            h('tr', h('th', `power of ${D.b}`), ...D.bits.map((_, j) => h('td', String(2 ** j)))),
+            h('tr', h('th', `value mod ${D.m}`), ...D.powers.map((p, j) => h('td', { class: j < step.shown ? (revealBits ? (D.bits[j] ? 'on' : 'off') : '') : 'off' }, j < step.shown ? String(p) : '?'))),
+            h('tr', h('th', `bit of ${D.e}`), ...D.bits.map((bit, j) => h('td', { class: revealBits ? (bit ? 'dig' : 'off') : 'off' }, revealBits ? String(bit) : '?')))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: 'min(38rem, 100%)' } },
+            h('div.big-math.mono', `${D.b}^${D.e} mod ${D.m}`),
+            h('div.small', h('b.mono', status)),
+            tbl,
+            step.phase === 'multiply' || step.answer ? h('p.small', `Product of the kept powers: ${D.used.map((j) => D.powers[j]).join(' · ')} ≡ ${D.ans} (mod ${D.m})`) : null,
+            step.answer ? h('div.ex-answer', `${D.b}^${D.e} ≡ ${D.ans} (mod ${D.m}) · check: multiplying ${D.b} by itself ${D.e} times, reducing mod ${D.m} each time, also ends at ${D.ans} ✓`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 4 */
+      {
+        title: 'Worked example: the sieve up to 30',
+        kind: 'example',
+        id: 'ex-sieve-primes',
+        problem: String.raw`<p>Use the sieve of Eratosthenes to find every prime up to \(30\): start with all numbers standing, then for each prime in turn cross out its multiples, and list the primes that remain standing.</p>`,
+        objective: 'Find all primes up to a stated bound with the sieve of Eratosthenes, crossing out multiples prime by prime starting at each prime squared, and check the surviving list by independent trial division.',
+        data: EX_SIEVE_DATA,
+        steps: sieveStepsFor(EX_SIEVE_DATA),
+        answer: EX_SIEVE_DATA.primes,
+        verify(M) { return sieveCheck(EX_SIEVE_DATA, M) && EX_SIEVE_DATA.primes.length === 10; },
+        variants: [
+          {
+            label: 'Variant: sieve up to 50',
+            problem: String.raw`<p>Use the sieve of Eratosthenes to find every prime up to \(50\). The larger bound admits one more pass than the sieve up to \(30\) needed, because \(7^2 = 49\) now falls inside the range — run the passes and list the primes that remain standing.</p>`,
+            data: EX_SIEVE_VAR_DATA,
+            steps: sieveStepsFor(EX_SIEVE_VAR_DATA),
+            answer: EX_SIEVE_VAR_DATA.primes,
+            verify(M) { return sieveCheck(EX_SIEVE_VAR_DATA, M) && EX_SIEVE_VAR_DATA.primes.length === 15 && EX_SIEVE_VAR_DATA.passes.length === 4 && EX_SIEVE_VAR_DATA.passes[3].crossed.join(',') === '49'; },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_SIEVE_DATA;
+          const crossedBy = new Map();
+          D.passes.slice(0, step.shown).forEach((ps) => ps.crossed.forEach((x) => crossedBy.set(x, ps.p)));
+          const picked = new Set(D.passes.slice(0, step.shown).map((ps) => ps.p));
+          const primeSet = new Set(D.primes);
+          const done = step.phase === 'collect' || !!step.answer;
+          const curP = step.phase === 'pass' ? D.passes[step.shown - 1].p : null;
+          const cells = [];
+          for (let v = 1; v <= D.N; v++) {
+            const base = { minWidth: '2rem', textAlign: 'center', padding: '0.18rem 0.1rem', border: '1px solid var(--rule)', borderRadius: '0.3rem', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', background: 'var(--sheet)', color: 'var(--ink)' };
+            if (v === 1) Object.assign(base, { color: 'var(--ink-3)', borderStyle: 'dashed' });
+            else if (crossedBy.has(v)) Object.assign(base, { color: 'var(--ink-3)', textDecoration: 'line-through', borderColor: PCOL[crossedBy.get(v)] || 'var(--rule)', background: 'var(--paper)' });
+            else if (done && primeSet.has(v)) Object.assign(base, { background: 'var(--true-bg)', borderColor: 'var(--true)', color: 'var(--true)', fontWeight: 700 });
+            else if (picked.has(v)) Object.assign(base, { background: 'var(--true-bg)', borderColor: 'var(--true)', fontWeight: 700 });
+            if (v === curP) base.boxShadow = '0 0 0 2px var(--ink)';
+            cells.push(h('div', { style: base }, String(v)));
+          }
+          const standing = D.N - 1 - crossedBy.size;
+          const status = step.phase === 'setup' ? `Numbers 1 to ${D.N} · nothing crossed out yet · ${D.N - 1} numbers standing`
+            : step.phase === 'pass' ? `Pass p = ${curP} · crossed out so far: ${crossedBy.size} · still standing: ${standing}`
+              : step.phase === 'collect' ? `All ${D.passes.length} passes done · ${D.primes.length} numbers still standing, all prime`
+                : `Primes up to ${D.N}: ${D.primes.length} found`;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: 'min(42rem, 100%)' } },
+            h('div.small', h('b.mono', status)),
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.25rem', justifyContent: 'center' } }, ...cells),
+            h('p.small.muted', step.phase === 'setup' ? 'The number 1 is neither prime nor composite, so it never joins the passes; every other number starts out standing.'
+              : done ? 'Green cells are the primes: every composite was crossed by its smallest prime factor.'
+                : 'Struck-through cells are crossed out, tinted by the prime whose pass removed them; green cells are primes already picked.'),
+            step.answer ? h('div.ex-answer', `Primes up to ${D.N}: ${D.primes.join(', ')} · check: trial division of every number up to its square root finds the same ${D.primes.length} primes ✓`) : null));
         },
       },
       /* ---------------------------------------------------------------- 14 */

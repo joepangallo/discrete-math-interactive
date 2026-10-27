@@ -60,6 +60,133 @@
   }
   const parseRoster = (txt) => [...new Set(String(txt).split(/[,\s]+/).map((x) => x.trim()).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 12))].sort((a, b) => a - b);
   const fmt = (arr) => (arr.length ? '{' + arr.join(', ') + '}' : '∅');
+  const fmtList = (arr) => (arr.length <= 2 ? arr.join(' and ') : arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1]);
+
+  /* ---- worked-example generators: each example's steps are computed from a preset data object,
+     so the primary problem and its variant share one generator and differ only in their input ---- */
+  // Venn shading: shade A, then a first compound of A and B, then C′, then combine the two shadings.
+  const VENN_SETS = { U: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], A: [1, 2, 3, 4, 5], B: [4, 5, 6, 7], C: [2, 5, 8] };
+  const EX_VENN_MAIN = { ...VENN_SETS, firstOp: 'union', combineOp: 'intersection', firstName: 'A ∪ B', exprName: '(A ∪ B) ∩ C′',
+    answerBanner: '(A ∪ B) ∩ C′ = {1, 3, 4, 6, 7} — check: every listed element is in A or in B, and none of them is in C' };
+  const EX_VENN_VARIANT = { ...VENN_SETS, firstOp: 'intersection', combineOp: 'union', firstName: 'A ∩ B', exprName: '(A ∩ B) ∪ C′',
+    answerBanner: '(A ∩ B) ∪ C′ = {1, 3, 4, 5, 6, 7, 9, 10} — check: every listed element is outside C or in both A and B at once; 5 is in C but is saved by the overlap' };
+  function vennParts(D) {
+    const first = D.U.filter((x) => (D.firstOp === 'union' ? (D.A.includes(x) || D.B.includes(x)) : (D.A.includes(x) && D.B.includes(x))));
+    const comp = D.U.filter((x) => !D.C.includes(x));
+    const fin = D.U.filter((x) => (D.combineOp === 'intersection' ? (first.includes(x) && comp.includes(x)) : (first.includes(x) || comp.includes(x))));
+    return { first, comp, fin };
+  }
+  function vennStepsFor(D) {
+    const { first, comp, fin } = vennParts(D);
+    const union = D.firstOp === 'union', inter = D.combineOp === 'intersection';
+    const regionName = { '100': 'A only', '010': 'B only', '001': 'C only', '110': 'A ∩ B outside C', '101': 'A ∩ C outside B', '011': 'B ∩ C outside A', '111': 'A ∩ B inside C', '000': 'outside every circle' };
+    const groups = [];
+    for (const x of fin) {
+      const key = (D.A.includes(x) ? '1' : '0') + (D.B.includes(x) ? '1' : '0') + (D.C.includes(x) ? '1' : '0');
+      const g = groups[groups.length - 1];
+      if (g && g.key === key) g.els.push(x); else groups.push({ key, els: [x] });
+    }
+    const groupText = fmtList(groups.map((g) => `${fmtList(g.els)} from ${regionName[g.key]}`));
+    const inFirstInC = first.filter((x) => D.C.includes(x));
+    const savedByFirst = inFirstInC.filter((x) => fin.includes(x));
+    const outsideAll = comp.filter((x) => !D.A.includes(x) && !D.B.includes(x));
+    return [
+      { phase: 0, status: 'Regions placed · nothing shaded yet', caption: `Plan first: place every element of U in its region, then work inside-out — shade A, ${union ? 'grow' : 'shrink'} the shading to ${D.firstName}, switch to the complement of C, and ${inter ? 'keep only what both shadings share' : 'keep anything that either shading covers'}. Nothing is shaded yet, so this first picture is the map for every later step.` },
+      { phase: 1, status: `Shaded: A = ${fmt(D.A)}`, caption: `Shade all of circle A, because the first sub-expression is just A = ${fmt(D.A)}. Every region inside circle A is now shaded, including the parts that also lie inside B or inside C.` },
+      union
+        ? { phase: 2, status: `Shaded: A ∪ B = ${fmt(first)}`, caption: `Extend the shading to all of circle B as well, because a union keeps anything that is in either set: A ∪ B = ${fmt(first)}. The shaded area is now the whole of both circles, with the overlap shaded once, not twice.` }
+        : { phase: 2, status: `Shaded: A ∩ B = ${fmt(first)}`, caption: `Shrink the shading to the overlap of the two circles, because an intersection keeps only what is in both sets at once: A ∩ B = ${fmt(first)}. The parts of A alone and of B alone go blank again, and only the lens where the circles overlap stays shaded.` },
+      { phase: 3, status: `Shaded: C′ = ${fmt(comp)} (everything outside C)`, checkpoint: inter ? `Predict: when the two shadings are intersected next, which members of ${D.firstName} drop out — the ones inside C, or the ones outside it?` : `Predict: when the two shadings are unioned next, will ${fmtList(savedByFirst)} — inside C, but also inside ${D.firstName} — end up in the final set?`, caption: `Start over with a different shading: everything outside circle C, because the complement C′ = ${fmt(comp)} holds all of U except ${fmtList(D.C)}. Even the corners of the universe, outside every circle, are shaded this time.` },
+      inter
+        ? { phase: 4, status: `Kept: in ${D.firstName} and outside C = ${fmt(fin)}`, caption: `Intersect the two shadings: keep only the regions that were shaded in both senses, meaning in ${D.firstName} and also outside C. The elements ${fmtList(inFirstInC)} drop out because they lie inside C, and ${fmtList(comp.filter((x) => !first.includes(x)))} drop out because they were never in ${D.firstName}.` }
+        : { phase: 4, status: `Kept: in ${D.firstName} or outside C = ${fmt(fin)}`, caption: `Union the two shadings: keep every region that was shaded in either sense, meaning in ${D.firstName} or outside C. The element ${fmtList(savedByFirst)} stays through the intersection even though it lies inside C, and ${fmtList(outsideAll)} join through the complement even though they lie in neither A nor B.` },
+      { phase: 4, answer: true, status: `Final regions outlined in bold: ${fmt(fin)}`, caption: inter
+        ? `Answer: ${D.exprName} = ${fmt(fin)}, read region by region — ${groupText}. Check each one: it is in A or in B and it is not in C, while the only other members of ${D.firstName}, namely ${fmtList(first.filter((x) => !fin.includes(x)))}, fail because they lie in C.`
+        : `Answer: ${D.exprName} = ${fmt(fin)}, read region by region — ${groupText}. Check each one: it is outside C, or it lies in both A and B at once. The only members of U left out are ${fmtList(D.U.filter((x) => !fin.includes(x)))}, and each of them lies in C without being in ${D.firstName}, so neither shading ever covers it.` },
+    ];
+  }
+  // De Morgan by membership table: the two presets are the two laws, on the same sets.
+  const EX_DM_MAIN = { U: [1, 2, 3, 4, 5, 6], A: [1, 2, 3], B: [3, 4], form: 'union',
+    bannerTail: '5 and 6 are exactly the elements in neither A nor B' };
+  const EX_DM_VARIANT = { U: [1, 2, 3, 4, 5, 6], A: [1, 2, 3], B: [3, 4], form: 'intersection',
+    bannerTail: 'every element except 3 lies outside at least one of A and B' };
+  function dmCols(D) {
+    const inA = (x) => D.A.includes(x), inB = (x) => D.B.includes(x);
+    const opF = D.form === 'union' ? (x) => inA(x) || inB(x) : (x) => inA(x) && inB(x);
+    const rhsF = D.form === 'union' ? (x) => !inA(x) && !inB(x) : (x) => !inA(x) || !inB(x);
+    return [
+      { head: 'in A', f: inA },
+      { head: 'in B', f: inB },
+      { head: D.form === 'union' ? 'in A ∪ B' : 'in A ∩ B', f: opF },
+      { head: D.form === 'union' ? 'in (A ∪ B)′' : 'in (A ∩ B)′', f: (x) => !opF(x) },
+      { head: 'in A′', f: (x) => !inA(x) },
+      { head: 'in B′', f: (x) => !inB(x) },
+      { head: D.form === 'union' ? 'in A′ ∩ B′' : 'in A′ ∪ B′', f: rhsF },
+    ];
+  }
+  function dmStepsFor(D) {
+    const COLS = dmCols(D);
+    const setOf = (f) => D.U.filter(f);
+    const opSet = setOf(COLS[2].f), lhsSet = setOf(COLS[3].f), aC = setOf(COLS[4].f), bC = setOf(COLS[5].f), rhsSet = setOf(COLS[6].f);
+    const opName = COLS[2].head.replace('in ', ''), lhsName = COLS[3].head.replace('in ', ''), rhsName = COLS[6].head.replace('in ', '');
+    const pattern = D.U.map((x) => (COLS[3].f(x) ? 'T' : 'F')).join(', ');
+    const union = D.form === 'union';
+    return [
+      { cols: 2, fresh: [0, 1], compare: false, status: 'Columns so far: x, in A, in B', caption: `Start with the raw facts only: one row for each element of U = ${fmt(D.U)}, with a T where the element belongs to A = ${fmt(D.A)} or to B = ${fmt(D.B)}. Every later column is computed from these two columns, row by row.` },
+      union
+        ? { cols: 3, fresh: [2], compare: false, status: `New column: in ${opName} = ${fmt(opSet)}`, caption: `Add the union column: an element is in A ∪ B when its row has a T in the A column, in the B column, or in both. Only ${fmtList(setOf((x) => !COLS[2].f(x)))} get an F here, because they are the elements that belong to neither set.` }
+        : { cols: 3, fresh: [2], compare: false, status: `New column: in ${opName} = ${fmt(opSet)}`, caption: `Add the intersection column: an element is in A ∩ B only when its row has a T in both the A column and the B column. Only ${fmtList(opSet)} gets a T here, because it is the single element that belongs to both sets at once.` },
+      { cols: 4, fresh: [3], compare: false, status: `New column: in ${lhsName} = ${fmt(lhsSet)}`, caption: `Flip the ${union ? 'union' : 'intersection'} column to get ${lhsName}: every T becomes F and every F becomes T, because a complement keeps exactly the elements the original set missed. This column is T only for ${fmtList(lhsSet)}, so the left-hand side of the law is ${fmt(lhsSet)}.` },
+      { cols: 6, fresh: [4, 5], compare: false, status: `New columns: in A′ = ${fmt(aC)} and in B′ = ${fmt(bC)}`, caption: `Now build the right-hand side in pieces: A′ flips the A column and B′ flips the B column, each one keeping the elements outside that single set. These two columns are the ingredients for the ${union ? 'intersection' : 'union'} that finishes the right-hand side.` },
+      { cols: 7, fresh: [6], compare: false, checkpoint: `Predict: will this last column match the ${lhsName} column in every one of the ${D.U.length} rows, or will a single row disagree?`, status: `New column: in ${rhsName} = ${fmt(rhsSet)}`, caption: union
+        ? `Intersect the last two columns: ${rhsName} is T only where a row has a T in both A′ and B′, because an intersection demands both conditions at once. That happens only for ${fmtList(rhsSet)}, the elements that are outside A and also outside B.`
+        : `Union the last two columns: ${rhsName} is T wherever a row has a T in A′, in B′, or in both, because a union needs only one of its conditions to hold. That happens for ${fmtList(rhsSet)} — every element except ${fmtList(opSet)}, the only element that lies in both A and B.` },
+      { cols: 7, fresh: [], compare: true, answer: true, status: `Compare: the ${lhsName} column and the ${rhsName} column — identical`, caption: `Answer: the ${lhsName} column and the ${rhsName} column are identical in all ${D.U.length} rows — ${pattern} — so the two sets are equal and ${lhsName} = ${rhsName} = ${fmt(lhsSet)}. The check is the row-by-row match itself, and it fits the picture: ${union ? `${fmtList(lhsSet)} are exactly the elements in neither A nor B` : `every element except ${fmtList(opSet)} fails to be in both A and B at once`}.` },
+    ];
+  }
+
+  // Cartesian product: fill the A × B grid one ordered pair at a time, sweeping row by row.
+  const EX_CART_MAIN = { A: ['S', 'M', 'L'], B: ['red', 'blue'] };
+  const EX_CART_VARIANT = { A: ['one-size'], B: ['red', 'blue', 'black'] };
+  function cartPairs(D) { const out = []; for (const a of D.A) for (const b of D.B) out.push(`(${a}, ${b})`); return out; }
+  function cartStepsFor(D) {
+    const pairs = cartPairs(D);
+    const total = pairs.length;
+    const steps = [{ filled: 0, status: `The empty grid: ${D.A.length} row${D.A.length === 1 ? '' : 's'} for A by ${D.B.length} columns for B`, caption: `Set up the grid for A × B with A = ${fmt(D.A)} down the side and B = ${fmt(D.B)} across the top. Each cell will hold exactly one ordered pair (a, b), so filling the grid cell by cell, row by row, builds the whole product with nothing missed and nothing repeated.` }];
+    pairs.forEach((p, i) => {
+      const a = D.A[Math.floor(i / D.B.length)], b = D.B[i % D.B.length];
+      const st = { filled: i + 1, status: `Placed ${p} · ${i + 1} of ${total} pairs`, caption: `Fill the cell in row ${a}, column ${b} with the ordered pair ${p}: the first coordinate must come from A and the second from B, in that order. ${i + 1 === total ? 'That was the last empty cell of the grid, so the sweep is finished and every combination now appears exactly once.' : `The grid now holds ${i + 1} of the ${total} pairs, and the sweep moves ${i % D.B.length === D.B.length - 1 ? 'down to the next row, because this row has one cell per element of B' : 'one cell to the right, staying in the same row'}.`}` };
+      if (i === total - 2) st.checkpoint = 'Predict: which ordered pair fills the very last cell of the grid, and how many pairs will A × B contain in all?';
+      steps.push(st);
+    });
+    steps.push({ filled: total, answer: true, status: `Complete: |A × B| = ${D.A.length} · ${D.B.length} = ${total}`, caption: `Answer: A × B = ${fmt(pairs)}, which is ${total} pairs, because each of the ${D.A.length} row${D.A.length === 1 ? '' : 's'} contributes ${D.B.length} pairs — the count is ${D.A.length} · ${D.B.length} = ${total}, the product rule. Swapping the factors would give B × A, whose pairs are reversed, a different set unless the two sets happen to be equal.` });
+    return steps;
+  }
+  // Power set: decide include/exclude one element at a time; the subset list doubles at each element.
+  const EX_PS_MAIN = { els: ['a', 'b', 'c'] };
+  const EX_PS_VARIANT = { els: ['p', 'q'] };
+  function psSubsets(els, k) {
+    let subs = [[]];
+    for (let i = 0; i < k; i++) subs = subs.concat(subs.map((s) => s.concat(els[i])));
+    return subs;
+  }
+  const psShow = (s) => (s.length ? '{' + s.join(', ') + '}' : '∅');
+  function psStepsFor(D) {
+    const n = D.els.length, total = 2 ** n;
+    const steps = [
+      { decided: -1, status: `The plan: one include-or-exclude decision per element of S = ${fmt(D.els)}`, caption: `Build 𝒫(S) by deciding, for each element of S = ${fmt(D.els)} in turn, whether it goes into the subset or stays out. Every finished sequence of decisions is one subset, and because each decision has exactly 2 outcomes, the count should double at every element until it reaches 2^${n} = ${total}.` },
+      { decided: 0, status: 'Before any decision: exactly 1 subset, ∅', caption: 'Start before any element is decided: there is exactly one partial subset, the empty set ∅, because with no decisions made there is only one way things can stand. This single subset is the seed that every later doubling grows from, so the count starts at 1, not at 0.' },
+    ];
+    D.els.forEach((x, i) => {
+      const before = 2 ** i, after = 2 ** (i + 1);
+      const prevLast = psSubsets(D.els, i).slice(-1)[0];
+      const st = { decided: i + 1, status: `Decided ${x}: ${before} → ${after} subsets`, caption: `Decide ${x}: every existing subset appears twice in the new list, once leaving ${x} out and once with ${x} added, so the list doubles from ${before} to ${after} subsets. The last new subset is ${psShow(prevLast.concat(x))}, formed by adding ${x} to ${psShow(prevLast)}, the largest subset built so far.` };
+      if (i === n - 2) st.checkpoint = `Predict: deciding the last element, ${D.els[n - 1]}, doubles the list once more — how many subsets will there be in all, and which subset ends up largest?`;
+      steps.push(st);
+    });
+    steps.push({ decided: n, answer: true, status: `Complete: |𝒫(S)| = 2^${n} = ${total}`, caption: `Answer: 𝒫(S) = ${fmt(psSubsets(D.els, n).map(psShow))}, which is ${total} subsets — the doubling lands exactly on 2^${n} = ${total}, as promised. The full set ${psShow(D.els)} itself appears as the very last subset, the one where every decision said "in", and ∅ is there too, from the sequence where every decision said "out".` });
+    return steps;
+  }
 
   DM.module({
     id: 'sets',
@@ -219,6 +346,51 @@
         },
       },
       /* ---------------------------------------------------------------- 4 */
+      {
+        title: 'Worked example: building a power set by doubling',
+        kind: 'example',
+        id: 'ex-power-set',
+        objective: 'Build a power set by the include/exclude decision process, watching the subset count double at each element until it reaches 2^n.',
+        problem: String.raw`<p>List the power set \(\mathcal{P}(S)\) for \(S = \{a, b, c\}\), building it one include-or-exclude decision at a time: first decide \(a\), then \(b\), then \(c\). Count the subsets at each stage.</p>`,
+        steps: psStepsFor(EX_PS_MAIN),
+        data: EX_PS_MAIN,
+        answer: ['∅', '{a}', '{b}', '{a, b}', '{c}', '{a, c}', '{b, c}', '{a, b, c}'],
+        verify(M) {
+          const els = ['a', 'b', 'c'];
+          const got = [];
+          for (let mask = 0; mask < 2 ** els.length; mask++) { const s = els.filter((_, i) => mask & (1 << i)); got.push(s.length ? '{' + s.join(', ') + '}' : '∅'); }
+          const want = ['∅', '{a}', '{b}', '{a, b}', '{c}', '{a, c}', '{b, c}', '{a, b, c}'];
+          return got.length === 2 ** els.length && got.every((s, i) => s === want[i]);
+        },
+        variants: [
+          {
+            label: 'Variant: the two-element case',
+            problem: String.raw`<p>List the power set \(\mathcal{P}(S)\) for the smaller set \(S = \{p, q\}\), building it one include-or-exclude decision at a time: first decide \(p\), then \(q\). This minimal case is the base of the doubling pattern — if it works here, each extra element just doubles it again.</p>`,
+            steps: psStepsFor(EX_PS_VARIANT),
+            data: EX_PS_VARIANT,
+            answer: ['∅', '{p}', '{q}', '{p, q}'],
+            verify(M) {
+              const els = ['p', 'q'];
+              const got = [];
+              for (let mask = 0; mask < 2 ** els.length; mask++) { const s = els.filter((_, i) => mask & (1 << i)); got.push(s.length ? '{' + s.join(', ') + '}' : '∅'); }
+              const want = ['∅', '{p}', '{q}', '{p, q}'];
+              return got.length === 2 ** els.length && got.every((s, i) => s === want[i]);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_PS_MAIN;
+          const subs = step.decided < 0 ? [] : psSubsets(D.els, step.decided);
+          const freshFrom = step.decided > 0 ? 2 ** (step.decided - 1) : Infinity;
+          const trail = D.els.map((_, i) => 2 ** (i + 1));
+          stage.append(h('div.stack', { style: { gap: '0.45rem' } },
+            h('div.small', h('b.mono', step.status)),
+            h('div.row', { style: { gap: '0.3rem' } }, subs.length ? subs.map((s, i) => h('span.chip', { style: i >= freshFrom ? { background: 'var(--accent)', color: 'var(--accent-ink)', fontWeight: 700 } : {} }, psShow(s))) : h('span.small.muted', 'No subsets yet — the decisions have not started.')),
+            h('div.small.muted', step.decided < 0 ? `Subset count after each decision will run: 1 → ${trail.join(' → ')}` : `Subsets after ${step.decided} of ${D.els.length} decisions: ${[1, ...trail.slice(0, step.decided)].join(' → ')} — each decision doubled the count.`),
+            step.answer ? h('div.ex-answer', `𝒫(S) = ${fmt(subs.map(psShow))} — |𝒫(S)| = 2^${D.els.length} = ${subs.length} subsets`) : null));
+        },
+      },
       {
         title: 'Lab: Venn diagram calculator',
         kind: 'lab',
@@ -384,6 +556,53 @@
       },
       /* ---------------------------------------------------------------- 7 */
       {
+        title: 'Worked example: building A × B on a grid',
+        kind: 'example',
+        id: 'ex-cartesian-product',
+        objective: 'Build a Cartesian product A × B cell by cell on a grid and count the ordered pairs with the product rule |A × B| = |A| · |B|.',
+        problem: String.raw`<p>A shirt comes in sizes \(A = \{S, M, L\}\) and colors \(B = \{\text{red}, \text{blue}\}\). Build the Cartesian product \(A \times B\) — every (size, color) ordered pair — by filling the grid one cell at a time, row by row, and state how many pairs there are.</p>`,
+        steps: cartStepsFor(EX_CART_MAIN),
+        data: EX_CART_MAIN,
+        answer: ['(S, red)', '(S, blue)', '(M, red)', '(M, blue)', '(L, red)', '(L, blue)'],
+        verify(M) {
+          const A = ['S', 'M', 'L'], B = ['red', 'blue'];
+          const got = [];
+          for (const a of A) for (const b of B) got.push(`(${a}, ${b})`);
+          const want = ['(S, red)', '(S, blue)', '(M, red)', '(M, blue)', '(L, red)', '(L, blue)'];
+          return got.length === A.length * B.length && got.every((p, i) => p === want[i]);
+        },
+        variants: [
+          {
+            label: 'Variant: a one-element set',
+            problem: String.raw`<p>A hat comes in a single size, \(A = \{\text{one-size}\}\), and three colors, \(B = \{\text{red}, \text{blue}, \text{black}\}\). Build the Cartesian product \(A \times B\) by filling the grid one cell at a time, and state how many pairs there are. With \(|A| = 1\) the grid has just one row — the boundary case of the product rule.</p>`,
+            steps: cartStepsFor(EX_CART_VARIANT),
+            data: EX_CART_VARIANT,
+            answer: ['(one-size, red)', '(one-size, blue)', '(one-size, black)'],
+            verify(M) {
+              const A = ['one-size'], B = ['red', 'blue', 'black'];
+              const got = [];
+              for (const a of A) for (const b of B) got.push(`(${a}, ${b})`);
+              const want = ['(one-size, red)', '(one-size, blue)', '(one-size, black)'];
+              return got.length === A.length * B.length && got.every((p, i) => p === want[i]);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_CART_MAIN;
+          const pairs = cartPairs(D);
+          const cell = (i) => (i < step.filled ? h('td.mono', { style: { fontSize: '0.82rem', ...(i === step.filled - 1 && !step.answer ? { background: 'var(--accent)', color: 'var(--accent-ink)', fontWeight: 700 } : {}) } }, pairs[i]) : h('td.muted', '·'));
+          const table = h('table.tt',
+            h('thead', h('tr', h('th', 'A \\ B'), D.B.map((b) => h('th', b)))),
+            h('tbody', D.A.map((a, r) => h('tr', h('th', a), D.B.map((_, c) => cell(r * D.B.length + c))))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+            h('div.small', h('b.mono', step.status)),
+            table,
+            h('div.small.muted', `Pairs placed: ${step.filled} of ${pairs.length} — one row of ${D.B.length} pairs for each element of A.`),
+            step.answer ? h('div.ex-answer', `A × B = ${fmt(pairs)} — |A × B| = ${D.A.length} · ${D.B.length} = ${pairs.length}`) : null));
+        },
+      },
+      {
         title: 'Code: set operations in Python',
         kind: 'code',
         file: 'set_operations.py',
@@ -526,15 +745,10 @@
         title: 'Worked example: shading (A ∪ B) ∩ C′ on a Venn diagram',
         kind: 'example',
         id: 'ex-venn-shading',
+        objective: 'Compute a compound set expression one sub-expression at a time, tracking each partial result as a shading on a Venn diagram.',
         problem: String.raw`<p>With universe \(U = \{1, 2, \dots, 10\}\), \(A = \{1, 2, 3, 4, 5\}\), \(B = \{4, 5, 6, 7\}\) and \(C = \{2, 5, 8\}\), compute \((A \cup B) \cap C'\), building the answer one sub-expression at a time on a Venn diagram.</p>`,
-        steps: [
-          { phase: 0, status: 'Regions placed · nothing shaded yet', caption: 'Plan first: place every element of U in its region, then work inside-out — shade A, grow the shading to A ∪ B, switch to the complement of C, and keep only what both shadings share. Nothing is shaded yet, so this first picture is the map for every later step.' },
-          { phase: 1, status: 'Shaded: A = {1, 2, 3, 4, 5}', caption: 'Shade all of circle A, because the first sub-expression is just A = {1, 2, 3, 4, 5}. Every region inside circle A is now shaded, including the parts that also lie inside B or inside C.' },
-          { phase: 2, status: 'Shaded: A ∪ B = {1, 2, 3, 4, 5, 6, 7}', caption: 'Extend the shading to all of circle B as well, because a union keeps anything that is in either set: A ∪ B = {1, 2, 3, 4, 5, 6, 7}. The shaded area is now the whole of both circles, with the overlap shaded once, not twice.' },
-          { phase: 3, status: 'Shaded: C′ = {1, 3, 4, 6, 7, 9, 10} (everything outside C)', caption: 'Start over with a different shading: everything outside circle C, because the complement C′ = {1, 3, 4, 6, 7, 9, 10} holds all of U except 2, 5 and 8. Even the corners of the universe, outside every circle, are shaded this time.' },
-          { phase: 4, status: 'Kept: in A ∪ B and outside C = {1, 3, 4, 6, 7}', caption: 'Intersect the two shadings: keep only the regions that were shaded in both senses, meaning in A ∪ B and also outside C. The elements 2 and 5 drop out because they lie inside C, and 9 and 10 drop out because they were never in A ∪ B.' },
-          { phase: 4, answer: true, status: 'Final regions outlined in bold: {1, 3, 4, 6, 7}', caption: 'Answer: (A ∪ B) ∩ C′ = {1, 3, 4, 6, 7}, read region by region — 1 and 3 from A only, 4 from A ∩ B outside C, and 6 and 7 from B only. Check each one: it is in A or in B and it is not in C, while the only other members of A ∪ B, namely 2 and 5, fail because they lie in C.' },
-        ],
+        steps: vennStepsFor(EX_VENN_MAIN),
+        data: EX_VENN_MAIN,
         answer: [1, 3, 4, 6, 7],
         verify(M) {
           const U = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], A = [1, 2, 3, 4, 5], B = [4, 5, 6, 7], C = [2, 5, 8];
@@ -542,39 +756,65 @@
           const want = [1, 3, 4, 6, 7];
           return got.length === want.length && got.every((x, i) => x === want[i]);
         },
-        draw(stage, ctx, step, k) {
+        variants: [
+          {
+            label: 'Variant: (A ∩ B) ∪ C′',
+            problem: String.raw`<p>With the same universe \(U = \{1, 2, \dots, 10\}\), \(A = \{1, 2, 3, 4, 5\}\), \(B = \{4, 5, 6, 7\}\) and \(C = \{2, 5, 8\}\), compute \((A \cap B) \cup C'\), building the answer one sub-expression at a time on a Venn diagram. Both operations are swapped compared with the main problem, so watch which shading shrinks and which combination grows.</p>`,
+            steps: vennStepsFor(EX_VENN_VARIANT),
+            data: EX_VENN_VARIANT,
+            answer: [1, 3, 4, 5, 6, 7, 9, 10],
+            verify(M) {
+              const U = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], A = [1, 2, 3, 4, 5], B = [4, 5, 6, 7], C = [2, 5, 8];
+              const got = U.filter((x) => (A.includes(x) && B.includes(x)) || !C.includes(x));
+              const want = [1, 3, 4, 5, 6, 7, 9, 10];
+              return got.length === want.length && got.every((x, i) => x === want[i]);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h, s } = ctx;
+          const D = (preset && preset.data) || EX_VENN_MAIN;
           const CTRS = { A: [195, 92], B: [325, 92], C: [260, 150] };
           const RAD = 80;
-          const REGIONS = [
-            { a: 1, b: 0, c: 0, pos: [138, 87], label: '1, 3' },
-            { a: 0, b: 1, c: 0, pos: [382, 87], label: '6, 7' },
-            { a: 0, b: 0, c: 1, pos: [260, 210], label: '8' },
-            { a: 1, b: 1, c: 0, pos: [260, 62], label: '4' },
-            { a: 1, b: 0, c: 1, pos: [193, 160], label: '2' },
-            { a: 0, b: 1, c: 1, pos: [327, 160], label: '' },
-            { a: 1, b: 1, c: 1, pos: [260, 120], label: '5' },
-            { a: 0, b: 0, c: 0, pos: [448, 244], label: '9, 10' },
-          ];
+          const POS = { '100': [138, 87], '010': [382, 87], '001': [260, 210], '110': [260, 62], '101': [193, 160], '011': [327, 160], '111': [260, 120], '000': [448, 244] };
+          const REGIONS = Object.entries(POS).map(([key, pos]) => {
+            const [a, b, c] = key.split('').map(Number);
+            const els = D.U.filter((x) => (D.A.includes(x) ? 1 : 0) === a && (D.B.includes(x) ? 1 : 0) === b && (D.C.includes(x) ? 1 : 0) === c);
+            return { a, b, c, pos, label: els.join(', ') };
+          });
+          const firstShade = (r) => (D.firstOp === 'union' ? (r.a === 1 || r.b === 1) : (r.a === 1 && r.b === 1));
           const shaded = (r) => step.phase === 1 ? r.a === 1
-            : step.phase === 2 ? (r.a === 1 || r.b === 1)
+            : step.phase === 2 ? firstShade(r)
             : step.phase === 3 ? r.c === 0
-            : step.phase >= 4 ? ((r.a === 1 || r.b === 1) && r.c === 0) : false;
+            : step.phase >= 4 ? (D.combineOp === 'intersection' ? (firstShade(r) && r.c === 0) : (firstShade(r) || r.c === 0)) : false;
           const circ = (key, attrs) => s('circle', { cx: CTRS[key][0], cy: CTRS[key][1], r: RAD, ...attrs });
           const kids = [];
           kids.push(s('defs',
             s('mask', { id: 'exv-nc' }, s('rect', { x: 0, y: 0, width: 520, height: 270, fill: 'white' }), circ('C', { fill: 'black' })),
-            s('clipPath', { id: 'exv-ab' }, circ('A', {}), circ('B', {}))));
+            s('mask', { id: 'exv-nlens' }, s('rect', { x: 0, y: 0, width: 520, height: 270, fill: 'white' }), s('g', { 'clip-path': 'url(#exv-b)' }, circ('A', { fill: 'black' }))),
+            s('clipPath', { id: 'exv-ab' }, circ('A', {}), circ('B', {})),
+            s('clipPath', { id: 'exv-a' }, circ('A', {})),
+            s('clipPath', { id: 'exv-b' }, circ('B', {})),
+            s('clipPath', { id: 'exv-c' }, circ('C', {}))));
           kids.push(s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'var(--sheet)', stroke: 'var(--rule)', 'stroke-width': 1.5 }));
           kids.push(s('text', { x: 24, y: 34, 'font-size': 16, 'font-weight': 600, fill: 'var(--ink-3)', text: 'U' }));
           if (step.phase === 1) kids.push(circ('A', { fill: 'var(--accent)', opacity: 0.38, stroke: 'none' }));
-          else if (step.phase === 2) kids.push(circ('A', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }));
+          else if (step.phase === 2 && D.firstOp === 'union') kids.push(circ('A', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.34, stroke: 'none' }));
+          else if (step.phase === 2) kids.push(s('g', { 'clip-path': 'url(#exv-a)' }, circ('B', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' })));
           else if (step.phase === 3) kids.push(s('g', { mask: 'url(#exv-nc)' }, s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'var(--num)', opacity: 0.3 })));
-          else if (step.phase >= 4) kids.push(s('g', { mask: 'url(#exv-nc)' }, circ('A', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' })));
+          else if (step.phase >= 4 && D.combineOp === 'intersection') kids.push(s('g', { mask: 'url(#exv-nc)' }, circ('A', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' }), circ('B', { fill: 'var(--accent)', opacity: 0.42, stroke: 'none' })));
+          else if (step.phase >= 4) kids.push(
+            s('g', { mask: 'url(#exv-nc)' }, s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'var(--accent)', opacity: 0.34 })),
+            s('g', { 'clip-path': 'url(#exv-a)' }, s('g', { 'clip-path': 'url(#exv-b)' }, s('g', { 'clip-path': 'url(#exv-c)' }, s('rect', { x: 8, y: 8, width: 504, height: 254, fill: 'var(--accent)', opacity: 0.34 })))));
           for (const key of ['A', 'B', 'C']) kids.push(circ(key, { fill: 'none', stroke: key === 'A' ? 'var(--accent)' : key === 'B' ? 'var(--fnc)' : 'var(--num)', 'stroke-width': 2.2 }));
-          if (step.answer) {
+          if (step.answer && D.combineOp === 'intersection') {
             kids.push(s('g', { mask: 'url(#exv-nc)' }, circ('A', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 }), circ('B', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
             kids.push(s('g', { 'clip-path': 'url(#exv-ab)' }, circ('C', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
+          } else if (step.answer) {
+            kids.push(s('rect', { x: 8, y: 8, width: 504, height: 254, rx: 14, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 }));
+            kids.push(s('g', { mask: 'url(#exv-nlens)' }, circ('C', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
+            kids.push(s('g', { 'clip-path': 'url(#exv-b)' }, circ('A', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
+            kids.push(s('g', { 'clip-path': 'url(#exv-a)' }, circ('B', { fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4.5 })));
           }
           kids.push(s('text', { x: 100, y: 36, 'font-size': 19, 'font-weight': 700, fill: 'var(--accent)', text: 'A' }));
           kids.push(s('text', { x: 408, y: 36, 'font-size': 19, 'font-weight': 700, fill: 'var(--fnc)', text: 'B' }));
@@ -587,22 +827,17 @@
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
             h('div.small', h('b.mono', step.status)),
             svg,
-            step.answer ? h('div.ex-answer', '(A ∪ B) ∩ C′ = {1, 3, 4, 6, 7} — check: every listed element is in A or in B, and none of them is in C') : null));
+            step.answer ? h('div.ex-answer', D.answerBanner) : null));
         },
       },
       {
         title: 'Worked example: De Morgan’s law by a membership table',
         kind: 'example',
         id: 'ex-demorgan-membership',
+        objective: 'Prove a De Morgan law for concrete sets by building a membership table and showing that the two sides agree in every row.',
         problem: String.raw`<p>Prove De Morgan's law \((A \cup B)' = A' \cap B'\) for \(A = \{1, 2, 3\}\) and \(B = \{3, 4\}\) in the universe \(U = \{1, 2, 3, 4, 5, 6\}\), by building a membership table with one row per element of \(U\).</p>`,
-        steps: [
-          { cols: 2, fresh: [0, 1], compare: false, status: 'Columns so far: x, in A, in B', caption: 'Start with the raw facts only: one row for each element of U = {1, 2, 3, 4, 5, 6}, with a T where the element belongs to A = {1, 2, 3} or to B = {3, 4}. Every later column is computed from these two columns, row by row.' },
-          { cols: 3, fresh: [2], compare: false, status: 'New column: in A ∪ B = {1, 2, 3, 4}', caption: 'Add the union column: an element is in A ∪ B when its row has a T in the A column, in the B column, or in both. Only 5 and 6 get an F here, because they are the two elements that belong to neither set.' },
-          { cols: 4, fresh: [3], compare: false, status: 'New column: in (A ∪ B)′ = {5, 6}', caption: 'Flip the union column to get (A ∪ B)′: every T becomes F and every F becomes T, because a complement keeps exactly the elements the original set missed. This column is T only for 5 and 6, so the left-hand side of the law is {5, 6}.' },
-          { cols: 6, fresh: [4, 5], compare: false, status: 'New columns: in A′ = {4, 5, 6} and in B′ = {1, 2, 5, 6}', caption: 'Now build the right-hand side in pieces: A′ flips the A column and B′ flips the B column, each one keeping the elements outside that single set. These two columns are the ingredients for the intersection that finishes the right-hand side.' },
-          { cols: 7, fresh: [6], compare: false, status: 'New column: in A′ ∩ B′ = {5, 6}', caption: 'Intersect the last two columns: A′ ∩ B′ is T only where a row has a T in both A′ and B′, because an intersection demands both conditions at once. That happens only for 5 and 6, the elements that are outside A and also outside B.' },
-          { cols: 7, fresh: [], compare: true, answer: true, status: 'Compare: the (A ∪ B)′ column and the A′ ∩ B′ column — identical', caption: 'Answer: the (A ∪ B)′ column and the A′ ∩ B′ column are identical in all 6 rows — F, F, F, F, T, T — so the two sets are equal and (A ∪ B)′ = A′ ∩ B′ = {5, 6}. The check is the row-by-row match itself, and it fits the picture: 5 and 6 are exactly the elements in neither A nor B.' },
-        ],
+        steps: dmStepsFor(EX_DM_MAIN),
+        data: EX_DM_MAIN,
         answer: [5, 6],
         verify(M) {
           const U = [1, 2, 3, 4, 5, 6], A = [1, 2, 3], B = [3, 4];
@@ -612,28 +847,38 @@
           const eq = (p, q) => p.length === q.length && p.every((x, i) => x === q[i]);
           return eq(lhs, rhs) && eq(lhs, want);
         },
-        draw(stage, ctx, step, k) {
+        variants: [
+          {
+            label: 'Variant: the other De Morgan law',
+            problem: String.raw`<p>Prove the other De Morgan law, \((A \cap B)' = A' \cup B'\), for the same sets \(A = \{1, 2, 3\}\) and \(B = \{3, 4\}\) in the universe \(U = \{1, 2, 3, 4, 5, 6\}\), by building a membership table with one row per element of \(U\). This time the complement starts from an intersection, so the right-hand side must finish with a union instead.</p>`,
+            steps: dmStepsFor(EX_DM_VARIANT),
+            data: EX_DM_VARIANT,
+            answer: [1, 2, 4, 5, 6],
+            verify(M) {
+              const U = [1, 2, 3, 4, 5, 6], A = [1, 2, 3], B = [3, 4];
+              const lhs = U.filter((x) => !(A.includes(x) && B.includes(x)));
+              const rhs = U.filter((x) => !A.includes(x) || !B.includes(x));
+              const want = [1, 2, 4, 5, 6];
+              const eq = (p, q) => p.length === q.length && p.every((x, i) => x === q[i]);
+              return eq(lhs, rhs) && eq(lhs, want);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const U = [1, 2, 3, 4, 5, 6], A = [1, 2, 3], B = [3, 4];
-          const COLS = [
-            { head: 'in A', f: (x) => A.includes(x) },
-            { head: 'in B', f: (x) => B.includes(x) },
-            { head: 'in A ∪ B', f: (x) => A.includes(x) || B.includes(x) },
-            { head: 'in (A ∪ B)′', f: (x) => !(A.includes(x) || B.includes(x)) },
-            { head: 'in A′', f: (x) => !A.includes(x) },
-            { head: 'in B′', f: (x) => !B.includes(x) },
-            { head: 'in A′ ∩ B′', f: (x) => !A.includes(x) && !B.includes(x) },
-          ];
+          const D = (preset && preset.data) || EX_DM_MAIN;
+          const COLS = dmCols(D);
+          const lhsSet = D.U.filter(COLS[3].f);
           const cellCls = (ci) => (step.fresh.includes(ci) || (step.compare && (ci === 3 || ci === 6)) ? 'cur' : '');
           const table = h('table.tt', { style: { fontSize: '0.85rem' } },
             h('thead', h('tr', h('th', 'x'), COLS.map((c, ci) => h('th', { class: ci < step.cols ? cellCls(ci) : 'muted' }, c.head)))),
-            h('tbody', U.map((x) => h('tr', { class: step.compare && (x === 5 || x === 6) ? 'hit' : '' },
+            h('tbody', D.U.map((x) => h('tr', { class: step.compare && COLS[3].f(x) ? 'hit' : '' },
               h('td', String(x)),
               COLS.map((c, ci) => (ci < step.cols ? h('td', { class: cellCls(ci) }, c.f(x) ? 'T' : 'F') : h('td.muted', '·')))))));
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
             h('div.small', h('b.mono', step.status)),
             table,
-            step.answer ? h('div.ex-answer', '(A ∪ B)′ = A′ ∩ B′ = {5, 6} — check: the two highlighted columns match in all 6 rows, and 5 and 6 are exactly the elements in neither A nor B') : null));
+            step.answer ? h('div.ex-answer', `${COLS[3].head.replace('in ', '')} = ${COLS[6].head.replace('in ', '')} = ${fmt(lhsSet)} — check: the two highlighted columns match in all ${D.U.length} rows, and ${D.bannerTail}`) : null));
         },
       },
       /* ---------------------------------------------------------------- 11 */

@@ -24,6 +24,190 @@
   const EX_BIN_LEAVES = (() => { let cur = ['']; for (let f = 0; f < 4; f++) { const nxt = []; for (const p of cur) { nxt.push(p + 'H'); nxt.push(p + 'T'); } cur = nxt; } return cur; })();
   const EX_BIN_HEADS = (leaf) => leaf.split('').filter((c) => c === 'H').length;
 
+  /* ---------- worked-example generators: steps computed from each preset's data ---------- */
+  // Bayes preset data: prevalence / sensitivity / false-positive rate as percents of 1,000 people,
+  // with every count the steps and the dot grid need derived from them.
+  function bayesData(prevPct, sensPct, fprPct) {
+    const sick = (1000 * prevPct) / 100;
+    const tp = (sick * sensPct) / 100;
+    const healthy = 1000 - sick;
+    const fp = (healthy * fprPct) / 100;
+    return { prevPct, sensPct, fprPct, sick, tp, fn: sick - tp, healthy, fp, tn: healthy - fp, pos: tp + fp };
+  }
+  function bayesStepsFor(D, checkpointText) {
+    const num100 = D.sensPct * D.prevPct, den100 = num100 + D.fprPct * (100 - D.prevPct);
+    const fracStr = fr(D.tp, D.pos), pctRound = Math.round((100 * D.tp) / D.pos);
+    const steps = [
+      { phase: 0, note: `Setup: 1,000 people · ${D.prevPct}% have the condition · sensitivity ${D.sensPct}% · false-positive rate ${D.fprPct}%`, caption: 'Counting people first and turning counts into a probability at the end keeps the base rate visible, which is the whole point of this method. All 1,000 dots start neutral, because no group has been marked yet.' },
+      { phase: 1, note: `Have the condition: ${D.sick} people · Do not have it: ${D.healthy} people`, caption: `Mark the people who have the condition: ${D.prevPct}% of 1,000 is ${D.sick} people. This group is the base rate, the fact every later count is compared against, and forgetting it is what causes the usual far-too-high guess.` },
+      { phase: 2, note: `Sick and test positive: ${D.tp} · Sick but missed: ${D.fn} · Positive so far: ${D.tp}`, caption: `Apply the ${D.sensPct}% sensitivity to the ${D.sick} sick people: ${D.tp} test positive and ${D.fn} ${D.fn === 1 ? 'is' : 'are'} missed. The dark ring and plus sign mark a positive result, so the test outcome never rests on color alone.` },
+      { phase: 3, note: `Healthy but test positive (false positives): ${D.fp} · Total positive: ${D.tp} + ${D.fp} = ${D.pos}`, caption: `Now mark the healthy group: ${D.fprPct}% sounds small, but ${D.fprPct}% of ${D.healthy} is ${D.fp} false positives. ${D.fp > D.sick ? `That is more false positives than the ${D.sick} people who have the condition in total, because the healthy group is so much bigger.` : `Even at this higher base rate they still sit next to the ${D.tp} true positives, because the healthy group starts out so much bigger.`}` },
+      { phase: 4, note: `Inside the ${D.pos} positive results: ${D.tp} are true cases and ${D.fp} are false positives`, caption: `Dim everyone who tested negative and focus on the ${D.pos} positive results only. A positive result puts you inside this group of ${D.pos}, so the relevant question is now ${D.tp} out of ${D.pos}.` },
+      {
+        phase: 5, note: `Inside the ${D.pos} positive results: ${D.tp} are true cases and ${D.fp} are false positives`, answer: true,
+        banner: `P(sick | positive) = ${fracStr}, about ${pctRound}% · check: ${D.tp} true positives out of ${D.pos} positive results (${D.tp} + ${D.fp} = ${D.pos}), and Bayes' rule gives ${num100}/${den100} = ${fracStr}`,
+        caption: `Check by Bayes' rule with exact fractions: (${D.sensPct}/100 × ${D.prevPct}/100) / (${D.sensPct}/100 × ${D.prevPct}/100 + ${D.fprPct}/100 × ${100 - D.prevPct}/100) = ${num100}/${den100} = ${fracStr}. The dot count and the formula agree, so a positive result means about a ${pctRound}% chance.`,
+      },
+    ];
+    if (checkpointText) steps[2].checkpoint = checkpointText;
+    return steps;
+  }
+  const EX_BAYES_DATA = bayesData(2, 95, 5);
+  const EX_BAYES_VAR_DATA = bayesData(10, 95, 5);
+
+  // Binomial preset data: the outcome strings of n flips and their head-count distribution.
+  function binLeaves(n) { let cur = ['']; for (let f = 0; f < n; f++) { const nxt = []; for (const p of cur) { nxt.push(p + 'H'); nxt.push(p + 'T'); } cur = nxt; } return cur; }
+  function binData(n, k) {
+    const leaves = binLeaves(n);
+    const dist = Array(n + 1).fill(0);
+    leaves.forEach((leaf) => (dist[EX_BIN_HEADS(leaf)]++));
+    return { n, k, leaves, dist, fav: dist[k], total: leaves.length };
+  }
+  function binStepsFor(D, checkpointText) {
+    const steps = [];
+    for (let L = 1; L <= D.n; L++) {
+      const prefs = [...new Set(D.leaves.map((leaf) => leaf.slice(0, L)))];
+      if (L === 1) steps.push({ depth: 1, note: `After 1 flip: 2 prefixes · after ${D.n} flips there will be ${Array(D.n).fill(2).join(' × ')} = ${D.total} outcome strings`, caption: `Each flip doubles the number of outcomes, so after ${D.n} flips there are 2^${D.n} = ${D.total} equally likely outcome strings. The tree starts at the root and makes its first split into H and T.` });
+      else if (L === D.n) steps.push({ depth: L, note: `Level ${L}: all ${D.total} outcome strings, each labeled with its head count`, caption: `Level ${L} completes the tree with all ${D.total} outcome strings as leaves, and each leaf is labeled with its head count. The same head count can come from several different leaves, which is why the next step collects them.` });
+      else if (L === 2) steps.push({ depth: 2, note: `Level 2: 4 prefixes — ${prefs.join(', ')}`, caption: `Level 2 is complete with 4 prefixes: ${prefs.join(', ')}. The tree keeps outcomes that feel similar, HT and TH, separate, and that distinction is exactly what counting needs.` });
+      else steps.push({ depth: L, note: `Level ${L}: ${2 ** L} prefixes, each one flip away from the next split`, caption: `Level ${L} doubles the prefixes again to ${2 ** L}, because each level-${L - 1} prefix branches into one ending in H and one ending in T. Nothing has merged, so every prefix still stands for distinct flip sequences.` });
+    }
+    const favList = D.leaves.filter((leaf) => EX_BIN_HEADS(leaf) === D.k).join(', ');
+    steps.push({ depth: D.n, collect: true, note: `Exactly ${D.k} heads: ${D.fav} leaves — ${favList}`, caption: `Collect the leaves with exactly ${D.k} heads: ${favList}. There are C(${D.n}, ${D.k}) = ${D.fav} ways to choose which ${D.k} of the ${D.n} flips are heads, and the tree shows all ${D.fav} of them.` });
+    const ansStr = fr(D.fav, D.total);
+    steps.push({
+      depth: D.n, collect: true, note: `Head-count distribution: ${D.dist.map((c, j) => `${j} head${j === 1 ? '' : 's'}: ${c}`).join(' · ')} · total ${D.total}`, answer: true,
+      banner: `P(exactly ${D.k} heads) = ${D.fav}/${D.total} = ${ansStr} · check: C(${D.n}, ${D.k}) = ${D.fav} favorable leaves out of 2^${D.n} = ${D.total}, and the distribution ${D.dist.join(', ')} sums to ${D.total}`,
+      caption: `Check: the full distribution from the tree is ${D.dist.join(', ')} for 0 to ${D.n} heads, which sums to ${D.total} leaves. The formula C(${D.n}, ${D.k}) / 2^${D.n} = ${D.fav}/${D.total} = ${ansStr} agrees with the leaf count exactly.`,
+    });
+    if (checkpointText) steps[D.n - 1].checkpoint = checkpointText;
+    return steps;
+  }
+  const EX_BIN_DATA = binData(4, 2);
+  const EX_BIN_VAR_DATA = binData(3, 2);
+
+  // Shared 6x6 two-dice grid (same geometry as the slide 1 lab). cell(a, b) returns the styling for one pair.
+  function diceGrid(ctx, label, cell) {
+    const { s } = ctx;
+    const kids = [];
+    for (let b = 1; b <= 6; b++) kids.push(s('text', { x: 26 + (b - 0.5) * 45, y: 14, 'text-anchor': 'middle', 'font-weight': 600, fill: 'var(--ink-2)', text: String(b) }));
+    for (let a = 1; a <= 6; a++) {
+      kids.push(s('text', { x: 13, y: 24 + (a - 0.5) * 30, 'text-anchor': 'middle', 'font-weight': 600, fill: 'var(--ink-2)', text: String(a) }));
+      for (let b = 1; b <= 6; b++) {
+        const x = 27.5 + (b - 1) * 45, y = 21.5 + (a - 1) * 30, c = cell(a, b);
+        const op = c.op == null ? 1 : c.op;
+        kids.push(s('rect', { x, y, width: 42, height: 27, rx: 4, fill: c.fill, stroke: c.stroke || 'var(--rule)', 'stroke-width': c.sw || 1, opacity: op }));
+        kids.push(s('text', { x: x + 21, y: y + 18, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': c.bold ? 700 : 400, fill: c.tc || 'var(--ink-3)', opacity: op, text: c.text }));
+        if (c.da) kids.push(s('circle', { cx: x + 6.5, cy: y + 6.5, r: 3.2, fill: 'var(--accent)', opacity: op }));
+        if (c.db) kids.push(s('circle', { cx: x + 35.5, cy: y + 6.5, r: 3.2, fill: 'var(--fnc)', opacity: op }));
+      }
+    }
+    return s('svg', { viewBox: '0 0 300 202', class: 'pb-svg', role: 'img', 'aria-label': label, style: 'max-height:12rem' }, ...kids);
+  }
+
+  // Sample-space preset data: one target sum on the two-dice grid; pairs and counts come from the module helpers.
+  function diceEventData(sum) { const pairs = pairsFor(sum); return { sum, fav: pairs.length, pairs }; }
+  function diceEventStepsFor(D, checkpointText) {
+    const list = D.pairs.join(', '), ans = fr(D.fav, 36);
+    const fracTxt = `${D.fav}/36` === ans ? `the fraction ${ans}, already in lowest terms` : `${D.fav}/36 = ${ans}`;
+    const steps = [
+      { stage: 0, note: 'Sample space: 36 ordered pairs (first die, second die), all equally likely', caption: 'Roll two dice and treat (first, second) as the outcome, so (2,5) and (5,2) count as different outcomes. The sample space is the 6 by 6 grid of ordered pairs, and every cell will hold exactly one equally likely outcome.' },
+      { stage: 1, note: 'Every cell now shows the sum of its pair: the grid holds all 36 outcomes', caption: 'Fill every cell with the sum of its two dice, working row by row so no pair is skipped or counted twice. Filling systematically is the whole method: the finished grid is the entire sample space, so |S| = 6 × 6 = 36.' },
+      { stage: 2, note: `Event: exactly the cells whose row and column values add to ${D.sum}`, caption: `The event "sum is ${D.sum}" picks out exactly the cells whose row and column values add to ${D.sum}. Outline those cells before marking any of them, because separating "find the event" from "count the event" keeps the two jobs from blurring together.` },
+      { stage: 3, note: `Pairs with sum ${D.sum}: ${list} — that is ${D.fav} outcome${D.fav === 1 ? '' : 's'}`, caption: `Mark the outlined cells: the pairs are ${list}. Counting them one at a time in grid order gives |E| = ${D.fav}, and because the list runs in order, no qualifying pair can be missing or repeated in the count.` },
+      { stage: 4, note: `|E| = ${D.fav} favorable outcome${D.fav === 1 ? '' : 's'} out of |S| = 36 equally likely outcomes`, caption: `Both counts are now in hand: ${D.fav} favorable outcome${D.fav === 1 ? '' : 's'} out of 36 equally likely ones. With equally likely outcomes, probability is the ratio of the two counts, so the unreduced answer is ${D.fav}/36 before any simplifying.` },
+      {
+        stage: 5, note: `P(sum is ${D.sum}) = ${fracTxt}`, answer: true,
+        banner: `P(sum is ${D.sum}) = ${fracTxt} · check: the pairs ${list} are ${D.fav} of the 36 equally likely ordered pairs in the grid`,
+        caption: `Reduce and finish: P(sum is ${D.sum}) = ${fracTxt}. The answer rests on the enumerated pairs ${list} rather than on how common the sum feels, which is exactly why the grid gets built before any probability is stated.`,
+      },
+    ];
+    if (checkpointText) steps[2].checkpoint = checkpointText;
+    return steps;
+  }
+  const EX_SS_DATA = diceEventData(7);
+  const EX_SS_VAR_DATA = diceEventData(12);
+
+  // Conditional-probability preset data: two events on the two-dice grid, named by key into EV_TESTS.
+  const EV_TESTS = {
+    dbl: (a, b) => a === b,
+    sum8: (a, b) => a + b === 8,
+    fev: (a) => a % 2 === 0,
+    sge5: (a, b) => b >= 5,
+  };
+  function condData(aKey, bKey, aLab, bLab) {
+    let nA = 0, nB = 0, nAB = 0;
+    for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) {
+      const inA = EV_TESTS[aKey](a, b), inB = EV_TESTS[bKey](a, b);
+      nA += inA; nB += inB; nAB += inA && inB;
+    }
+    return { aKey, bKey, aLab, bLab, nA, nB, nAB };
+  }
+  function condStepsFor(D, checkpointText) {
+    const pA = fr(D.nA, 36), pB = fr(D.nB, 36), pAB = fr(D.nAB, 36), pAgB = fr(D.nAB, D.nB), prod = fr(D.nA * D.nB, 36 * 36);
+    const indep = D.nAB * 36 === D.nA * D.nB;
+    const steps = [
+      { stage: 0, note: `Two dice, 36 equally likely pairs · A: ${D.aLab} · B: ${D.bLab}`, caption: `Two events live on the same 36-pair sample space: A is "${D.aLab}" and B is "${D.bLab}". The plan is to count A, count B, and count their overlap, then let exact fractions settle both the conditional probability and the independence question.` },
+      { stage: 1, note: `A (${D.aLab}): ${D.nA} pairs, so P(A) = ${D.nA}/36 = ${pA}`, caption: `Mark every pair in A with a corner dot: ${D.nA} of the 36 pairs qualify, so P(A) = ${D.nA}/36 = ${pA}. This unconditional value is the baseline, because the independence question is precisely whether learning B moves A away from it.` },
+      { stage: 2, note: `B (${D.bLab}): ${D.nB} pairs · both A and B: ${D.nAB} pair${D.nAB === 1 ? '' : 's'}`, caption: `Add a second corner dot for B: ${D.nB} pairs qualify, and ${D.nAB} pair${D.nAB === 1 ? ' carries' : 's carry'} both dots, so |A ∩ B| = ${D.nAB} and P(A ∩ B) = ${pAB}. That overlap count is the shared ingredient in both calculations that follow.` },
+      { stage: 3, note: `Inside B only: ${D.nAB} of the ${D.nB} remaining pairs are also in A`, caption: `Knowing B happened shrinks the sample space to the ${D.nB} pairs in B, and every other pair fades out of the picture. Inside that smaller space, ${D.nAB} of the ${D.nB} pairs are also in A, so P(A | B) = ${D.nAB}/${D.nB} = ${pAgB} by direct counting.` },
+      { stage: 4, note: `Independence test: P(A ∩ B) = ${pAB} against P(A) · P(B) = ${pA} × ${pB} = ${prod}`, caption: `Independence requires P(A ∩ B) = P(A) · P(B) exactly, with no rounding anywhere. Here the left side is ${pAB} and the product is ${pA} × ${pB} = ${prod}, and the two fractions are ${indep ? 'the same fraction' : 'different fractions'}, so the verdict follows from the arithmetic itself.` },
+      {
+        stage: 5, note: `P(A | B) = ${pAgB} · P(A) = ${pA} · the two ${indep ? 'agree' : 'differ'}`, answer: true,
+        banner: indep
+          ? `P(A | B) = ${D.nAB}/${D.nB} = ${pAgB} and P(A ∩ B) = ${pAB} = P(A) · P(B) = ${prod}: A and B are independent · check: inside B, ${D.nAB} of ${D.nB} pairs are in A, the same rate as in the full space`
+          : `P(A | B) = ${D.nAB}/${D.nB} = ${pAgB} and P(A ∩ B) = ${pAB} ≠ P(A) · P(B) = ${prod}: A and B are dependent · check: inside B, ${D.nAB} of ${D.nB} pairs are in A, a different rate than ${pA} in the full space`,
+        caption: indep
+          ? `Because P(A ∩ B) = ${prod} matches the product exactly, A and B are independent: learning B left the probability of A unchanged at ${pA}. The restricted-space count and the product test are two computations of the same fact, and they agree.`
+          : `Because ${pAB} ≠ ${prod}, A and B are dependent: learning B moved the probability of A from ${pA} to ${pAgB}. The restricted-space count and the product test tell the same story by two different routes, which is the cross-check.`,
+      },
+    ];
+    if (checkpointText) steps[2].checkpoint = checkpointText;
+    return steps;
+  }
+  const EX_COND_DATA = condData('dbl', 'sum8', 'doubles', 'the sum is 8');
+  const EX_COND_VAR_DATA = condData('fev', 'sge5', 'the first die is even', 'the second die is 5 or 6');
+
+  // Expected-value preset data: pay a $1 fee to roll one die; win6 / win5 are the payouts for those faces.
+  function evGameData(win6, win5) {
+    return {
+      fee: 1, win6, win5,
+      rows: [
+        { lab: 'Roll a 6', cnt: 1, pay: win6 },
+        { lab: 'Roll a 5', cnt: 1, pay: win5 },
+        { lab: 'Roll 1, 2, 3 or 4', cnt: 4, pay: 0 },
+      ],
+    };
+  }
+  function evRows(D) { return D.rows.map((r) => ({ ...r, net: r.pay - D.fee })); }
+  function evRun(rows) { let acc = 0; return rows.map((r) => (acc += r.net * r.cnt)); }
+  function evStepsFor(D, checkpointText) {
+    const rows = evRows(D), run = evRun(rows), tot = run[run.length - 1];
+    const eStr = fr(tot, 6), gross = fr(rows.reduce((a, r) => a + r.pay * r.cnt, 0), 6);
+    const money = (v) => (v < 0 ? `-$${-v}` : `$${v}`);
+    const termTxt = (r) => `${r.net} × ${r.cnt}/6 = ${fr(r.net * r.cnt, 6)}`;
+    const steps = [
+      { stage: 0, note: `Pay ${money(D.fee)} to roll one die · a 6 pays ${money(D.win6)} · a 5 pays ${money(D.win5)} · any other face pays $0`, caption: 'Let X be your net gain on one play: payout minus the $1 fee. The table lists every value X can take with its probability, and the expected value will be built by weighting each value by how likely it is.' },
+      { stage: 1, note: `Roll a 6 (probability 1/6): net ${money(rows[0].net)} · term ${termTxt(rows[0])} · running total ${fr(run[0], 6)}`, caption: `First term: rolling a 6 has probability 1/6 and nets ${money(rows[0].net)}, so it contributes ${termTxt(rows[0])} to the expectation. One term is not the answer yet; it is the running total that the remaining faces will adjust.` },
+      { stage: 2, note: `Roll a 5 (probability 1/6): net ${money(rows[1].net)} · term ${termTxt(rows[1])} · running total ${fr(run[1], 6)}`, caption: `Second term: rolling a 5 also has probability 1/6 and nets ${money(rows[1].net)}, contributing ${termTxt(rows[1])}. Adding it to the running total gives ${fr(run[1], 6)}, and only the four losing faces are still missing from the sum.` },
+      { stage: 3, note: `Roll 1, 2, 3 or 4 (probability 4/6): net ${money(rows[2].net)} · term ${termTxt(rows[2])} · running total ${fr(run[2], 6)}`, caption: `Last term: the four remaining faces together have probability 4/6 and each nets ${money(rows[2].net)} (the lost fee), contributing ${termTxt(rows[2])}. This is the term intuition tends to skip, and it pulls the running total down by the full weight of the likely outcome.` },
+      { stage: 4, note: `E[X] = ${rows.map((r) => fr(r.net * r.cnt, 6)).join(' + ').replace(/\+ -/g, '− ')} = ${eStr} dollars per game`, caption: `Add the three terms: E[X] = ${eStr} dollars per game. Cross-check by a second route: the expected payout before the fee is ${gross} dollars, and subtracting the $1 fee gives ${gross} − 1 = ${eStr}, the same value from a different direction.` },
+      {
+        stage: 5, note: `Fair price of this game: ${money(0).replace('$0', '$')}${gross} ≈ $${(rows.reduce((a, r) => a + r.pay * r.cnt, 0) / 6).toFixed(2)} · charged: $1`, answer: true,
+        banner: tot > 0
+          ? `E[X] = ${eStr} dollars (about $0.17) per game in your favor · check: terms ${rows.map((r) => fr(r.net * r.cnt, 6)).join(', ')} sum to ${eStr}, and the fair entry price is the expected payout ${gross} dollars`
+          : `E[X] = ${eStr} dollars (about -$0.17) per game against you · check: terms ${rows.map((r) => fr(r.net * r.cnt, 6)).join(', ')} sum to ${eStr}, and the fair entry price is the expected payout ${gross} dollars`,
+        caption: tot > 0
+          ? `Interpretation: the fair price of the game is its expected payout, ${gross} dollars (about $1.17), and you are charged only $1, so the game favors you by ${eStr} dollars per play on average. Over many plays your average net gain settles near that value, win or lose on any single roll.`
+          : `Interpretation: the fair price of the game is its expected payout, ${gross} dollars (about $0.83), but you are charged $1, so the game costs you ${fr(-tot, 6)} dollars per play on average. Over many plays your average net result settles near ${eStr} dollars, which is how the house edge shows up.`,
+      },
+    ];
+    if (checkpointText) steps[3].checkpoint = checkpointText;
+    return steps;
+  }
+  const EX_EV_DATA = evGameData(5, 2);
+  const EX_EV_VAR_DATA = evGameData(3, 2);
+
   DM.module({
     id: 'probability',
     num: 13,
@@ -208,6 +392,64 @@
               <div class="tip">For any "at least one" question, compute the complement "none" and subtract from 1. It is usually one multiplication instead of many cases.</div>
             </div>
           </div>`,
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: two dice, building the sample space',
+        kind: 'example',
+        id: 'ex-dice-sample-space',
+        problem: String.raw`<p>Two fair dice are rolled. Build the sample space as a grid of ordered pairs, mark the event "the sum is 7", and find its probability by counting.</p>`,
+        objective: 'Construct the 36-pair sample space for two dice as a grid, mark an event on it, and compute the probability as a reduced fraction of the two counts.',
+        data: EX_SS_DATA,
+        steps: diceEventStepsFor(EX_SS_DATA, 'Predict: the cells that add to 7 form one diagonal band of the grid. How many of the 36 pairs will the next step mark?'),
+        answer: '1/6',
+        verify(M) {
+          let cnt = 0, total = 0;
+          for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) { total++; if (a + b === 7) cnt++; }
+          const f = M.frac(cnt, total);
+          return total === 36 && cnt === 6 && pairsFor(7).join(' ') === '(1,6) (2,5) (3,4) (4,3) (5,2) (6,1)'
+            && f.n === 1 && f.d === 6 && String(f) === '1/6' && String(M.frac(6, 36)) === '1/6';
+        },
+        variants: [
+          {
+            label: 'Variant: the boundary sum 12',
+            problem: String.raw`<p>Two fair dice are rolled. Build the sample space as a grid of ordered pairs, mark the event "the sum is 12" — the largest total two dice can make — and find its probability by counting.</p>`,
+            data: EX_SS_VAR_DATA,
+            steps: diceEventStepsFor(EX_SS_VAR_DATA, 'Predict: 12 is the largest possible sum. Will the next step mark more pairs than it did for sum 7, the same number, or fewer?'),
+            answer: '1/36',
+            verify(M) {
+              let cnt = 0, total = 0;
+              for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) { total++; if (a + b === 12) cnt++; }
+              const f = M.frac(cnt, total);
+              return total === 36 && cnt === 1 && pairsFor(12).join(' ') === '(6,6)'
+                && f.n === 1 && f.d === 36 && String(f) === '1/36' && ways2(12) === 1 && ways2(7) === 6;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_SS_DATA;
+          const cell = (a, b) => {
+            const ev = a + b === D.sum, sumTxt = String(a + b);
+            if (step.stage === 0) return { fill: 'var(--sheet)', text: `${a},${b}` };
+            if (step.stage === 1) return { fill: 'var(--sheet)', text: sumTxt, tc: 'var(--ink-2)' };
+            if (step.stage === 2) return ev
+              ? { fill: 'var(--sheet)', text: sumTxt, stroke: 'var(--warn)', sw: 2.2, bold: true, tc: 'var(--ink)' }
+              : { fill: 'var(--sheet)', text: sumTxt, op: 0.5 };
+            return ev
+              ? { fill: 'var(--mark)', text: sumTxt, stroke: 'var(--warn)', sw: 1.4, bold: true, tc: 'var(--mark-ink)', op: step.stage >= 4 ? 1 : 1 }
+              : { fill: 'var(--sheet)', text: sumTxt, op: step.stage >= 4 ? 0.45 : 0.75 };
+          };
+          const legendTxt = step.stage === 0
+            ? 'Each cell is one ordered pair (first die across the top, second die down the side)'
+            : step.stage < 3 ? 'Each cell shows the sum of its pair' : `Highlighted cells: sum is ${D.sum} (${D.fav} pair${D.fav === 1 ? '' : 's'})`;
+          stage.append(h('div.stack', { style: { gap: '0.35rem', width: '100%' } },
+            h('div.pb-legend', h('span', legendTxt)),
+            diceGrid(ctx, 'The 36 outcomes of rolling two dice', cell),
+            h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
+            step.stage >= 4 && !step.answer ? h('div.pb-chips', { style: { justifyContent: 'center' } }, h('span', `|S| = 36`), h('span.hit', `✓ |E| = ${D.fav}`), h('span', `P(E) = ${D.fav}/36`)) : null,
+            step.answer ? h('div.ex-answer', step.banner) : null));
+        },
       },
       /* ---------------------------------------------------------------- 3 */
       {
@@ -449,6 +691,67 @@
             </div>
           </div>`,
       },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: conditional probability and an independence test',
+        kind: 'example',
+        id: 'ex-conditional-independence',
+        problem: String.raw`<p>Two fair dice are rolled. Let A be "doubles" and B be "the sum is 8". Find P(A | B) by restricting the sample space to B, then test whether A and B are independent by comparing P(A ∩ B) with P(A) · P(B) using exact fractions.</p>`,
+        objective: 'Compute a conditional probability by restricting the sample space to the given event, then test independence by comparing the exact fractions P(A and B) and P(A) times P(B).',
+        data: EX_COND_DATA,
+        steps: condStepsFor(EX_COND_DATA, 'Predict: you now learn that B happened, so only the 5 pairs with sum 8 are still possible. Inside that smaller space, will doubles be more likely, less likely, or exactly as likely as before?'),
+        answer: '1/5, dependent',
+        verify(M) {
+          const s8 = pairsFor(8);
+          return s8.length === 5 && s8.includes('(4,4)') && ways2(8) === 5
+            && String(M.frac(6, 36)) === '1/6' && String(M.frac(5, 36)) === '5/36'
+            && String(M.frac(1, 5)) === '1/5' && String(M.frac(1, 36)) === '1/36'
+            && String(M.frac(6 * 5, 36 * 36)) === '5/216' && String(M.frac(1, 36)) !== String(M.frac(6 * 5, 36 * 36));
+        },
+        variants: [
+          {
+            label: 'Variant: a pair that is independent',
+            problem: String.raw`<p>Two fair dice are rolled. Let A be "the first die is even" and B be "the second die is 5 or 6". Find P(A | B) by restricting the sample space to B, then test whether A and B are independent by comparing P(A ∩ B) with P(A) · P(B) using exact fractions.</p>`,
+            data: EX_COND_VAR_DATA,
+            steps: condStepsFor(EX_COND_VAR_DATA, 'Predict: you now learn that B happened, so only the 12 pairs whose second die is 5 or 6 are still possible. Inside that smaller space, will an even first die be more likely, less likely, or exactly as likely as before?'),
+            answer: '1/2, independent',
+            verify(M) {
+              return String(M.frac(3 * 6, 36)) === '1/2' && String(M.frac(6 * 2, 36)) === '1/3'
+                && String(M.frac(3 * 2, 36)) === '1/6' && String(M.frac(6, 12)) === '1/2'
+                && String(M.frac(18 * 12, 36 * 36)) === '1/6' && String(M.frac(18 * 12, 36 * 36)) === String(M.frac(6, 36));
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_COND_DATA;
+          const inA = (a, b) => EV_TESTS[D.aKey](a, b), inB = (a, b) => EV_TESTS[D.bKey](a, b);
+          const cell = (a, b) => {
+            const A = inA(a, b), B = inB(a, b), both = A && B;
+            const base = { fill: 'var(--sheet)', text: `${a},${b}` };
+            if (step.stage === 0) return base;
+            if (step.stage === 1) return { ...base, da: A, tc: A ? 'var(--ink)' : 'var(--ink-3)', bold: A };
+            if (step.stage === 2) return { ...base, da: A, db: B, tc: A || B ? 'var(--ink)' : 'var(--ink-3)', bold: both };
+            if (step.stage === 3) return both
+              ? { fill: 'var(--mark)', text: `${a},${b}`, stroke: 'var(--warn)', sw: 1.4, bold: true, tc: 'var(--mark-ink)', da: true, db: true }
+              : { ...base, da: A, db: B, op: B ? 0.85 : 0.14, tc: B ? 'var(--ink)' : 'var(--ink-3)' };
+            return both
+              ? { fill: 'var(--mark)', text: `${a},${b}`, stroke: 'var(--warn)', sw: 1.4, bold: true, tc: 'var(--mark-ink)', da: true, db: true }
+              : { ...base, da: A, db: B, op: 0.8 };
+          };
+          const indep = D.nAB * 36 === D.nA * D.nB;
+          stage.append(h('div.stack', { style: { gap: '0.35rem', width: '100%' } },
+            h('div.pb-legend',
+              h('span', h('i', { style: { background: 'var(--accent)', borderRadius: '50%' } }), `A: ${D.aLab}${step.stage >= 1 ? ` (${D.nA} pairs)` : ''}`),
+              h('span', h('i', { style: { background: 'var(--fnc)', borderRadius: '50%' } }), `B: ${D.bLab}${step.stage >= 2 ? ` (${D.nB} pairs)` : ''}`),
+              step.stage >= 2 ? h('span', h('i', { style: { background: 'var(--mark)' } }), `Both A and B (${D.nAB})`) : null),
+            diceGrid(ctx, 'The 36 outcomes of rolling two dice, marked by events A and B', cell),
+            h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
+            step.stage === 4 ? h('div.pb-chips', { style: { justifyContent: 'center' } },
+              h('span', `P(A ∩ B) = ${fr(D.nAB, 36)}`), h('span', indep ? '=' : '≠'), h('span', `P(A) · P(B) = ${fr(D.nA, 36)} × ${fr(D.nB, 36)} = ${fr(D.nA * D.nB, 36 * 36)}`)) : null,
+            step.answer ? h('div.ex-answer', step.banner) : null));
+        },
+      },
       /* ---------------------------------------------------------------- 6 */
       {
         title: "Bayes' theorem and the base-rate fallacy",
@@ -680,6 +983,63 @@
             </div>
           </div>`,
       },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: expected value, term by term',
+        kind: 'example',
+        id: 'ex-expected-value-game',
+        problem: String.raw`<p>You pay $1 to roll one die once. Rolling a 6 pays $5, rolling a 5 pays $2, and any other face pays nothing. Let X be your net gain. Build E[X] term by term and decide whether the game favors you.</p>`,
+        objective: 'Build an expected value one term at a time from a payout table, keep a running total, and interpret the result as a fair price and a long-run average.',
+        data: EX_EV_DATA,
+        steps: evStepsFor(EX_EV_DATA, 'Predict: the running total is 5/6 and the last term, for the four losing faces, subtracts 2/3. Will the finished expectation be positive, exactly zero, or negative?'),
+        answer: '1/6',
+        verify(M) {
+          const payout = (f) => (f === 6 ? 5 : f === 5 ? 2 : 0);
+          let netSum = 0, grossSum = 0;
+          for (let f = 1; f <= 6; f++) { netSum += payout(f) - 1; grossSum += payout(f); }
+          return netSum === 1 && grossSum === 7 && String(M.frac(netSum, 6)) === '1/6'
+            && String(M.frac(grossSum, 6)) === '7/6' && String(M.frac(4 * 1 + 1 * 1 + -1 * 4, 6)) === '1/6';
+        },
+        variants: [
+          {
+            label: 'Variant: the top prize drops to $3',
+            problem: String.raw`<p>You pay $1 to roll one die once. Rolling a 6 now pays only $3 (it paid $5 before), rolling a 5 still pays $2, and any other face pays nothing. Let X be your net gain. Build E[X] term by term and decide whether the game favors you.</p>`,
+            data: EX_EV_VAR_DATA,
+            steps: evStepsFor(EX_EV_VAR_DATA, 'Predict: the running total is 1/2 and the last term, for the four losing faces, subtracts 2/3. Will the finished expectation be positive, exactly zero, or negative?'),
+            answer: '-1/6',
+            verify(M) {
+              const payout = (f) => (f === 6 ? 3 : f === 5 ? 2 : 0);
+              let netSum = 0, grossSum = 0;
+              for (let f = 1; f <= 6; f++) { netSum += payout(f) - 1; grossSum += payout(f); }
+              return netSum === -1 && grossSum === 5 && String(M.frac(netSum, 6)) === '-1/6'
+                && String(M.frac(grossSum, 6)) === '5/6' && String(M.frac(2 * 1 + 1 * 1 + -1 * 4, 6)) === '-1/6';
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_EV_DATA;
+          const rows = evRows(D), run = evRun(rows), tot = run[run.length - 1];
+          const money = (v) => (v < 0 ? `-$${-v}` : `$${v}`);
+          const head = h('tr', h('th', 'Roll'), h('th', 'Pays'), h('th', 'Net X'), h('th', 'P(X)'), h('th', 'Term x · P(X)'), h('th', 'Running total'));
+          const bodyRows = rows.map((r, i) => {
+            const shown = step.stage >= i + 1;
+            const active = step.stage === i + 1;
+            return h('tr', { style: active ? { background: 'var(--accent-2)', fontWeight: '700' } : shown ? {} : { opacity: '0.55' } },
+              h('td', r.lab), h('td', money(r.pay)), h('td', money(r.net)), h('td', `${r.cnt}/6`),
+              h('td', shown ? `${r.net} × ${r.cnt}/6 = ${fr(r.net * r.cnt, 6)}` : '—'),
+              h('td', shown ? fr(run[i], 6) : '—'));
+          });
+          stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%' } },
+            h('table.pb-dist', { style: { margin: '0 auto' } }, head, ...bodyRows),
+            h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
+            step.stage === 4 ? h('div.pb-chips', { style: { justifyContent: 'center' } },
+              ...rows.map((r) => h('span', `${fr(r.net * r.cnt, 6)}`)), h('span', '='), h('span.hit', `✓ E[X] = ${fr(tot, 6)} dollars`)) : null,
+            step.stage >= 5 ? h('div.pb-chips', { style: { justifyContent: 'center' } },
+              h('span', `Fair price: ${fr(rows.reduce((a, r) => a + r.pay * r.cnt, 0), 6)} dollars`), h('span', 'Charged: $1'), h('span.hit', tot > 0 ? '✓ Game favors the player' : '✓ Game favors the house')) : null,
+            step.answer ? h('div.ex-answer', step.banner) : null));
+        },
+      },
       /* ---------------------------------------------------------------- 10 */
       {
         title: 'Lab: the binomial distribution',
@@ -873,14 +1233,9 @@
         kind: 'example',
         id: 'ex-bayes-dots',
         problem: String.raw`<p>A condition affects 2% of a population. A test catches 95% of the people who have it (its sensitivity) and wrongly flags 5% of the people who do not (its false-positive rate). Out of 1,000 people, your test comes back positive. What is the probability that you actually have the condition? Count it with all 1,000 people drawn as dots.</p>`,
-        steps: [
-          { phase: 0, note: 'Setup: 1,000 people · 2% have the condition · sensitivity 95% · false-positive rate 5%', caption: 'Counting people first and turning counts into a probability at the end keeps the base rate visible, which is the whole point of this method. All 1,000 dots start neutral, because no group has been marked yet.' },
-          { phase: 1, note: 'Have the condition: 20 people · Do not have it: 980 people', caption: 'Mark the people who have the condition: 2% of 1,000 is 20 people. This small group is the base rate, and forgetting how small it is causes the usual far-too-high guess.' },
-          { phase: 2, note: 'Sick and test positive: 19 · Sick but missed: 1 · Positive so far: 19', caption: 'Apply the 95% sensitivity to the 20 sick people: 19 test positive and 1 is missed. The dark ring and plus sign mark a positive result, so the test outcome never rests on color alone.' },
-          { phase: 3, note: 'Healthy but test positive (false positives): 49 · Total positive: 19 + 49 = 68', caption: 'Now mark the healthy group: 5% sounds small, but 5% of 980 is 49 false positives. That is more than twice the entire group of 20 people who have the condition.' },
-          { phase: 4, note: 'Inside the 68 positive results: 19 are true cases and 49 are false positives', caption: 'Dim everyone who tested negative and focus on the 68 positive results only. A positive result puts you inside this group of 68, so the relevant question is now 19 out of 68.' },
-          { phase: 5, note: 'Inside the 68 positive results: 19 are true cases and 49 are false positives', answer: true, caption: 'Check by Bayes\' rule with exact fractions: (95/100 × 2/100) / (95/100 × 2/100 + 5/100 × 98/100) = 190/680 = 19/68. The dot count and the formula agree, so a positive result means about a 28% chance.' },
-        ],
+        objective: 'Use natural frequencies — counts out of 1,000 people — to find the probability that a positive test result is a true case, keeping the base rate in sight the whole way.',
+        data: EX_BAYES_DATA,
+        steps: bayesStepsFor(EX_BAYES_DATA, 'Predict: the test also flags 5% of the 980 healthy people. How many false positives will that be — and will they outnumber the 19 true positives?'),
         answer: '19/68',
         verify(M) {
           const sick = (1000 * 2) / 100;
@@ -891,14 +1246,33 @@
           return sick === 20 && tp === 19 && healthy === 980 && fp === 49 && tp + fp === 68
             && f.n === 19 && f.d === 68 && String(f) === '19/68' && String(M.frac(tp, tp + fp)) === '19/68';
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: a much commoner condition',
+            problem: String.raw`<p>Same test, different condition: this one affects 10% of a population — 1 person in 10 instead of 2 in 100. The test still catches 95% of the people who have it and wrongly flags 5% of the people who do not. Out of 1,000 people, your test comes back positive. Now what is the probability that you actually have the condition?</p>`,
+            data: EX_BAYES_VAR_DATA,
+            steps: bayesStepsFor(EX_BAYES_VAR_DATA, 'Predict: the test also flags 5% of the 900 healthy people. How many false positives will that be — and how will they compare with the 95 true positives?'),
+            answer: '19/28',
+            verify(M) {
+              const sick = (1000 * 10) / 100;
+              const tp = (sick * 95) / 100;
+              const healthy = 1000 - sick;
+              const fp = (healthy * 5) / 100;
+              const f = M.frac(95 * 10, 95 * 10 + 5 * 90);
+              return sick === 100 && tp === 95 && healthy === 900 && fp === 45 && tp + fp === 140
+                && f.n === 19 && f.d === 28 && String(f) === '19/28' && String(M.frac(tp, tp + fp)) === '19/28';
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h, s } = ctx;
+          const D = (preset && preset.data) || EX_BAYES_DATA;
           const phase = step.phase;
           const circles = [];
           const pluses = [];
           for (let i = 0; i < 1000; i++) {
-            const sick = i < 20;
-            const pos = sick ? i < 19 : i >= 20 && i < 69;
+            const sick = i < D.sick;
+            const pos = sick ? i < D.tp : i >= D.sick && i < D.sick + D.fp;
             let fill = 'var(--rule)', stroke = 'none', sw = 0, op = 1;
             if (phase >= 1 && sick) fill = 'var(--false)';
             if (phase >= 2 && sick && !pos) { fill = 'var(--sheet)'; stroke = 'var(--false)'; sw = 1.6; }
@@ -911,15 +1285,15 @@
           }
           const svg = s('svg', { viewBox: '0 0 1000 300', class: 'pb-svg', role: 'img', 'aria-label': '1,000 dots, one per person, marked by condition and test result', style: 'max-height:13.5rem' }, ...circles, ...pluses);
           const legendKids = [h('span', h('i', { style: { background: 'var(--rule)' } }), phase === 0 ? '1,000 people, no groups marked yet' : 'Healthy, test negative')];
-          if (phase >= 1) legendKids.push(h('span', h('i', { style: { background: 'var(--false)' } }), 'Has the condition (20)'));
-          if (phase >= 2) legendKids.push(h('span', 'Ring and + : tests positive'), h('span', h('i', { style: { background: 'var(--sheet)', borderColor: 'var(--false)' } }), 'Sick but missed (1)'));
-          if (phase >= 3) legendKids.push(h('span', h('i', { style: { background: 'var(--warn)' } }), 'Healthy, tests positive: false positive (49)'));
-          if (phase >= 4) legendKids.push(h('span', 'Dimmed: tested negative (932), out of the question now'));
+          if (phase >= 1) legendKids.push(h('span', h('i', { style: { background: 'var(--false)' } }), `Has the condition (${D.sick})`));
+          if (phase >= 2) legendKids.push(h('span', 'Ring and + : tests positive'), h('span', h('i', { style: { background: 'var(--sheet)', borderColor: 'var(--false)' } }), `Sick but missed (${D.fn})`));
+          if (phase >= 3) legendKids.push(h('span', h('i', { style: { background: 'var(--warn)' } }), `Healthy, tests positive: false positive (${D.fp})`));
+          if (phase >= 4) legendKids.push(h('span', `Dimmed: tested negative (${D.fn + D.tn}), out of the question now`));
           stage.append(h('div.stack', { style: { gap: '0.35rem', width: '100%' } },
             h('div.pb-legend', legendKids),
             svg,
             h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
-            step.answer ? h('div.ex-answer', 'P(sick | positive) = 19/68, about 28% · check: 19 true positives out of 68 positive results (19 + 49 = 68), and Bayes\' rule gives 190/680 = 19/68') : null));
+            step.answer ? h('div.ex-answer', step.banner) : null));
         },
       },
       /* ---------------------------------------------------------------- worked example */
@@ -928,14 +1302,9 @@
         kind: 'example',
         id: 'ex-binomial-tree',
         problem: String.raw`<p>A fair coin is flipped 4 times. What is the probability of exactly 2 heads? Build the full outcome tree: list every outcome string, collect the ones with exactly 2 heads, and count.</p>`,
-        steps: [
-          { depth: 1, note: 'After 1 flip: 2 prefixes · after 4 flips there will be 2 × 2 × 2 × 2 = 16 outcome strings', caption: 'Each flip doubles the number of outcomes, so after 4 flips there are 2^4 = 16 equally likely outcome strings. The tree starts at the root and makes its first split into H and T.' },
-          { depth: 2, note: 'Level 2: 4 prefixes — HH, HT, TH, TT', caption: 'Level 2 is complete with 4 prefixes: HH, HT, TH, and TT. The tree keeps outcomes that feel similar, HT and TH, separate, and that distinction is exactly what counting needs.' },
-          { depth: 3, note: 'Level 3: 8 prefixes, each one flip away from a finished outcome string', caption: 'Level 3 doubles the prefixes again to 8, because each level-2 prefix branches into one ending in H and one ending in T. Nothing has merged, so every prefix still stands for distinct flip sequences.' },
-          { depth: 4, note: 'Level 4: all 16 outcome strings, each labeled with its head count', caption: 'Level 4 completes the tree with all 16 outcome strings as leaves, and each leaf is labeled with its head count. The same head count can come from several different leaves, which is why the next step collects them.' },
-          { depth: 4, collect: true, note: 'Exactly 2 heads: 6 leaves — HHTT, HTHT, HTTH, THHT, THTH, TTHH', caption: 'Collect the leaves with exactly 2 heads: HHTT, HTHT, HTTH, THHT, THTH, and TTHH. There are C(4, 2) = 6 ways to choose which 2 of the 4 flips are heads, and the tree shows all 6 of them.' },
-          { depth: 4, collect: true, note: 'Head-count distribution: 0 heads: 1 · 1 head: 4 · 2 heads: 6 · 3 heads: 4 · 4 heads: 1 · total 16', answer: true, caption: 'Check: the full distribution from the tree is 1, 4, 6, 4, 1 for 0 to 4 heads, which sums to 16 leaves. The formula C(4, 2) / 2^4 = 6/16 = 3/8 agrees with the leaf count exactly.' },
-        ],
+        objective: 'Build the full outcome tree for repeated coin flips, collect the leaves with the target head count, and turn the leaf count into a probability.',
+        data: EX_BIN_DATA,
+        steps: binStepsFor(EX_BIN_DATA, 'Predict: the tree is complete and every leaf is labeled with its head count. Before the next step highlights them, how many of the 16 leaves have exactly 2 heads?'),
         answer: '3/8',
         verify(M) {
           const dist = [0, 0, 0, 0, 0];
@@ -951,18 +1320,42 @@
             && M.C(4, 2) === 6 && f.n === 3 && f.d === 8 && String(f) === '3/8' && EX_BIN_LEAVES.length === 16
             && EX_BIN_LEAVES.filter((leaf) => EX_BIN_HEADS(leaf) === 2).length === 6;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: 3 flips instead of 4',
+            problem: String.raw`<p>A fair coin is flipped 3 times. What is the probability of exactly 2 heads? Build the full outcome tree: list every outcome string, collect the ones with exactly 2 heads, and count.</p>`,
+            data: EX_BIN_VAR_DATA,
+            steps: binStepsFor(EX_BIN_VAR_DATA, 'Predict: the tree is complete and every leaf is labeled with its head count. Before the next step highlights them, how many of the 8 leaves have exactly 2 heads?'),
+            answer: '3/8',
+            verify(M) {
+              const dist = [0, 0, 0, 0];
+              let count2 = 0;
+              for (let mask = 0; mask < 8; mask++) {
+                let ones = 0;
+                for (let b = 0; b < 3; b++) if (mask & (1 << b)) ones++;
+                dist[ones]++;
+                if (ones === 2) count2++;
+              }
+              const f = M.frac(3, 8);
+              return count2 === 3 && dist.join(',') === '1,3,3,1' && dist.reduce((a, b) => a + b, 0) === 8
+                && M.C(3, 2) === 3 && String(f) === '3/8'
+                && EX_BIN_VAR_DATA.leaves.length === 8 && EX_BIN_VAR_DATA.leaves.filter((leaf) => EX_BIN_HEADS(leaf) === 2).length === 3;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
+          const D = (preset && preset.data) || EX_BIN_DATA;
           const rows = [h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'flex-start' } },
             h('div.tiny.mono.muted', { style: { minWidth: '3.6rem', paddingTop: '0.25rem' } }, 'Start'),
             h('div.pb-chips', h('span', 'no flips yet')))];
           for (let L = 1; L <= step.depth; L++) {
-            const prefs = [...new Set(EX_BIN_LEAVES.map((leaf) => leaf.slice(0, L)))];
+            const prefs = [...new Set(D.leaves.map((leaf) => leaf.slice(0, L)))];
             const chips = prefs.map((p) => {
-              if (L < 4) return h('span', p);
+              if (L < D.n) return h('span', p);
               const heads = EX_BIN_HEADS(p);
               const label = `${p} · ${heads} head${heads === 1 ? '' : 's'}`;
-              if (step.collect && heads === 2) return h('span.hit', `✓ ${label}`);
+              if (step.collect && heads === D.k) return h('span.hit', `✓ ${label}`);
               if (step.collect) return h('span', { style: { opacity: '0.45' } }, label);
               return h('span', label);
             });
@@ -974,8 +1367,8 @@
             rows,
             h('div.small', { style: { textAlign: 'center', fontWeight: '600' } }, step.note),
             step.answer ? h('div.pb-chips', { style: { justifyContent: 'center' } },
-              h('span', '0 heads: 1'), h('span', '1 head: 4'), h('span.hit', '✓ 2 heads: 6'), h('span', '3 heads: 4'), h('span', '4 heads: 1'), h('span', 'total: 16')) : null,
-            step.answer ? h('div.ex-answer', 'P(exactly 2 heads) = 6/16 = 3/8 · check: C(4, 2) = 6 favorable leaves out of 2^4 = 16, and the distribution 1, 4, 6, 4, 1 sums to 16') : null));
+              ...D.dist.map((c, j) => (j === D.k ? h('span.hit', `✓ ${j} head${j === 1 ? '' : 's'}: ${c}`) : h('span', `${j} head${j === 1 ? '' : 's'}: ${c}`))), h('span', `total: ${D.total}`)) : null,
+            step.answer ? h('div.ex-answer', step.banner) : null));
         },
       },
       /* ---------------------------------------------------------------- 14 */

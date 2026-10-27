@@ -441,10 +441,14 @@ li.on .tok-kw, li.on .tok-str, li.on .tok-num, li.on .tok-fn, li.on .tok-bi, li.
 .ex-count { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-2); white-space: nowrap; }
 .ex-keys { flex: none; }
 .ex-try { flex: none; }
+.ex-presets { flex: none; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+.ex-holder { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.ex-checkpoint { flex: none; border: 1.5px dashed var(--fnc); border-radius: var(--radius); background: var(--sheet); padding: 0.5rem 0.8rem; font-size: 0.95rem; line-height: 1.5; font-weight: 600; }
+.ex-checkpoint[hidden] { display: none; }
 .ex-board { font-size: 0.84rem; line-height: 1.5; }
 .ex-board .ex-answer-line { font-weight: 600; }
 .print-page .ex-final { flex: none; max-height: 15rem; }
-.print-page .ex-board { column-count: 2; column-gap: 1.4rem; }
+.print-page .ex-board { column-count: 3; column-gap: 1.4rem; font-size: 0.8rem; line-height: 1.45; }
 @media (max-width: 760px) {
   .ex-caption { min-height: 0; }
 }

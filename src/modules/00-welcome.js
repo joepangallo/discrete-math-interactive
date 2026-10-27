@@ -1,4 +1,83 @@
 /* Module 0: Welcome. The opening hero, how the lab works, the course map, and objective coverage. */
+
+/* ---- worked-example generators for this module: both examples exist to teach the example player
+   itself (Step, Play, prediction checkpoints, the preset switcher, the checked answer banner) on
+   small pieces of real course math. Steps are computed from a preset data object, so each primary
+   problem and its variant share one generator. ---- */
+function wmPrime(n) { if (n < 2) return false; for (let d = 2; d * d <= n; d++) if (n % d === 0) return false; return true; }
+function wmFactor(n) { for (let d = 2; d * d <= n; d++) if (n % d === 0) return d; return null; }
+const wmSet = (arr) => (arr.length ? '{' + arr.join(', ') + '}' : '∅');
+const wmList = (arr) => (arr.length <= 2 ? arr.join(' and ') : arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1]);
+
+/* (a) Sort a tray of numbers into even/odd and prime/composite, one number per step. */
+const WM_CLASS_MAIN = { nums: [6, 7, 10, 13, 14, 21] };
+const WM_CLASS_VARIANT = { nums: [8, 5, 12, 1, 2, 27] };
+function wmClassOf(n) { return { parity: n % 2 === 0 ? 'even' : 'odd', kind: n === 1 ? 'neither' : wmPrime(n) ? 'prime' : 'composite' }; }
+function wmClassAnswer(D) {
+  const by = (f) => D.nums.filter(f).sort((a, b) => a - b);
+  return { evens: by((n) => n % 2 === 0), odds: by((n) => n % 2 === 1), primes: by((n) => wmPrime(n)), composites: by((n) => n > 1 && !wmPrime(n)), neither: by((n) => n === 1) };
+}
+function wmClassStepsFor(D) {
+  const steps = [{ done: 0, status: `The tray holds ${D.nums.join(', ')} — nothing sorted yet`, caption: 'Meet the worked-example player on a tiny problem: sort every number in the tray twice, once into the even or odd box and once into the prime or composite box. Press Step ▶ below the picture to place the first number; every step changes the picture and explains what changed and why.' }];
+  D.nums.forEach((n, i) => {
+    const c = wmClassOf(n), d = wmFactor(n);
+    const why = c.kind === 'prime' ? `no whole number from 2 up to ${Math.floor(Math.sqrt(n))} divides it, so it has exactly two divisors, 1 and itself`
+      : c.kind === 'composite' ? `it has a divisor besides 1 and itself, since ${n} = ${d} × ${n / d}`
+      : 'it is neither prime nor composite, because a prime must have exactly two divisors and 1 has only one, itself';
+    const coach = i === 1 ? ' Tip: the ▶ Play button advances the steps on its own, and it always pauses at a prediction checkpoint so you can think before the reveal.' : i === 3 ? ' Tip: ↺ Restart and the scrubber under the picture let you replay any step — nothing here can be broken, so experiment freely.' : '';
+    const st = { done: i + 1, status: `${n} sorted: ${c.parity} and ${c.kind} · ${i + 1} of ${D.nums.length} numbers placed`, caption: `${n} lands in the ${c.parity} box because ${n % 2 === 0 ? `${n} = 2 × ${n / 2} with nothing left over` : `dividing ${n} by 2 leaves a remainder of 1`}, and in the ${c.kind} box because ${why}. One number always sits in two boxes at once, because parity and primality are two independent questions about it.${coach}` };
+    if (i === D.nums.length - 2) st.checkpoint = `Predict: the last number in the tray, ${D.nums[D.nums.length - 1]}, is odd — will it land in the prime box or the composite box?`;
+    steps.push(st);
+  });
+  const A = wmClassAnswer(D);
+  steps.push({ done: D.nums.length, answer: true, status: 'Every number sorted — the checked answer', caption: `Answer: the evens are ${wmSet(A.evens)} and the odds are ${wmSet(A.odds)}; the primes are ${wmSet(A.primes)} and the composites are ${wmSet(A.composites)}${A.neither.length ? `, while ${wmList(A.neither)} sits in the neither box` : ''}. The green banner is the checked answer, recomputed independently of the steps; the Problem switcher above the picture reruns the same method on a new tray with two troublemakers in it.` });
+  return steps;
+}
+
+/* (b) Shortest route on a tiny weighted map, settling one place at a time (a first taste of Module 9). */
+const WM_GRAPH_NODES = ['Gate', 'Fountain', 'Library', 'Cafe', 'Lab', 'Dorm'];
+const WM_GRAPH_POS = { Gate: [60, 150], Fountain: [175, 55], Library: [175, 245], Cafe: [300, 150], Lab: [425, 55], Dorm: [425, 245] };
+const WM_ROUTE_MAIN = { start: 'Gate', goal: 'Dorm', cpAt: 'Library', cpText: 'Predict: Cafe is 6 minutes away via Fountain, but Library (settled at 4) plus the 1-minute Library–Cafe road gives a different total — which one wins when Cafe is settled next?',
+  edges: [['Gate', 'Fountain', 2], ['Gate', 'Library', 5], ['Fountain', 'Library', 2], ['Fountain', 'Cafe', 4], ['Library', 'Cafe', 1], ['Library', 'Lab', 3], ['Cafe', 'Lab', 2], ['Cafe', 'Dorm', 5], ['Lab', 'Dorm', 2]] };
+const WM_ROUTE_VARIANT = { start: 'Gate', goal: 'Dorm', cpAt: 'Cafe', cpText: 'Predict: Dorm already shows 13 minutes via Cafe, and the direct Gate–Dorm road costs 14 — when Lab settles next, will Dorm drop below both of those?',
+  edges: [['Gate', 'Fountain', 3], ['Gate', 'Library', 3], ['Gate', 'Dorm', 14], ['Fountain', 'Cafe', 6], ['Fountain', 'Lab', 5], ['Library', 'Cafe', 2], ['Library', 'Lab', 4], ['Cafe', 'Lab', 1], ['Cafe', 'Dorm', 8], ['Lab', 'Dorm', 4]] };
+function wmRouteRun(D) {
+  const dist = {}, prev = {}, settled = [], events = [];
+  for (const n of WM_GRAPH_NODES) dist[n] = Infinity;
+  dist[D.start] = 0;
+  while (settled.length < WM_GRAPH_NODES.length) {
+    let cur = null;
+    for (const n of WM_GRAPH_NODES) if (!settled.includes(n) && (cur === null || dist[n] < dist[cur])) cur = n;
+    settled.push(cur);
+    const improved = [];
+    for (const e of D.edges) {
+      const to = e[0] === cur ? e[1] : e[1] === cur ? e[0] : null;
+      if (to && !settled.includes(to) && dist[cur] + e[2] < dist[to]) { dist[to] = dist[cur] + e[2]; prev[to] = cur; improved.push([to, dist[to]]); }
+    }
+    events.push({ cur, settled: settled.slice(), dist: { ...dist }, improved });
+  }
+  const route = [];
+  for (let n = D.goal; n; n = prev[n]) route.unshift(n);
+  return { events, route, total: dist[D.goal] };
+}
+function wmRouteStepsFor(D) {
+  const { events, route, total } = wmRouteRun(D);
+  const snap = (dist) => { const o = {}; for (const n of WM_GRAPH_NODES) o[n] = dist[n] === Infinity ? null : dist[n]; return o; };
+  const d0 = {}; for (const n of WM_GRAPH_NODES) d0[n] = n === D.start ? 0 : null;
+  const steps = [{ set: [], cur: null, dist: d0, status: 'The campus map: every road labeled with its walking minutes', caption: `Find the fastest walking route from ${D.start} to ${D.goal} on this little map, where every road is labeled with its minutes. The method: repeatedly settle the closest place that is not settled yet — its distance can never improve later, because every road costs a positive number of minutes. Press Step ▶ to settle ${D.start} first.` }];
+  for (const ev of events) {
+    const goal = ev.cur === D.goal;
+    const st = { set: ev.settled, cur: ev.cur, dist: snap(ev.dist),
+      status: goal ? `Route found: ${route.join(' → ')} = ${total} minutes` : `Settled so far: ${ev.settled.join(' → ')} · ${ev.cur} locked at ${ev.dist[ev.cur]} min`,
+      caption: goal ? `Answer: ${D.goal} settles at ${total} minutes, and following the "came from" links back to ${D.start} gives the route ${route.join(' → ')}, totaling ${total} minutes. The green banner is the checked answer — it was verified by trying every possible route, not just the settled one. The Problem switcher above the picture reruns the same method on a second map.`
+        : `Settle ${ev.cur} at ${ev.dist[ev.cur]} minutes: among the places not yet settled it holds the smallest tentative distance, so that distance is final and can never be beaten later. ${ev.improved.length ? `From ${ev.cur}, the roads out update the neighbors they improve: ${ev.improved.map(([t, v]) => `${t} drops to ${v}`).join('; ')}.` : `From ${ev.cur}, no road improves any neighbor's tentative distance, so nothing else changes this step.`}` };
+    if (ev.cur === D.cpAt) st.checkpoint = D.cpText;
+    if (goal) { st.route = route; st.answer = true; }
+    steps.push(st);
+  }
+  return steps;
+}
+
 DM.module({
   id: 'welcome',
   num: 0,
@@ -83,6 +162,118 @@ DM.module({
           <div class="why">The Python in this course is real Python 3, compiled to WebAssembly and running inside your browser tab. The first run downloads it once; after that, runs are instant. Nothing you type leaves your computer.</div>
           <div class="box small"><span class="lbl muted">Handy keys</span><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> search everything · <kbd>N</kbd> notation · <kbd>G</kbd> glossary · <kbd>T</kbd> theme · <kbd>?</kbd> all shortcuts. Your progress rings in the module list are saved in this browser only.</div>
         </div>`,
+    },
+    {
+      title: 'Worked example: sort the tray (meet the player)',
+      kind: 'example',
+      id: 'ex-sort-into-sets',
+      objective: 'Learn the worked-example player controls (Step, Play, prediction checkpoints and the preset switcher) while sorting numbers into even/odd and prime/composite sets.',
+      problem: String.raw`<p>Sort each number in the tray \(\{6, 7, 10, 13, 14, 21\}\) twice: once by parity, into the evens and the odds, and once by kind, into the primes and the composites. As you work, learn the player: <b>Step ▶</b> advances one step, <b>▶ Play</b> advances on its own but pauses at prediction checkpoints, and the <b>Problem</b> switcher reruns the same method on new numbers.</p>`,
+      steps: wmClassStepsFor(WM_CLASS_MAIN),
+      data: WM_CLASS_MAIN,
+      answer: wmClassAnswer(WM_CLASS_MAIN),
+      verify(M) {
+        const nums = [6, 7, 10, 13, 14, 21];
+        const by = (f) => nums.filter(f).sort((a, b) => a - b);
+        const want = { evens: [6, 10, 14], odds: [7, 13, 21], primes: [7, 13], composites: [6, 10, 14, 21], neither: [] };
+        const got = { evens: by((n) => n % 2 === 0), odds: by((n) => n % 2 === 1), primes: by((n) => M.isPrime(n)), composites: by((n) => n > 1 && !M.isPrime(n)), neither: by((n) => n === 1) };
+        return Object.keys(want).every((k) => got[k].length === want[k].length && got[k].every((x, i) => x === want[k][i]));
+      },
+      variants: [
+        {
+          label: 'Variant: a tray with troublemakers',
+          problem: String.raw`<p>Sort each number in the tray \(\{8, 5, 12, 1, 2, 27\}\) twice: once by parity, into the evens and the odds, and once by kind, into the primes and the composites. This tray hides two troublemakers: \(1\), which is neither prime nor composite, and \(2\), the only even prime.</p>`,
+          steps: wmClassStepsFor(WM_CLASS_VARIANT),
+          data: WM_CLASS_VARIANT,
+          answer: wmClassAnswer(WM_CLASS_VARIANT),
+          verify(M) {
+            const nums = [8, 5, 12, 1, 2, 27];
+            const by = (f) => nums.filter(f).sort((a, b) => a - b);
+            const want = { evens: [2, 8, 12], odds: [1, 5, 27], primes: [2, 5], composites: [8, 12, 27], neither: [1] };
+            const got = { evens: by((n) => n % 2 === 0), odds: by((n) => n % 2 === 1), primes: by((n) => M.isPrime(n)), composites: by((n) => n > 1 && !M.isPrime(n)), neither: by((n) => n === 1) };
+            return Object.keys(want).every((k) => got[k].length === want[k].length && got[k].every((x, i) => x === want[k][i]));
+          },
+        },
+      ],
+      draw(stage, ctx, step, k, preset) {
+        const { h } = ctx;
+        const D = (preset && preset.data) || WM_CLASS_MAIN;
+        const placed = D.nums.slice(0, step.done);
+        const cur = step.done > 0 && !step.answer ? D.nums[step.done - 1] : null;
+        const chip = (n, hot) => h('span.chip', { style: hot ? { background: 'var(--accent)', color: 'var(--accent-ink)', fontWeight: 700 } : {} }, String(n));
+        const box = (title, test) => {
+          const got = placed.filter(test);
+          return h('div.card', { style: { padding: '0.5rem 0.6rem', flex: '1 1 7.5rem' } },
+            h('div.tiny.mono.muted', title),
+            h('div.row', { style: { gap: '0.3rem', marginTop: '0.3rem', minHeight: '1.6rem' } }, got.length ? got.map((n) => chip(n, n === cur)) : h('span.small.muted', 'empty so far')));
+        };
+        const tray = D.nums.slice(step.done);
+        const A = wmClassAnswer(D);
+        stage.append(h('div.stack', { style: { gap: '0.45rem' } },
+          h('div.small', h('b.mono', step.status)),
+          h('div.row', { style: { gap: '0.3rem', alignItems: 'center' } }, h('span.tiny.mono.muted', 'STILL IN THE TRAY:'), tray.length ? tray.map((n) => chip(n, false)) : h('span.small.muted', 'none — the tray is empty')),
+          h('div.row', { style: { gap: '0.5rem', alignItems: 'stretch' } }, box('EVEN', (n) => n % 2 === 0), box('ODD', (n) => n % 2 === 1)),
+          h('div.row', { style: { gap: '0.5rem', alignItems: 'stretch' } }, box('PRIME', (n) => wmPrime(n)), box('COMPOSITE', (n) => n > 1 && !wmPrime(n)), box('NEITHER', (n) => n === 1)),
+          step.answer ? h('div.ex-answer', `Evens ${wmSet(A.evens)} · Odds ${wmSet(A.odds)} · Primes ${wmSet(A.primes)} · Composites ${wmSet(A.composites)}${A.neither.length ? ` · Neither ${wmSet(A.neither)}` : ''}`) : null));
+      },
+    },
+    {
+      title: 'Worked example: the shortest route across campus',
+      kind: 'example',
+      id: 'ex-shortest-route',
+      objective: 'Learn prediction checkpoints and answer-checking on the player while finding the shortest route through a small weighted graph, settling one vertex at a time.',
+      problem: String.raw`<p>On the campus map, every road is labeled with its walking time in minutes: Gate–Fountain \(2\), Gate–Library \(5\), Fountain–Library \(2\), Fountain–Cafe \(4\), Library–Cafe \(1\), Library–Lab \(3\), Cafe–Lab \(2\), Cafe–Dorm \(5\) and Lab–Dorm \(2\). Find the fastest route from the Gate to the Dorm. Predict before each reveal: autoplay pauses at the checkpoint, and the final banner is the checked answer.</p>`,
+      steps: wmRouteStepsFor(WM_ROUTE_MAIN),
+      data: WM_ROUTE_MAIN,
+      answer: { route: ['Gate', 'Fountain', 'Library', 'Cafe', 'Lab', 'Dorm'], minutes: 9 },
+      verify(M) {
+        const E = WM_ROUTE_MAIN.edges;
+        const cost = (r) => r.slice(1).reduce((sum, n, i) => sum + E.find((x) => (x[0] === r[i] && x[1] === n) || (x[1] === r[i] && x[0] === n))[2], 0);
+        let best = Infinity;
+        const dfs = (n, seen, acc) => { if (n === 'Dorm') { best = Math.min(best, acc); return; } for (const e of E) { const to = e[0] === n ? e[1] : e[1] === n ? e[0] : null; if (to && !seen.has(to)) { seen.add(to); dfs(to, seen, acc + e[2]); seen.delete(to); } } };
+        dfs('Gate', new Set(['Gate']), 0);
+        return best === 9 && cost(['Gate', 'Fountain', 'Library', 'Cafe', 'Lab', 'Dorm']) === 9;
+      },
+      variants: [
+        {
+          label: 'Variant: the tempting direct road',
+          problem: String.raw`<p>Same campus, different road times: Gate–Fountain \(3\), Gate–Library \(3\), Fountain–Cafe \(6\), Fountain–Lab \(5\), Library–Cafe \(2\), Library–Lab \(4\), Cafe–Lab \(1\), Cafe–Dorm \(8\) and Lab–Dorm \(4\) — plus a direct Gate–Dorm road that takes \(14\) minutes. Find the fastest route from the Gate to the Dorm, and see whether the direct road ever wins.</p>`,
+          steps: wmRouteStepsFor(WM_ROUTE_VARIANT),
+          data: WM_ROUTE_VARIANT,
+          answer: { route: ['Gate', 'Library', 'Cafe', 'Lab', 'Dorm'], minutes: 10 },
+          verify(M) {
+            const E = WM_ROUTE_VARIANT.edges;
+            const cost = (r) => r.slice(1).reduce((sum, n, i) => sum + E.find((x) => (x[0] === r[i] && x[1] === n) || (x[1] === r[i] && x[0] === n))[2], 0);
+            let best = Infinity;
+            const dfs = (n, seen, acc) => { if (n === 'Dorm') { best = Math.min(best, acc); return; } for (const e of E) { const to = e[0] === n ? e[1] : e[1] === n ? e[0] : null; if (to && !seen.has(to)) { seen.add(to); dfs(to, seen, acc + e[2]); seen.delete(to); } } };
+            dfs('Gate', new Set(['Gate']), 0);
+            return best === 10 && cost(['Gate', 'Library', 'Cafe', 'Lab', 'Dorm']) === 10;
+          },
+        },
+      ],
+      draw(stage, ctx, step, k, preset) {
+        const { h, s } = ctx;
+        const D = (preset && preset.data) || WM_ROUTE_MAIN;
+        const onRoute = (a, b) => !!(step.route && step.route.some((n, i) => i < step.route.length - 1 && ((step.route[i] === a && step.route[i + 1] === b) || (step.route[i] === b && step.route[i + 1] === a))));
+        const kids = [];
+        for (const [a, b, w] of D.edges) {
+          const [x1, y1] = WM_GRAPH_POS[a], [x2, y2] = WM_GRAPH_POS[b];
+          kids.push(s('line', { x1, y1, x2, y2, stroke: onRoute(a, b) ? 'var(--accent)' : 'var(--rule)', 'stroke-width': onRoute(a, b) ? 5 : 1.5 }));
+          kids.push(s('text', { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 5, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 600, fill: 'var(--ink-3)', text: String(w) }));
+        }
+        for (const n of WM_GRAPH_NODES) {
+          const [x, y] = WM_GRAPH_POS[n];
+          const settled = step.set.includes(n);
+          kids.push(s('circle', { cx: x, cy: y, r: 16, fill: settled ? 'var(--accent)' : 'var(--sheet)', stroke: step.cur === n ? 'var(--ink)' : 'var(--ink-3)', 'stroke-width': step.cur === n ? 3 : 1.5 }));
+          kids.push(s('text', { x, y: y - 24, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': settled ? 700 : 400, fill: 'var(--ink)', text: step.dist[n] === null ? '∞' : `${step.dist[n]} min` }));
+          kids.push(s('text', { x, y: y + 32, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 600, fill: 'var(--ink)', text: n + (n === D.start ? ' (start)' : n === D.goal ? ' (goal)' : '') }));
+        }
+        const svg = s('svg', { viewBox: '0 0 485 300', role: 'img', 'aria-label': 'Campus map graph with roads labeled in minutes; settled places fill in as the route is found', style: { width: '440px', maxWidth: '100%', height: 'auto', display: 'block' } }, ...kids);
+        stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
+          h('div.small', h('b.mono', step.status)),
+          svg,
+          step.answer ? h('div.ex-answer', `Shortest route: ${step.route.join(' → ')} — ${step.dist[D.goal]} minutes in all, and no other route ties or beats it`) : null));
+      },
     },
     {
       title: 'Course map: how the ideas build on each other',

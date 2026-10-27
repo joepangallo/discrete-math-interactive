@@ -154,14 +154,160 @@ bsearch(s, i, j, key) {     // search s[i..j]
   // ---- worked-example data, computed once ----
   const EX_BIN_LIST = [3, 7, 12, 19, 25, 31, 42, 56];
   const EX_INS_INPUT = [5, 2, 4, 6, 1, 3];
-  const EX_INS_STATES = [
-    [5, 2, 4, 6, 1, 3],
-    [2, 5, 4, 6, 1, 3],
-    [2, 4, 5, 6, 1, 3],
-    [2, 4, 5, 6, 1, 3],
-    [1, 2, 4, 5, 6, 3],
-    [1, 2, 3, 4, 5, 6],
-  ];
+
+  /* Binary search steps, computed by simulating the search on a preset's data ({ list, target }).
+     Each probe step records the range still in play AFTER that probe's decision, so draw can dim
+     exactly the ruled-out cells for either preset. The same generator builds the primary steps
+     (target present) and the variant steps (target absent, interval empties). */
+  function binStepsFor(D) {
+    const a = D.list, t = D.target, n = a.length;
+    const steps = [{ probe: 0, lo: 0, hi: n - 1, mid: -1, found: false, confirm: false, empty: false,
+      caption: `Setup: the list [${a.join(', ')}] is sorted and the target is ${t}, with lo = 0 and hi = ${n - 1} marking the whole range as still possible. Binary search needs a sorted list and works by ruling out half of what remains with each probe — that halving is where the speed comes from.` }];
+    let lo = 0, hi = n - 1, probe = 0, last = null;
+    while (lo <= hi) {
+      const plo = lo, phi = hi, mid = Math.floor((lo + hi) / 2), v = a[mid];
+      probe++;
+      let res;
+      if (v === t) res = 'eq';
+      else if (v < t) { res = 'lt'; lo = mid + 1; } else { res = 'gt'; hi = mid - 1; }
+      const step = { probe, lo: res === 'eq' ? plo : lo, hi: res === 'eq' ? phi : hi, mid, found: res === 'eq', confirm: false, empty: res !== 'eq' && lo > hi,
+        caption: res === 'eq'
+          ? `Probe ${probe}: with lo = ${plo} and hi = ${phi}, mid = (${plo} + ${phi}) // 2 = ${mid} and list[${mid}] = ${v}, which equals the target exactly. The search stops at once, because an equal probe is the success case and no smaller range needs to be checked.`
+          : res === 'lt'
+            ? `Probe ${probe}: mid = (${plo} + ${phi}) // 2 = ${mid} and list[${mid}] = ${v}, and since ${v} < ${t} the target, if present, is strictly to the right of mid. Cells ${plo} to ${mid} are ruled out — mid itself goes too, because we just compared it and it was too small — so lo becomes ${lo}.`
+            : `Probe ${probe}: mid = (${plo} + ${phi}) // 2 = ${mid} and list[${mid}] = ${v}, and since ${v} > ${t} the target, if present, is strictly to the left of mid. Cells ${mid} to ${phi} are ruled out — mid itself goes too, because we just compared it and it was too big — so hi becomes ${hi}.` };
+      steps.push(step);
+      last = { ...step, plo, phi, res };
+      if (res === 'eq') break;
+    }
+    if (probe >= 2 && last) {
+      steps[steps.length - 2].checkpoint = last.res === 'eq'
+        ? `Predict: the range has narrowed to lo = ${last.plo} and hi = ${last.phi}, so the next probe checks mid = ${last.mid} — will list[${last.mid}] turn out smaller than ${t}, bigger than ${t}, or exactly ${t}?`
+        : `Predict: only one candidate is left, list[${last.mid}] = ${a[last.mid]} — if it is not ${t}, the next update pushes lo past hi. What will that empty interval prove about ${t}?`;
+    }
+    if (last && last.res === 'eq') {
+      steps.push({ probe, lo: last.lo, hi: last.hi, mid: last.mid, found: true, confirm: true, empty: false,
+        caption: `Confirm the hit before reporting it: index ${last.mid} lies inside the narrowed range from lo = ${last.lo} to hi = ${last.hi}, and the value stored there is exactly ${t}. Checking the index and the value together guards against reporting a position produced by an arithmetic slip.` });
+      steps.push({ probe, lo: last.lo, hi: last.hi, mid: last.mid, found: true, confirm: true, empty: false, answer: true,
+        caption: `Answer: ${t} is at index ${last.mid}, found in only ${probe} probes where linear search could need up to ${n}. Check: the list really is sorted and list[${last.mid}] = ${t}, and each probe at most halves the candidates, so the range shrank from ${n} cells all the way down to the single found cell.` });
+    } else if (last) {
+      steps.push({ probe, lo: last.lo, hi: last.hi, mid: last.mid, found: false, confirm: false, empty: true, answer: true,
+        caption: `Answer: ${t} is not in the list. The last probe pushed lo to ${last.lo} while hi stayed ${last.hi}, so lo > hi and the interval is empty — no index is left that could hold ${t}, which proves absence instead of merely failing to spot the value. Binary search needed ${probe} probes to prove it; a linear search would have needed all ${n} comparisons. The result is reported as index −1 (not found).` });
+    }
+    return steps;
+  }
+  const EX_BIN_DATA = { list: EX_BIN_LIST, target: 31 };
+  const EX_BIN_VAR_DATA = { list: EX_BIN_LIST, target: 28 };
+
+  /* Insertion sort, simulated once per preset: pass states for draw, and per-pass details
+     (key, landing index, comparisons, shifts) for the step captions. */
+  function insStatesFor(input) {
+    const a = input.slice(), states = [a.slice()];
+    for (let i = 1; i < a.length; i++) {
+      const key = a[i]; let j = i - 1;
+      while (j >= 0 && a[j] > key) { a[j + 1] = a[j]; j--; }
+      a[j + 1] = key;
+      states.push(a.slice());
+    }
+    return states;
+  }
+  function insPassesFor(input) {
+    const a = input.slice(), passes = [];
+    for (let i = 1; i < a.length; i++) {
+      const key = a[i]; let j = i - 1, comps = 0;
+      while (j >= 0) { comps++; if (a[j] <= key) break; a[j + 1] = a[j]; j--; }
+      a[j + 1] = key;
+      passes.push({ i, key, keyPos: j + 1, comps, shifts: i - (j + 1), state: a.slice() });
+    }
+    return passes;
+  }
+  function insStepsFor(D) {
+    const input = D.input, n = input.length, passes = insPassesFor(input);
+    const totalComps = passes.reduce((s, p) => s + p.comps, 0), totalShifts = passes.reduce((s, p) => s + p.shifts, 0);
+    const sum = input.reduce((s, x) => s + x, 0), sortedList = passes[passes.length - 1].state;
+    const steps = [{ pass: 0, keyPos: -1, sorted: 1, stays: false,
+      caption: `Setup: start with [${input.join(', ')}], where the sorted prefix is just [${input[0]}] because a single item is always in order by itself. Insertion sort grows that sorted prefix one key at a time, inserting each new key into its place — like sorting a hand of cards.` }];
+    for (const p of passes) {
+      steps.push({ pass: p.i, keyPos: p.keyPos, sorted: p.i + 1, stays: p.shifts === 0,
+        caption: p.shifts === 0
+          ? `Pass ${p.i} takes the key ${p.key} from index ${p.i}: its only comparison is against ${p.state[p.i - 1]}, the last item of the sorted prefix, and ${p.key} is not smaller, so nothing shifts and the key stays at index ${p.i}. The list is unchanged, [${p.state.join(', ')}], but the sorted prefix still grows to [${p.state.slice(0, p.i + 1).join(', ')}].`
+          : `Pass ${p.i} takes the key ${p.key} from index ${p.i}: it is compared ${p.comps} time${p.comps === 1 ? '' : 's'} while sliding left past ${p.shifts} larger item${p.shifts === 1 ? '' : 's'}, and it lands at index ${p.keyPos}${p.keyPos === 0 ? ', the very front of the list' : ''}. The list becomes [${p.state.join(', ')}] and the sorted prefix grows to [${p.state.slice(0, p.i + 1).join(', ')}].` });
+    }
+    const star = passes.reduce((best, p) => (p.shifts > best.shifts ? p : best), passes[0]);
+    if (star.shifts > 0 && star.i >= 2) {
+      steps[star.i - 1].checkpoint = `Predict: the next key is ${star.key}, smaller than every item already in the sorted prefix — how far left will it slide, and at which index will it finally land?`;
+    } else if (passes.length >= 3) {
+      steps[2].checkpoint = `Predict: the next key is ${passes[2].key}, larger than everything in the sorted prefix so far — how many comparisons will its pass need, and will any item have to shift?`;
+    }
+    steps.push({ pass: n - 1, keyPos: -1, sorted: n, stays: false, answer: true,
+      caption: `Answer: the sorted list is [${sortedList.join(', ')}], in ascending order at every neighboring pair. Check: it is the same multiset as the input — both lists have ${n} elements and both sum to ${sum}, so nothing was lost, added or duplicated while sorting. The whole sort took ${totalComps} comparisons and ${totalShifts} shifts${totalShifts === 0 ? `, the fewest possible for ${n} items, since each of the ${n - 1} passes still has to compare its key at least once` : ''}.` });
+    return steps;
+  }
+  const EX_INS_STATES = insStatesFor(EX_INS_INPUT);
+  const EX_INS_DATA = { input: EX_INS_INPUT, states: EX_INS_STATES };
+  const EX_INS_VAR_INPUT = [2, 5, 9, 14, 20, 27];
+  const EX_INS_VAR_DATA = { input: EX_INS_VAR_INPUT, states: insStatesFor(EX_INS_VAR_INPUT) };
+
+  /* Loop counting (the nested loop of the counting slide): rowsFor gives the inner-line count
+     for each outer value i = 1..n — triangular when the inner loop runs to i, rectangular when
+     it runs to n. The same generator narrates both shapes row by row. */
+  function loopRowsFor(n, shape) { const r = []; for (let i = 1; i <= n; i++) r.push(shape === 'rect' ? n : i); return r; }
+  function loopStepsFor(D) {
+    const { n, shape, rows, total } = D;
+    const steps = [{ shown: 0, run: 0, caption: `Setup: count how many times the inner line x = x + 1 runs when n = ${n}. The outer loop takes i = 1 to ${n} in turn; for each fixed i the inner loop runs j from 1 to ${shape === 'rect' ? 'n' : 'i'}, so each outer value contributes one row of executions, and the rows accumulate into the total we are after.` }];
+    let run = 0;
+    rows.forEach((c, idx) => {
+      const prev = run; run += c; const i = idx + 1;
+      steps.push({ shown: i, run, caption: shape === 'rect'
+        ? `Row i = ${i}: the inner loop runs j = 1 to n = ${n}, which is ${c} executions, because the inner bound is n itself and does not shrink or grow with i. Adding ${c} to the running total gives ${prev} + ${c} = ${run}, and the picture gains a full row of ${c} dots.`
+        : `Row i = ${i}: the inner loop runs j = 1 to i = ${i}, which is ${c} execution${c === 1 ? '' : 's'}, because both inner bounds are fixed once i is ${i}. Adding ${c} to the running total gives ${prev} + ${c} = ${run}, and the picture gains a row of ${c} dot${c === 1 ? '' : 's'} — one longer than the row before.` });
+    });
+    if (rows.length >= 3) steps[2].checkpoint = `Predict: the next row is i = 3 — how many times will the inner line run in that row, and what will the running total become once it is added?`;
+    steps.push({ shown: rows.length, run: total, answer: true, caption: `Answer: the inner line runs ${total} times in all: ${rows.join(' + ')} = ${total}. Check: the closed form ${shape === 'rect' ? `n · n = ${n} · ${n}` : `n(n + 1)/2 = ${n} · ${n + 1}/2`} = ${total} agrees, and actually running both loops with a counter ends at the same ${total}, so the row-by-row count, the formula and the simulation all match. The count is Theta(n²) either way, because the total grows like a constant times n².` });
+    return steps;
+  }
+  const loopDataFor = (n, shape) => { const rows = loopRowsFor(n, shape); return { n, shape, rows, total: rows.reduce((s, x) => s + x, 0) }; };
+  const EX_LOOP_DATA = loopDataFor(5, 'tri');
+  const EX_LOOP_VAR_DATA = loopDataFor(5, 'rect');
+
+  /* Growth race: operation counts for the module's growth families at doubling inputs.
+     GROW_FAMS holds the formulas; a preset's data names its families by key and stores the
+     computed table, so one generator and one draw serve both races. */
+  const GROW_FAMS = {
+    n: { label: 'n', f: (n) => n, why: 'doubling the input doubles the count' },
+    nlogn: { label: 'n log₂ n', f: (n) => n * Math.log2(n), why: 'log₂ n grows by exactly 1 when n doubles, so the factor 2(k+1)/k shrinks toward 2' },
+    nsq: { label: 'n²', f: (n) => n * n, why: '(2n)² = 4n², so the count quadruples' },
+    exp: { label: '2ⁿ', f: (n) => 2 ** n, why: '2^(2n) = (2ⁿ)², so the count squares and the factor itself explodes' },
+  };
+  const fmtV = (v) => (v >= 10000 ? v.toLocaleString('en-US') : String(v));
+  const fmtR = (x) => (Number.isInteger(x) ? String(x) : x.toFixed(2).replace(/0$/, ''));
+  function growthStepsFor(D) {
+    const steps = [{ shown: 0, caption: `Setup: race the operation counts ${D.fams.map((k) => GROW_FAMS[k].label).join(', ')} as n doubles through ${D.ns.join(', ')}. Each new column recomputes every count at the doubled input, and the doubling factor of each family — how many times bigger its count gets — is what decides the race in the long run.` }];
+    D.ns.forEach((n, j) => {
+      if (j === 0) {
+        steps.push({ shown: 1, caption: `First column, n = ${n}: the counts are ${D.fams.map((k, fi) => `${GROW_FAMS[k].label} = ${fmtV(D.table[fi][0])}`).join(', ')}. At this small size the families sit close together and the lead looks modest, but a race between growth rates is decided by the doubling factors, not by who leads first — so read the columns left to right.` });
+        return;
+      }
+      const parts = D.fams.map((k, fi) => `${GROW_FAMS[k].label}: ${fmtV(D.table[fi][j - 1])} → ${fmtV(D.table[fi][j])} (×${fmtR(D.table[fi][j] / D.table[fi][j - 1])}, because ${GROW_FAMS[k].why})`);
+      steps.push({ shown: j + 1, caption: `Doubling to n = ${n}: ${parts.join('; ')}. The family with the stubbornly largest doubling factor pulls further ahead at every doubling, which is exactly why constant factors stop mattering for large n.` });
+    });
+    const cp = steps[steps.length - 2];
+    if (cp && D.predict) cp.checkpoint = D.predict;
+    const last = D.ns.length - 1, wi = D.fams.indexOf(D.winnerKey);
+    const others = D.fams.filter((_, fi) => fi !== wi).map((k, fi) => `${GROW_FAMS[k].label} = ${fmtV(D.table[D.fams.indexOf(k)][last])}`).join(' and ');
+    steps.push({ shown: D.ns.length, answer: true, caption: `Answer: ${GROW_FAMS[D.winnerKey].label} grows fastest of the ${D.fams.length} families. At n = ${D.ns[last]} it already needs ${fmtV(D.table[wi][last])} operations against ${others}, and its doubling factor never shrinks, so the gap only widens from here. A counted total with this shape is Theta(${GROW_FAMS[D.winnerKey].label}): that family is both an upper bound and a lower bound for its growth.` });
+    return steps;
+  }
+  function growthDataFor(ns, fams, predict) {
+    const table = fams.map((k) => ns.map((n) => GROW_FAMS[k].f(n)));
+    const last = ns.length - 1;
+    let wi = 0; fams.forEach((k, fi) => { if (table[fi][last] > table[wi][last]) wi = fi; });
+    return { ns, fams, table, winnerKey: fams[wi], ans: GROW_FAMS[fams[wi]].label, predict };
+  }
+  const EX_GROW_DATA = growthDataFor([4, 8, 16, 32], ['n', 'nlogn', 'nsq'],
+    'Predict: n doubles once more, to 32. The n² column has multiplied by 4 on every doubling so far — will it do so again, and will the n log₂ n factor (×2.67 last time) grow or shrink?');
+  const EX_GROW_VAR_DATA = growthDataFor([4, 8, 16, 32], ['n', 'nsq', 'exp'],
+    'Predict: at n = 32 the exponential column does not double or quadruple — when n doubles, 2ⁿ squares. What will 65,536 become, and how far behind will n² be left?');
 
   // ---- sorting, as lists of snapshots so the lab can step forward and back ----
   function insEvents(arr) {
@@ -950,13 +1096,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
         kind: 'example',
         id: 'ex-binary-search',
         problem: String.raw`<p>Use binary search to find 31 in the sorted list \([3, 7, 12, 19, 25, 31, 42, 56]\), showing \(lo\), \(hi\) and \(mid\) at every probe. Indices start at 0, and \(mid = \lfloor (lo + hi)/2 \rfloor\).</p>`,
-        steps: [
-          { probe: 0, lo: 0, hi: 7, mid: -1, out: -1, found: false, confirm: false, caption: 'Setup: the list [3, 7, 12, 19, 25, 31, 42, 56] is sorted and the target is 31, with lo = 0 and hi = 7 marking the whole range as still possible. Binary search needs a sorted list and works by ruling out half of what remains with each probe — that halving is where the speed comes from.' },
-          { probe: 1, lo: 0, hi: 7, mid: 3, out: 3, found: false, confirm: false, caption: 'First probe: mid = (0 + 7) // 2 = 3 and list[3] = 19, and since 19 < 31 the target, if present, is strictly to the right of mid. Cells 0 to 3 are ruled out — mid itself goes too, because we just compared it and it was too small — so lo becomes 4.' },
-          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: false, caption: 'Second probe: with lo = 4 and hi = 7, mid = (4 + 7) // 2 = 5 and list[5] = 31, which equals the target exactly. The search stops at once, because an equal probe is the success case and no smaller range needs to be checked.' },
-          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: true, caption: 'Confirm the hit before reporting it: index 5 lies inside the narrowed range from lo = 4 to hi = 7, and the value stored there is exactly 31. Checking the index and the value together guards against reporting a position produced by an arithmetic slip.' },
-          { probe: 2, lo: 4, hi: 7, mid: 5, out: 3, found: true, confirm: true, answer: true, caption: 'Answer: 31 is at index 5, found in only 2 probes where linear search could need up to 8. Check: the list really is sorted and list[5] = 31, and each probe at most halves the candidates, going from 8 candidates to 4 and then to the found cell.' },
-        ],
+        objective: 'Trace binary search probe by probe on a sorted list, tracking lo, hi and mid until the target is found, and report the index together with the probe count.',
+        data: EX_BIN_DATA,
+        steps: binStepsFor(EX_BIN_DATA),
         answer: 5,
         verify(M) {
           const a = [3, 7, 12, 19, 25, 31, 42, 56];
@@ -970,36 +1112,65 @@ bsearch(s, i, j, key) {     // search s[i..j]
           }
           return a.indexOf(31) === 5 && sorted && found === 5 && probes === 2 && a[5] === 31 && EX_BIN_LIST[5] === 31;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: target missing',
+            problem: String.raw`<p>Use binary search to look for 28 in the same sorted list \([3, 7, 12, 19, 25, 31, 42, 56]\), showing \(lo\), \(hi\) and \(mid\) at every probe. This time the target is not in the list — watch what happens to the interval when a search fails.</p>`,
+            data: EX_BIN_VAR_DATA,
+            steps: binStepsFor(EX_BIN_VAR_DATA),
+            answer: -1,
+            verify(M) {
+              const a = EX_BIN_LIST;
+              let lo = 0, hi = a.length - 1, probes = 0, found = -1;
+              while (lo <= hi) {
+                const mid = Math.floor((lo + hi) / 2);
+                probes++;
+                if (a[mid] === 28) { found = mid; break; }
+                if (a[mid] < 28) lo = mid + 1; else hi = mid - 1;
+              }
+              return found === -1 && probes === 3 && lo === 5 && hi === 4 && a.indexOf(28) === -1 && !a.some((x) => x === 28);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
+          const D = (preset && preset.data) || EX_BIN_DATA;
+          const a = D.list, t = D.target, n = a.length;
+          const v = step.mid >= 0 ? a[step.mid] : null;
           const status = step.probe === 0
-            ? 'Target 31 · lo = 0 · hi = 7 · all 8 values are still candidates'
-            : step.probe === 1
-              ? 'Probe 1: mid = 3 · list[3] = 19 < 31 · indices 0–3 ruled out · lo moves to 4'
-              : step.confirm
-                ? 'Probe 2: mid = 5 · list[5] = 31 = target · found — now confirm it'
-                : 'Probe 2: lo = 4 · hi = 7 · mid = 5 · list[5] = 31 = target · found';
+            ? `Target ${t} · lo = 0 · hi = ${n - 1} · all ${n} values are still candidates`
+            : step.answer && !step.found
+              ? `Probe ${step.probe}: list[${step.mid}] = ${v} · lo = ${step.lo} > hi = ${step.hi} · interval empty · not found`
+              : step.found
+                ? step.confirm && !step.answer
+                  ? `Probe ${step.probe}: mid = ${step.mid} · list[${step.mid}] = ${v} = target · found — now confirm it`
+                  : `Probe ${step.probe}: lo = ${step.lo} · hi = ${step.hi} · mid = ${step.mid} · list[${step.mid}] = ${v} = target · found`
+                : `Probe ${step.probe}: mid = ${step.mid} · list[${step.mid}] = ${v} ${v < t ? '<' : '>'} ${t} · range narrows to lo = ${step.lo}, hi = ${step.hi}`;
           const tagFor = (i) => {
             if (step.found && i === step.mid) return 'mid · found ★';
             if (i === step.mid) return 'mid';
-            if (i <= step.out) return 'ruled out';
+            if (i < step.lo || i > step.hi) return 'ruled out';
             if (i === step.lo) return 'lo';
             if (i === step.hi) return 'hi';
-            return ' ';
+            return ' ';
           };
-          const clsFor = (i) => (step.found && i === step.mid ? 'm5-cell found' : i === step.mid ? 'm5-cell cur' : i <= step.out ? 'm5-cell out' : 'm5-cell');
-          const cells = EX_BIN_LIST.map((v, i) => h('div', { class: clsFor(i), style: { flex: '1 1 0', minWidth: '2rem' } },
-            String(v), h('small', `index ${i}`), h('small', tagFor(i))));
+          const clsFor = (i) => (step.found && i === step.mid ? 'm5-cell found' : i === step.mid && !step.empty ? 'm5-cell cur' : i < step.lo || i > step.hi ? 'm5-cell out' : 'm5-cell');
+          const cells = a.map((val, i) => h('div', { class: clsFor(i), style: { flex: '1 1 0', minWidth: '2rem' } },
+            String(val), h('small', `index ${i}`), h('small', tagFor(i))));
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: 'min(46rem, 100%)' } },
             h('div.small', h('b.mono', status)),
             h('div', { style: { display: 'flex', gap: '0.35rem', width: '100%' } }, ...cells),
             h('p.small.muted', step.probe === 0
               ? 'The labels under the cells name the two ends of the range still in play: lo on the left and hi on the right.'
-              : step.probe === 1
-                ? 'Dimmed cells are ruled out: no later probe will look at indices 0 to 3 again.'
-                : 'Dimmed cells stay ruled out, and the starred cell is the probe that matched the target.'),
-            step.confirm && !step.answer ? h('p.small', 'Confirm: index 5 is between lo = 4 and hi = 7, and list[5] = 31 exactly ✓') : null,
-            step.answer ? h('div.ex-answer', 'Answer: 31 is at index 5 · check: the list is sorted, list[5] = 31, and the search took only 2 probes ✓') : null));
+              : step.empty
+                ? 'Every cell is dimmed now: the interval is empty, so no index remains that could possibly hold the target.'
+                : step.found
+                  ? 'Dimmed cells stay ruled out, and the starred cell is the probe that matched the target.'
+                  : 'Dimmed cells are ruled out: no later probe will look at those indices again.'),
+            step.confirm && !step.answer ? h('p.small', `Confirm: index ${step.mid} is between lo = ${step.lo} and hi = ${step.hi}, and list[${step.mid}] = ${t} exactly ✓`) : null,
+            step.answer ? h('div.ex-answer', step.found
+              ? `Answer: ${t} is at index ${step.mid} · check: the list is sorted, list[${step.mid}] = ${t}, and the search took only ${step.probe} probes ✓`
+              : `Answer: ${t} is not in the list · check: the interval emptied (lo = ${step.lo} > hi = ${step.hi}) after ${step.probe} probes, so every index was ruled out ✓`) : null));
         },
       },
       /* ---------------------------------------------------------------- worked example 2 */
@@ -1008,15 +1179,9 @@ bsearch(s, i, j, key) {     // search s[i..j]
         kind: 'example',
         id: 'ex-insertion-sort',
         problem: String.raw`<p>Sort \([5, 2, 4, 6, 1, 3]\) with insertion sort, one pass per step, growing a sorted prefix from the left and sliding each new key into its place.</p>`,
-        steps: [
-          { pass: 0, keyPos: -1, sorted: 1, stays: false, caption: 'Setup: start with [5, 2, 4, 6, 1, 3], where the sorted prefix is just [5] because a single item is always in order by itself. Insertion sort grows that sorted prefix one key at a time, inserting each new key into its place — like sorting a hand of cards.' },
-          { pass: 1, keyPos: 0, sorted: 2, stays: false, caption: 'Pass 1 takes the key 2 from index 1: 2 is smaller than 5, so it slides left past 5 and lands at the front of the list. The list becomes [2, 5, 4, 6, 1, 3] and the sorted prefix grows to [2, 5].' },
-          { pass: 2, keyPos: 1, sorted: 3, stays: false, caption: 'Pass 2 takes the key 4: 4 is smaller than 5, so it moves left once, but it is not smaller than 2, so it stops right there. The list becomes [2, 4, 5, 6, 1, 3] and the sorted prefix grows to [2, 4, 5].' },
-          { pass: 3, keyPos: 3, sorted: 4, stays: true, caption: 'Pass 3 takes the key 6: 6 is not smaller than 5, the last item of the sorted prefix, so it does not move at all and stays at index 3. The list is unchanged, [2, 4, 5, 6, 1, 3], but the sorted prefix still grows to include that staying 6.' },
-          { pass: 4, keyPos: 0, sorted: 5, stays: false, caption: 'Pass 4 takes the key 1: it is smaller than 6, 5, 4 and 2 in turn, so it slides left past all four of them to the very front. The list becomes [1, 2, 4, 5, 6, 3] and only the last item is still outside the sorted prefix.' },
-          { pass: 5, keyPos: 2, sorted: 6, stays: false, caption: 'Pass 5 takes the key 3: it is smaller than 6, 5 and 4, so it slides left past those three, but it is not smaller than 2, so it stops at index 2. The list becomes [1, 2, 3, 4, 5, 6] and the sorted prefix now covers the whole list.' },
-          { pass: 5, keyPos: -1, sorted: 6, stays: false, answer: true, caption: 'Answer: the sorted list is [1, 2, 3, 4, 5, 6], in ascending order at every neighboring pair. Check: it is the same multiset as the input — both lists have 6 elements and both sum to 21, so nothing was lost, added or duplicated while sorting.' },
-        ],
+        objective: 'Sort a list with insertion sort one pass at a time, growing a sorted prefix from the left and tracking the comparisons and shifts each inserted key costs.',
+        data: EX_INS_DATA,
+        steps: insStepsFor(EX_INS_DATA),
         answer: [1, 2, 3, 4, 5, 6],
         verify(M) {
           const input = [5, 2, 4, 6, 1, 3];
@@ -1027,14 +1192,38 @@ bsearch(s, i, j, key) {     // search s[i..j]
           const sum = (arr) => arr.reduce((t, x) => t + x, 0);
           return same && nondec && sum(ans) === 21 && sum(ans) === sum(input) && EX_INS_STATES[5].every((x, i) => x === ans[i]) && EX_INS_INPUT.every((x, i) => x === input[i]);
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: already sorted',
+            problem: String.raw`<p>Sort \([2, 5, 9, 14, 20, 27]\) with insertion sort, one pass per step. This list is already in ascending order — watch what each pass still has to do, and what it gets to skip.</p>`,
+            data: EX_INS_VAR_DATA,
+            steps: insStepsFor(EX_INS_VAR_DATA),
+            answer: [2, 5, 9, 14, 20, 27],
+            verify(M) {
+              const input = [2, 5, 9, 14, 20, 27];
+              const ans = [2, 5, 9, 14, 20, 27];
+              const sorted = M.sortNum(input);
+              let comps = 0, shifts = 0;
+              const a = input.slice();
+              for (let i = 1; i < a.length; i++) {
+                const key = a[i]; let j = i - 1;
+                while (j >= 0) { comps++; if (a[j] <= key) break; a[j + 1] = a[j]; shifts++; j--; }
+                a[j + 1] = key;
+              }
+              return sorted.every((x, i) => x === ans[i]) && a.every((x, i) => x === ans[i]) && comps === input.length - 1 && shifts === 0;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const a = EX_INS_STATES[step.pass];
+          const D = (preset && preset.data) || EX_INS_DATA;
+          const a = D.states[step.pass];
+          const sum = a.reduce((s, x) => s + x, 0);
           const status = step.answer
-            ? 'All 5 passes done · the sorted prefix covers the whole list'
+            ? `All ${a.length - 1} passes done · the sorted prefix covers the whole list`
             : step.pass === 0
-              ? 'Input [5, 2, 4, 6, 1, 3] · sorted prefix: [5] · 5 passes to go'
-              : `Pass ${step.pass} of 5 · key = ${a[step.keyPos]} · sorted prefix: [${a.slice(0, step.sorted).join(', ')}]${step.stays ? ' · the key stays in place' : ''}`;
+              ? `Input [${D.input.join(', ')}] · sorted prefix: [${a[0]}] · ${a.length - 1} passes to go`
+              : `Pass ${step.pass} of ${a.length - 1} · key = ${a[step.keyPos]} · sorted prefix: [${a.slice(0, step.sorted).join(', ')}]${step.stays ? ' · the key stays in place' : ''}`;
           const cells = a.map((v, i) => {
             const isKey = i === step.keyPos;
             const inSorted = i < step.sorted;
@@ -1049,9 +1238,112 @@ bsearch(s, i, j, key) {     // search s[i..j]
             h('p.small.muted', step.pass === 0
               ? 'Cells tagged “sorted” form the prefix that is already in order; the raised cell in later steps is the key being inserted.'
               : step.stays
-                ? 'Nothing moved this pass — the change is the marker: 6 joined the sorted prefix exactly where it already stood.'
+                ? 'Nothing moved this pass — the change is the marker: the key joined the sorted prefix exactly where it already stood.'
                 : 'Cells tagged “sorted” form the prefix that is already in order, and the raised cell is the key that was just placed.'),
-            step.answer ? h('div.ex-answer', 'Answer: [1, 2, 3, 4, 5, 6] · check: 6 items summing to 21, exactly like the input, and every neighboring pair is in ascending order ✓') : null));
+            step.answer ? h('div.ex-answer', `Answer: [${a.join(', ')}] · check: ${a.length} items summing to ${sum}, exactly like the input, and every neighboring pair is in ascending order ✓`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 3 */
+      {
+        title: 'Worked example: counting a nested loop exactly',
+        kind: 'example',
+        id: 'ex-loop-count',
+        problem: String.raw`<p>Count exactly how many times the line <code>x = x + 1</code> runs in the nested loop below when \(n = 5\), counting row by row, and check the total against its closed form.</p><pre class="m5-pseudo">for i = 1 to n
+  for j = 1 to i
+    x = x + 1</pre>`,
+        objective: 'Count the exact number of inner-line executions of a triangular nested loop row by row, accumulate the running total, and check it against the closed form n(n + 1)/2.',
+        data: EX_LOOP_DATA,
+        steps: loopStepsFor(EX_LOOP_DATA),
+        answer: EX_LOOP_DATA.total,
+        verify(M) {
+          let c = 0;
+          for (let i = 1; i <= 5; i++) for (let j = 1; j <= i; j++) c++;
+          return c === 15 && EX_LOOP_DATA.total === 15 && (5 * 6) / 2 === 15 && EX_LOOP_DATA.rows.join(',') === '1,2,3,4,5';
+        },
+        variants: [
+          {
+            label: 'Variant: inner loop runs to n',
+            problem: String.raw`<p>Count exactly how many times the line <code>x = x + 1</code> runs in the nested loop below when \(n = 5\). The inner loop now runs to \(n\) instead of to \(i\), so the triangle becomes a rectangle — count row by row and check against the closed form.</p><pre class="m5-pseudo">for i = 1 to n
+  for j = 1 to n
+    x = x + 1</pre>`,
+            data: EX_LOOP_VAR_DATA,
+            steps: loopStepsFor(EX_LOOP_VAR_DATA),
+            answer: EX_LOOP_VAR_DATA.total,
+            verify(M) {
+              let c = 0;
+              for (let i = 1; i <= 5; i++) for (let j = 1; j <= 5; j++) c++;
+              return c === 25 && EX_LOOP_VAR_DATA.total === 25 && 5 * 5 === 25 && EX_LOOP_VAR_DATA.rows.every((r) => r === 5);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_LOOP_DATA;
+          const closed = D.shape === 'rect' ? `n · n = ${D.n} · ${D.n} = ${D.total}` : `n(n + 1)/2 = ${D.n} · ${D.n + 1}/2 = ${D.total}`;
+          const dotRows = D.rows.map((c, idx) => h('div', { style: { display: 'flex', gap: '0.22rem', alignItems: 'center' } },
+            h('span.mono.small', { style: { width: '3.2rem', textAlign: 'right' } }, `i = ${idx + 1}`),
+            ...Array.from({ length: c }, (_, d) => h('span', { style: { width: '1.05rem', height: '1.05rem', borderRadius: '0.25rem', border: '1px solid var(--rule)', background: idx < step.shown ? (step.answer ? 'var(--true)' : 'var(--accent)') : 'var(--sheet)', opacity: idx < step.shown ? 0.85 : 0.35 } })),
+            h('span.mono.small', idx < step.shown ? `+${c} → ${D.rows.slice(0, idx + 1).reduce((s, x) => s + x, 0)}` : '?')));
+          const tbl = h('table.tt', h('thead', h('tr', h('th', 'i'), h('th', 'inner runs'), h('th', 'running total'))),
+            h('tbody', D.rows.map((c, idx) => h('tr', { class: idx === step.shown - 1 && !step.answer ? 'hit' : '' }, h('td', String(idx + 1)), h('td', idx < step.shown ? String(c) : '?'), h('td', idx < step.shown ? String(D.rows.slice(0, idx + 1).reduce((s, x) => s + x, 0)) : '?')))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.5rem', width: 'min(40rem, 100%)' } },
+            h('div.small', h('b.mono', step.shown === 0 ? `n = ${D.n} · no rows counted yet` : `Rows counted: ${step.shown} of ${D.n} · running total = ${step.run}`)),
+            h('div.stack', { style: { gap: '0.28rem' } }, ...dotRows),
+            tbl,
+            step.answer ? h('p.small', `Closed form check: ${closed} ✓`) : null,
+            step.answer ? h('div.ex-answer', `Answer: ${D.total} executions · check: ${D.rows.join(' + ')} = ${D.total} and the closed form ${closed} ✓`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 4 */
+      {
+        title: 'Worked example: a growth race at doubling inputs',
+        kind: 'example',
+        id: 'ex-growth-race',
+        problem: String.raw`<p>Three algorithms use \(n\), \(n \log_2 n\) and \(n^2\) operations. Compute the exact counts at \(n = 4, 8, 16, 32\), track each family's doubling factor, and name the family that grows fastest.</p>`,
+        objective: 'Compare the growth families n, n log n and n squared by computing exact operation counts at doubling inputs, tracking each doubling factor, and naming the fastest-growing family.',
+        data: EX_GROW_DATA,
+        steps: growthStepsFor(EX_GROW_DATA),
+        answer: EX_GROW_DATA.ans,
+        verify(M) {
+          const D = EX_GROW_DATA;
+          const log2i = (n) => { let k = 0, p = 1; while (p < n) { p *= 2; k++; } return k; };
+          const ref = { n: (n) => n, nlogn: (n) => n * log2i(n), nsq: (n) => n * n, exp: (n) => { let r = 1; for (let i = 0; i < n; i++) r *= 2; return r; } };
+          const ok = D.fams.every((k, fi) => D.ns.every((n, ni) => D.table[fi][ni] === ref[k](n)));
+          const last = D.ns.length - 1, wi = D.fams.indexOf(D.winnerKey);
+          return ok && D.table[wi][last] === Math.max(...D.fams.map((_, fi) => D.table[fi][last])) && D.ans === 'n²' && D.table[2][last] === 1024;
+        },
+        variants: [
+          {
+            label: 'Variant: 2ⁿ enters the race',
+            problem: String.raw`<p>An exponential algorithm joins the race: the families are now \(n\), \(n^2\) and \(2^n\) operations. Compute the exact counts at \(n = 4, 8, 16, 32\), track each doubling factor, and name the family that grows fastest.</p>`,
+            data: EX_GROW_VAR_DATA,
+            steps: growthStepsFor(EX_GROW_VAR_DATA),
+            answer: EX_GROW_VAR_DATA.ans,
+            verify(M) {
+              const D = EX_GROW_VAR_DATA;
+              const ref = { n: (n) => n, nsq: (n) => n * n, exp: (n) => { let r = 1; for (let i = 0; i < n; i++) r *= 2; return r; } };
+              const ok = D.fams.every((k, fi) => D.ns.every((n, ni) => D.table[fi][ni] === ref[k](n)));
+              const last = D.ns.length - 1, wi = D.fams.indexOf(D.winnerKey);
+              return ok && D.table[wi][last] === 4294967296 && D.table[wi][last] > 1000 * D.table[1][last] && D.ans === '2ⁿ' && D.table[2][0] === D.table[1][0];
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_GROW_DATA;
+          const last = D.ns.length - 1;
+          const tbl = h('table.tt', h('thead', h('tr', h('th.l', 'family'), ...D.ns.map((n) => h('th', `n = ${n}`)))),
+            h('tbody', D.fams.map((k, fi) => h('tr', { class: step.answer && k === D.winnerKey ? 'hit' : '' },
+              h('td.l', h('b', GROW_FAMS[k].label)),
+              ...D.ns.map((n, ni) => h('td', { class: ni < step.shown ? '' : 'off', style: ni < step.shown ? null : { color: 'var(--ink-3)' } }, ni < step.shown ? fmtV(D.table[fi][ni]) : '?'))))));
+          const ratioLine = step.shown >= 2 && !step.answer
+            ? `Latest doubling factors: ${D.fams.map((k, fi) => `${GROW_FAMS[k].label} ×${fmtR(D.table[fi][step.shown - 1] / D.table[fi][step.shown - 2])}`).join(' · ')}`
+            : step.shown === 1 ? 'One column in: the doublings from here decide the race.' : step.shown === 0 ? 'No columns yet — press Step to compute the counts at n = ' + D.ns[0] + '.' : '';
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.5rem', width: 'min(42rem, 100%)' } },
+            h('div.small', h('b.mono', step.answer ? `Final column: n = ${D.ns[last]} · winner: ${GROW_FAMS[D.winnerKey].label}` : step.shown === 0 ? 'Growth race · no inputs computed yet' : `Inputs computed up to n = ${D.ns[step.shown - 1]}`)),
+            tbl,
+            ratioLine ? h('p.small', ratioLine) : null,
+            step.answer ? h('div.ex-answer', `Answer: ${GROW_FAMS[D.winnerKey].label} grows fastest · check: at n = ${D.ns[last]} it is ${fmtV(D.table[D.fams.indexOf(D.winnerKey)][last])}, ahead of ${D.fams.filter((k) => k !== D.winnerKey).map((k) => `${GROW_FAMS[k].label} = ${fmtV(D.table[D.fams.indexOf(k)][last])}`).join(' and ')}, and its doubling factor never shrinks ✓`) : null));
         },
       },
       /* ---------------------------------------------------------------- 14 */

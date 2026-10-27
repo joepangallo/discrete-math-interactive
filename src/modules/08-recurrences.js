@@ -34,19 +34,148 @@
   while (fibs.length < 60) fibs.push(fibs[fibs.length - 1] + fibs[fibs.length - 2]);
   const pow2s = (x) => ({ 0: '1', 0.5: '√n', 1: 'n', 1.5: 'n√n', 2: 'n²', 3: 'n³', 4: 'n⁴' })[x];
 
-  // ---- worked-example data, computed once in module scope ----
-  // Optimal 3-disk Hanoi moves as [disk, from peg, to peg] with pegs A = 0, B = 1, C = 2.
-  const EX_HANOI_MOVES = [[1, 0, 2], [2, 0, 1], [1, 2, 1], [3, 0, 2], [1, 1, 0], [2, 1, 2], [1, 0, 2]];
-  // The 8 states of that solution: peg contents (bottom disk first) before the first move and after each move.
-  const EX_HANOI_STATES = (() => {
-    const pegs = [[3, 2, 1], [], []];
-    const states = [pegs.map((p) => [...p])];
-    for (const [, from, to] of EX_HANOI_MOVES) { pegs[to].push(pegs[from].pop()); states.push(pegs.map((p) => [...p])); }
-    return states;
-  })();
-  // First terms of a(n) = 2a(n-1) + 1 with a0 = 0, iterated once here: 0, 1, 3, 7, 15.
-  const EX_REC_TERMS = [0];
-  for (let i = 1; i <= 4; i++) EX_REC_TERMS.push(2 * EX_REC_TERMS[i - 1] + 1);
+  // ---- worked-example generators (phase 2): each primary and its variant share one step builder ----
+  const HANOI_WORD = { 2: 'two', 3: 'three', 4: 'four' };
+  // The data for one Tower of Hanoi example: the optimal moves for n disks as [disk, from peg, to peg]
+  // with pegs A = 0, B = 1, C = 2, and the state (peg contents, bottom disk first) after each move.
+  function hanoiData(n) {
+    const moves = [];
+    const gen = (k, from, to, via) => { if (k === 0) return; gen(k - 1, from, via, to); moves.push([k, from, to]); gen(k - 1, via, to, from); };
+    gen(n, 0, 2, 1);
+    const pegs = [Array.from({ length: n }, (_, i) => n - i), [], []];
+    const states = [pegs.map((pg) => [...pg])];
+    for (const [, from, to] of moves) { pegs[to].push(pegs[from].pop()); states.push(pegs.map((pg) => [...pg])); }
+    return { n, moves, states };
+  }
+  function stepsForHanoi(D) {
+    const NAME = ['A', 'B', 'C'];
+    const total = D.moves.length, mid = (total + 1) / 2;
+    const steps = [{ mv: 0, caption: `All ${HANOI_WORD[D.n]} disks start on peg A, largest at the bottom, and the goal is the same tower on peg C. To free the largest disk, the ${HANOI_WORD[D.n - 1]} smaller disks above it must first become one tower on the spare peg B.` }];
+    D.moves.forEach(([disk, from, to], idx) => {
+      const i = idx + 1;
+      const top = D.states[idx][to][D.states[idx][to].length - 1];
+      const landing = top === undefined ? `peg ${NAME[to]} is empty, so it can land there` : `it lands on the larger disk ${top}, so the move is legal`;
+      const role = disk === D.n ? `This is the largest disk's one move, the +1 between the two smaller towers in the recurrence T(n) = 2T(n−1) + 1` : i < mid ? `It belongs to the first smaller tower, gathering the ${D.n - 1} smaller disks on one peg so the largest disk can move` : `It belongs to the second smaller tower, rebuilding the ${D.n - 1} smaller disks on top of the largest disk`;
+      const st = { mv: i, caption: `Move ${i}: disk ${disk} goes from ${NAME[from]} to ${NAME[to]}, because it is the top disk on peg ${NAME[from]} and ${landing}. ${role}.` };
+      if (i === mid - 1) st.checkpoint = `Predict: the ${D.n - 1} smaller disks are about to sit stacked on a single peg — which disk will finally be free to move next, and to which peg will it go?`;
+      steps.push(st);
+    });
+    steps.push({ mv: total, answer: true, caption: `Answer: the tower takes ${total} moves, checked by the recurrence T(${D.n}) = 2·T(${D.n - 1}) + 1 = 2·${(total - 1) / 2} + 1 = ${total}, which is also 2^${D.n} − 1. Every disk ended in size order on peg C, and no disk ever rested on a smaller one during the sequence.` });
+    return steps;
+  }
+  const EX_HANOI = hanoiData(3);
+  const EX_HANOI_VAR = hanoiData(4); // variant: 4 disks, 15 moves; the draw stays readable at this size
+  const EX_HANOI_MOVES = EX_HANOI.moves; // the 7 optimal moves for 3 disks
+  const EX_HANOI_STATES = EX_HANOI.states; // the 8 states of that solution
+
+  // The data for one iteration example: a(n) = c·a(n-1) + k from a0, terms a0..a4, and the shifted
+  // column mult·a(n) + add, which the recurrence multiplies by exactly c at every step.
+  function recData(c, k, a0, mult, add) {
+    const terms = [a0];
+    for (let i = 1; i <= 4; i++) terms.push(c * terms[i - 1] + k);
+    return { c, k, a0, mult, add, terms };
+  }
+  const tcolPlain = (D) => (D.mult === 1 ? `a(n) + ${D.add}` : `${D.mult}a(n) + ${D.add}`);
+  const tcolTex = (D) => (D.mult === 1 ? `a_n + ${D.add}` : `${D.mult}a_n + ${D.add}`);
+  const expPlain = (e) => (/\+/.test(e) ? `(${e})` : e);
+  // Both examples below have mult·a0 + add = 1, so the shifted column is exactly c^n and the closed form is (c^n − add) / mult.
+  const closedPlainAt = (D, e) => (D.mult === 1 ? `${D.c}^${expPlain(e)} − ${D.add}` : `(${D.c}^${expPlain(e)} − ${D.add})/${D.mult}`);
+  const closedTexAt = (D, e) => (D.mult === 1 ? `${D.c}^{${e}} - ${D.add}` : `\\frac{${D.c}^{${e}} - ${D.add}}{${D.mult}}`);
+  function stepsForRec(D) {
+    const t = D.terms, tv = t.map((x) => D.mult * x + D.add);
+    const tail = D.c === 2 && D.k === 1 && D.a0 === 0
+      ? `This is the same count as the Hanoi moves with a shift of index, since the three-disk tower takes T(3) = ${t[3]} = a3 moves.`
+      : `It also predicts the next term without iterating: a5 = ${closedPlainAt(D, '5')} = ${D.c * t[4] + D.k}, and the rule confirms that value, since ${D.c}·${t[4]} + ${D.k} = ${D.c * t[4] + D.k}.`;
+    return [
+      { rows: 0, phase: 0, caption: `Setup: the starting value is a0 = ${D.a0} and every later term follows a(n) = ${D.c}·a(n−1) + ${D.k}, so iteration means just applying the rule repeatedly. The extra ${tcolPlain(D)} column is there because the shifted values turn out to follow a much cleaner pattern than the terms themselves.` },
+      { rows: 3, phase: 0, caption: `Two terms appear: a1 = ${D.c}·${t[0]} + ${D.k} = ${t[1]} and a2 = ${D.c}·${t[1]} + ${D.k} = ${t[2]}, filling the table down from the starting value. Each term needs only the previous one, which is what makes iteration cheap.` },
+      { rows: 5, phase: 0, caption: `Two more terms appear: a3 = ${D.c}·${t[2]} + ${D.k} = ${t[3]} and a4 = ${D.c}·${t[3]} + ${D.k} = ${t[4]}, completing the first five terms. The ${tcolPlain(D)} column now reads ${tv.join(', ')} — pure powers of ${D.c}.`, checkpoint: `Predict: the ${tcolPlain(D)} column reads ${tv.join(', ')} — what closed form for a(n) do those pure powers of ${D.c} suggest?` },
+      { rows: 5, phase: 1, caption: `The pattern suggests the guess ${tcolPlain(D)} = ${D.c}^n, so a(n) = ${closedPlainAt(D, 'n')} for every n. A pattern in five terms is a conjecture, not a proof, and induction is the right tool because the claim covers all n while the recurrence links each n to the one before.` },
+      { rows: 5, phase: 2, caption: `Induction checks the guess: the base case a0 = ${closedPlainAt(D, '0')} = ${D.a0} matches the starting value outright. If a(k) = ${closedPlainAt(D, 'k')} holds for some k, then a(k+1) = ${D.c}(${closedPlainAt(D, 'k')}) + ${D.k} = ${closedPlainAt(D, 'k+1')} after simplifying, so the formula reproduces itself through the recurrence.` },
+      { rows: 5, phase: 2, answer: true, caption: `Answer: a(n) = ${closedPlainAt(D, 'n')}, and the spot check a4 = ${closedPlainAt(D, '4')} = ${t[4]} matches the iterated table exactly. ${tail}` },
+    ];
+  }
+  const EX_REC = recData(2, 1, 0, 1, 1); // a(n) = 2a(n-1) + 1 with a0 = 0: 0, 1, 3, 7, 15, and a(n) + 1 is a power of 2
+  const EX_REC_VAR = recData(3, 1, 0, 2, 1); // variant: a(n) = 3a(n-1) + 1 with a0 = 0: 0, 1, 4, 13, 40, and 2a(n) + 1 is a power of 3
+  const EX_REC_TERMS = EX_REC.terms; // first terms of the primary recurrence, iterated once here
+
+  // Recursion-tree preset data: T(n) = aT(n/2) + n with T(1) = 1. Each level lists its call count,
+  // the size of each call, the work per call and the level total; seq holds T(1), T(2), T(4), T(8)
+  // computed by iterating the recurrence itself, for the answer step's independent check.
+  function treeData(a, n) {
+    const levels = [];
+    for (let size = n, cnt = 1, i = 0; ; size /= 2, cnt *= a, i++) {
+      levels.push({ i, cnt, size, per: size, tot: cnt * size });
+      if (size === 1) break;
+    }
+    const seq = [1];
+    for (let size = 2; size <= n; size *= 2) seq.push(a * seq[seq.length - 1] + size);
+    return { a, n, levels, seq, total: levels.reduce((s, L) => s + L.tot, 0) };
+  }
+  const EX_TREE = treeData(2, 8); // merge sort shape: every level totals 8, total 32
+  const EX_TREE_VAR = treeData(3, 8); // Karatsuba shape: level totals 8, 12, 18, 27, total 65
+  function stepsForTree(D, cpText) {
+    const L = D.levels, leaf = L[L.length - 1], s = D.seq;
+    const trend = D.a === 2 ? 'The call count doubled while the size halved, so this level costs exactly what level 0 cost' : `The call count tripled while the size only halved, so this level costs ${D.a}/2 times the level above it`;
+    return [
+      { shown: 0, caption: `Setup: solve T(n) = ${D.a}T(n/2) + n with T(1) = 1 at n = ${D.n} by drawing the recursion tree. Each node is one call, labeled with the work that call does outside its recursive calls; the plan is to total every level separately and then add the levels.` },
+      { shown: 1, caption: `Level 0 is the root: a single call on size ${D.n}. It does ${D.n} units of its own work and hands the rest to ${D.a} calls on size ${D.n / 2}, so the level total is 1 × ${D.n} = ${D.n} before any child is even drawn.`, checkpoint: cpText },
+      { shown: 2, caption: `Level 1 has ${L[1].cnt} calls, each on size ${L[1].size} doing ${L[1].per} units of work, so its total is ${L[1].cnt} × ${L[1].per} = ${L[1].tot}. ${trend}.` },
+      { shown: 3, caption: `Level 2 has ${L[2].cnt} calls, each on size ${L[2].size} doing ${L[2].per} units of work, for a total of ${L[2].cnt} × ${L[2].per} = ${L[2].tot}. The pattern per level is now visible: multiply the call count by ${D.a}, halve the size, and the level total follows from those two numbers alone.` },
+      { shown: 4, caption: `Level 3 is the bottom: the size has halved down to 1, so these ${leaf.cnt} calls are base cases with T(1) = 1 each, and the leaf total is ${leaf.cnt} × 1 = ${leaf.tot}. The tree has log2 ${D.n} + 1 = ${L.length} levels in all: one level per halving, plus the root level.` },
+      { shown: 4, sum: true, caption: `Add the level totals: ${L.map((x) => x.tot).join(' + ')} = ${D.total}. ${D.a === 2 ? `Every level costs the same n = ${D.n} and there are log2 ${D.n} + 1 = ${L.length} levels, which is exactly why the closed form for this shape is n(log2 n + 1).` : `The totals grow by a factor of ${D.a}/2 per level, a geometric series, and adding the ${L.length} of them directly gives the total.`}` },
+      { shown: 4, sum: true, answer: true, caption: `Answer: T(${D.n}) = ${D.total}. The independent check skips the tree and iterates the recurrence itself: T(2) = ${D.a}·T(1) + 2 = ${s[1]}, T(4) = ${D.a}·${s[1]} + 4 = ${s[2]}, and T(${D.n}) = ${D.a}·${s[2]} + ${D.n} = ${s[3]}, matching the level sum exactly.` },
+    ];
+  }
+
+  // Characteristic-equation preset data: a(n) = c1 a(n-1) + c2 a(n-2) with a0, a1. The solver finds
+  // the roots (distinct or repeated), the constants b and d, the iterated terms and the closed-form
+  // values, all in exact integer arithmetic for the chosen examples.
+  function charData(c1, c2, a0, a1) {
+    const terms = [a0, a1];
+    for (let i = 2; i <= 5; i++) terms.push(c1 * terms[i - 1] + c2 * terms[i - 2]);
+    const disc = c1 * c1 + 4 * c2;
+    if (disc === 0) {
+      const r = c1 / 2, b = a0, d = a1 / r - b;
+      return { c1, c2, a0, a1, kind: 'repeated', r, b, d, terms, closed: terms.map((_, n) => (b + d * n) * r ** n) };
+    }
+    const sq = Math.sqrt(disc), r1 = (c1 - sq) / 2, r2 = (c1 + sq) / 2;
+    const b = (a1 - a0 * r2) / (r1 - r2), d = a0 - b;
+    return { c1, c2, a0, a1, kind: 'distinct', r1, r2, b, d, terms, closed: terms.map((_, n) => b * r1 ** n + d * r2 ** n) };
+  }
+  const EX_CHAR = charData(5, -6, 7, 16); // roots 2 and 3, a(n) = 5·2^n + 2·3^n (the solver lab's own preset)
+  const EX_CHAR_VAR = charData(4, -4, 1, 4); // repeated root 2, a(n) = (1 + n)·2^n (the concept slide's own case)
+  /** signed plain-text combination: pcombo([[5,'a(n-1)'],[-6,'a(n-2)']]) -> "5a(n-1) − 6a(n-2)" */
+  function pcombo(terms) {
+    let out = '';
+    for (const [c, v] of terms) {
+      if (c === 0) continue;
+      const abs = Math.abs(c);
+      const coef = v && abs === 1 ? '' : String(abs);
+      out += (c < 0 ? (out ? ' − ' : '−') : (out ? ' + ' : '')) + coef + (v || '');
+    }
+    return out || '0';
+  }
+  const charRecPlain = (D) => pcombo([[D.c1, 'a(n−1)'], [D.c2, 'a(n−2)']]);
+  const charEqPlain = (D) => `r^2 ${-D.c1 < 0 ? '−' : '+'} ${Math.abs(D.c1)}r ${-D.c2 < 0 ? '−' : '+'} ${Math.abs(D.c2)} = 0`;
+  const charEqTex = (D) => String.raw`r^2 ${-D.c1 < 0 ? '-' : '+'} ${Math.abs(D.c1)}r ${-D.c2 < 0 ? '-' : '+'} ${Math.abs(D.c2)} = 0`;
+  const facPlain = (r) => `(r ${r < 0 ? '+' : '−'} ${Math.abs(r)})`;
+  const facTex = (r) => `(r ${r < 0 ? '+' : '-'} ${Math.abs(r)})`;
+  const charClosedPlain = (D) => (D.kind === 'repeated' ? `(${pcombo([[D.b, ''], [D.d, 'n']])})·${D.r}^n` : pcombo([[D.b, `·${D.r1}^n`], [D.d, `·${D.r2}^n`]]));
+  const charClosedTex = (D) => (D.kind === 'repeated' ? `(${combo([[D.b, ''], [D.d, 'n']])}) \\cdot ${D.r}^n` : combo([[D.b, ` \\cdot ${D.r1}^n`], [D.d, ` \\cdot ${D.r2}^n`]]));
+  const charGeneralTex = (D) => (D.kind === 'repeated' ? String.raw`a_n = (b + dn) \cdot ${D.r}^n` : String.raw`a_n = b \cdot ${D.r1}^n + d \cdot ${D.r2}^n`);
+  function stepsForChar(D, cpText) {
+    const rep = D.kind === 'repeated';
+    return [
+      { phase: 0, caption: `Setup: a(n) = ${charRecPlain(D)} with a(0) = ${D.a0} and a(1) = ${D.a1} is linear, homogeneous and order 2, so the characteristic-equation method applies. The plan: guess a solution of the form a(n) = r^n, find which r work, then let the two initial conditions fix the two constants.` },
+      { phase: 1, caption: `Substituting the guess a(n) = r^n into the recurrence and dividing by r^(n−2) leaves the characteristic equation ${charEqPlain(D)}. Its roots are exactly the values of r for which r^n solves the recurrence, so factoring this quadratic is the whole next job.`, checkpoint: cpText },
+      { phase: 2, caption: rep ? `It factors as ${facPlain(D.r)}^2 = 0, so r = ${D.r} is a repeated root: the same root twice. A repeated root contributes two independent solutions, ${D.r}^n and n·${D.r}^n, and the extra factor of n in the second one is exactly what keeps the two solutions from collapsing into one.` : `It factors as ${facPlain(D.r1)}${facPlain(D.r2)} = 0, so the roots are r = ${D.r1} and r = ${D.r2}, two different real numbers. Each root contributes one exponential solution, ${D.r1}^n and ${D.r2}^n, and any combination of them also solves the recurrence.` },
+      { phase: 3, caption: rep ? `The general solution for a repeated root is a(n) = b·${D.r}^n + d·n·${D.r}^n, which factors as (b + dn)·${D.r}^n with the constants still unknown. Every choice of b and d satisfies the recurrence; the initial conditions pick out the one sequence we actually want.` : `The general solution combines the two root solutions with unknown constants: a(n) = b·${D.r1}^n + d·${D.r2}^n. Every choice of b and d satisfies the recurrence; the initial conditions pick out the one sequence we actually want.` },
+      { phase: 4, caption: rep ? `Use a(0) = ${D.a0} first: at n = 0 the formula gives (b + d·0)·${D.r}^0 = b, so b = ${D.b} immediately. For a repeated root the first initial condition hands us one constant outright, leaving only d to find.` : `Use a(0) = ${D.a0} first: at n = 0 the formula gives b·${D.r1}^0 + d·${D.r2}^0 = b + d = ${D.a0}. That is one equation in two unknowns, so it narrows the possibilities to a line rather than fixing the constants; the second initial condition is still needed.` },
+      { phase: 5, caption: rep ? `Now a(1) = ${D.a1}: the formula gives (b + d)·${D.r} = ${D.a1}, so b + d = ${D.a1 / D.r}, and with b = ${D.b} that leaves d = ${D.d}. Both constants are fixed, so the closed form is completely determined.` : `Now a(1) = ${D.a1} gives ${D.r1}b + ${D.r2}d = ${D.a1}. Subtracting ${D.r1} times the first equation removes b: (${D.r2} − ${D.r1})d = ${D.a1} − ${D.r1}·${D.a0} = ${D.a1 - D.r1 * D.a0}, so d = ${D.d}, and then b = ${D.a0} − ${D.d} = ${D.b}. Both constants are fixed.` },
+      { phase: 6, answer: true, caption: `Answer: a(n) = ${charClosedPlain(D)}. Check it against plain iteration of the recurrence, which gives ${D.terms.join(', ')}, while the closed form gives ${D.closed.join(', ')}: identical on every term shown, including a(4) = ${D.terms[4]}, which was never used to fit the constants.` },
+    ];
+  }
 
   // Compare the entered decimal values exactly before using floating-point roots.
   // An epsilon would erase deliberately small nonzero contributions as well as noise.
@@ -991,17 +1120,9 @@
         kind: 'example',
         id: 'ex-hanoi-moves',
         problem: String.raw`<p>The Tower of Hanoi starts with 3 disks on peg A, largest at the bottom, and no disk may ever rest on a smaller one. List and picture every move of the fastest solution that transfers the whole tower to peg C, and count the moves.</p>`,
-        steps: [
-          { mv: 0, caption: 'All three disks start on peg A, largest at the bottom, and the goal is the same tower on peg C. To free the largest disk, the two smaller disks above it must first become one tower on the spare peg B.' },
-          { mv: 1, caption: 'Move 1: disk 1 goes from A to C, because the smallest disk is uncovered first and can land on any peg. Parking it on C begins the subproblem of moving the top two disks onto B.' },
-          { mv: 2, caption: 'Move 2: disk 2 goes from A to B, now that disk 1 has uncovered it and B is still empty. This starts the two-disk tower on B, which is where those disks must wait while disk 3 moves.' },
-          { mv: 3, caption: 'Move 3: disk 1 goes from C to B, landing on the larger disk 2, so the move is legal. The two smaller disks now form one tower on B, exactly what freeing the largest disk required.' },
-          { mv: 4, caption: 'Move 4: disk 3 goes from A to C, and the largest disk can finally move because both smaller disks are stacked on B and C is empty. This single move is the +1 between the two smaller towers in the recurrence.' },
-          { mv: 5, caption: 'Move 5: disk 1 goes from B to A, because it covers disk 2 and must move out of the way first. The two-disk tower now has to be rebuilt on peg C, on top of the largest disk.' },
-          { mv: 6, caption: 'Move 6: disk 2 goes from B to C, landing on the larger disk 3, so the move is legal. Only disk 1 is still out of place, sitting alone on A and ready for the final move.' },
-          { mv: 7, caption: 'Move 7: disk 1 goes from A to C, landing on disk 2 to complete the tower in size order. All seven moves followed one pattern: clear the disk below, move it, then rebuild the smaller tower on top.' },
-          { mv: 7, answer: true, caption: 'Answer: the tower takes 7 moves, checked by the recurrence T(3) = 2·T(2) + 1 = 2·(2·T(1) + 1) + 1 = 7, which is also 2^3 − 1. Every disk ended in size order on peg C, and no disk ever rested on a smaller one during the sequence.' },
-        ],
+        objective: 'Learn how the recursive Tower of Hanoi strategy builds an optimal move sequence one subproblem at a time, and why n disks always take exactly 2^n − 1 moves.',
+        data: EX_HANOI,
+        steps: stepsForHanoi(EX_HANOI),
         answer: 7,
         verify(M) {
           const moves = [];
@@ -1023,13 +1144,41 @@
           for (let n = 1; n <= 3; n++) T = 2 * T + 1;
           return legal && pegs[2].join(',') === '3,2,1' && pegs[0].length === 0 && pegs[1].length === 0 && 2 ** 3 - 1 === 7 && T === 7;
         },
-        draw(stage, ctx, step) {
+        variants: [{
+          label: 'Variant: 4 disks',
+          problem: String.raw`<p>The Tower of Hanoi starts with 4 disks on peg A, largest at the bottom, and no disk may ever rest on a smaller one. List and picture every move of the fastest solution that transfers the whole tower to peg C, and count the moves.</p>`,
+          steps: stepsForHanoi(EX_HANOI_VAR),
+          answer: 15,
+          verify(M) {
+            const moves = [];
+            function gen(n, from, to, via) {
+              if (n === 0) return;
+              gen(n - 1, from, via, to);
+              moves.push([n, from, to]);
+              gen(n - 1, via, to, from);
+            }
+            gen(4, 0, 2, 1);
+            const pegs = [[4, 3, 2, 1], [], []];
+            let legal = moves.length === 15;
+            for (const [disk, from, to] of moves) {
+              const top = pegs[to][pegs[to].length - 1];
+              if (pegs[from][pegs[from].length - 1] !== disk || (top !== undefined && top < disk)) legal = false;
+              pegs[to].push(pegs[from].pop());
+            }
+            let T = 0;
+            for (let n = 1; n <= 4; n++) T = 2 * T + 1;
+            return legal && pegs[2].join(',') === '4,3,2,1' && pegs[0].length === 0 && pegs[1].length === 0 && 2 ** 4 - 1 === 15 && T === 15 && EX_HANOI_VAR.moves.length === 15;
+          },
+          data: EX_HANOI_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
           const { h, s } = ctx;
+          const D = (preset && preset.data) || EX_HANOI;
           const NAME = ['A', 'B', 'C'];
           const PX = [110, 320, 530], BASE = 210, DH = 28;
-          const COLOR = ['--num', '--fnc', '--accent'];
-          const state = EX_HANOI_STATES[step.mv];
-          const lastMove = step.mv > 0 ? EX_HANOI_MOVES[step.mv - 1] : null;
+          const COLOR = ['--num', '--fnc', '--accent', '--kw', '--str', '--warn', '--false'];
+          const state = D.states[step.mv];
+          const lastMove = step.mv > 0 ? D.moves[step.mv - 1] : null;
           const movedDisk = lastMove ? lastMove[0] : 0;
           const kids = [
             s('rect', { x: 20, y: BASE, width: 600, height: 10, rx: 4, fill: 'var(--ink-3)' }),
@@ -1044,13 +1193,13 @@
             kids.push(s('text', { x: PX[p], y: y + DH / 2 + 1, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': isMoved ? 800 : 700, fill: 'var(--accent-ink)', text: String(disk) }));
           }));
           if (lastMove) kids.push(s('text', { x: PX[lastMove[2]], y: 40, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: 'var(--ink)', text: `disk ${movedDisk} just moved here` }));
-          const svg = s('svg', { viewBox: '0 0 640 248', role: 'img', 'aria-label': 'Three pegs A, B and C with three disks', style: 'width:min(40rem,100%);height:auto' }, ...kids);
-          const soFar = step.mv === 0 ? 'Moves so far: none yet' : 'Moves so far: ' + EX_HANOI_MOVES.slice(0, step.mv).map(([d, f, t], i) => `${i + 1}. disk ${d} ${NAME[f]}→${NAME[t]}`).join(' · ');
+          const svg = s('svg', { viewBox: '0 0 640 248', role: 'img', 'aria-label': `Three pegs A, B and C with ${D.n} disks`, style: 'width:min(40rem,100%);height:auto' }, ...kids);
+          const soFar = step.mv === 0 ? 'Moves so far: none yet' : 'Moves so far: ' + D.moves.slice(0, step.mv).map(([d, f, t], i) => `${i + 1}. disk ${d} ${NAME[f]}→${NAME[t]}`).join(' · ');
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.35rem' } },
             svg,
-            h('p.small', { style: { margin: 0, textAlign: 'center' } }, step.mv === 0 ? 'Start: after move 0 of 7 — the tower sits on peg A and the goal is peg C' : `After move ${step.mv} of 7: disk ${movedDisk} moved ${NAME[lastMove[1]]} → ${NAME[lastMove[2]]}`),
+            h('p.small', { style: { margin: 0, textAlign: 'center' } }, step.mv === 0 ? `Start: after move 0 of ${D.moves.length} — the tower sits on peg A and the goal is peg C` : `After move ${step.mv} of ${D.moves.length}: disk ${movedDisk} moved ${NAME[lastMove[1]]} → ${NAME[lastMove[2]]}`),
             h('p.small.mono.muted', { style: { margin: 0, textAlign: 'center' } }, soFar),
-            step.answer ? h('div.ex-answer', 'Answer: 7 moves = 2^3 − 1 · check: T(3) = 2·T(2) + 1 = 7, and the tower stands in size order on peg C') : null));
+            step.answer ? h('div.ex-answer', `Answer: ${D.moves.length} moves = 2^${D.n} − 1 · check: T(${D.n}) = 2·T(${D.n - 1}) + 1 = ${D.moves.length}, and the tower stands in size order on peg C`) : null));
         },
       },
       /* ---------------------------------------------------------------- worked example 2 */
@@ -1059,14 +1208,9 @@
         kind: 'example',
         id: 'ex-recurrence-iteration',
         problem: String.raw`<p>A sequence starts with \(a_0 = 0\) and follows \(a_n = 2a_{n-1} + 1\) for \(n \ge 1\). Compute the first terms by iteration, guess a closed form for \(a_n\), and prove the guess by induction.</p>`,
-        steps: [
-          { rows: 0, phase: 0, caption: 'Setup: the starting value is a0 = 0 and every later term follows a(n) = 2·a(n−1) + 1, so iteration means just applying the rule repeatedly. The extra a(n) + 1 column is there because these numbers look like one less than something familiar.' },
-          { rows: 3, phase: 0, caption: 'Two terms appear: a1 = 2·0 + 1 = 1 and a2 = 2·1 + 1 = 3, filling the table down from the starting value. Each term needs only the previous one, which is what makes iteration cheap.' },
-          { rows: 5, phase: 0, caption: 'Two more terms appear: a3 = 2·3 + 1 = 7 and a4 = 2·7 + 1 = 15, completing the first five terms. The a(n) + 1 column now reads 1, 2, 4, 8, 16 — pure powers of 2.' },
-          { rows: 5, phase: 1, caption: 'The pattern suggests the guess a(n) + 1 = 2^n, so a(n) = 2^n − 1 for every n. A pattern in five terms is a conjecture, not a proof, and induction is the right tool because the claim covers all n while the recurrence links each n to the one before.' },
-          { rows: 5, phase: 2, caption: 'Induction checks the guess: the base case a0 = 2^0 − 1 = 0 matches the starting value outright. If a(k) = 2^k − 1 holds for some k, then a(k+1) = 2(2^k − 1) + 1 = 2^(k+1) − 1, so the formula reproduces itself through the recurrence.' },
-          { rows: 5, phase: 2, answer: true, caption: 'Answer: a(n) = 2^n − 1, and the spot check a4 = 2^4 − 1 = 15 matches the iterated table exactly. This is the same count as the Hanoi moves with a shift of index, since the three-disk tower takes T(3) = 7 = a3 moves.' },
-        ],
+        objective: 'Learn to solve a first-order recurrence by iterating it, spotting the pattern in a shifted column of terms, and proving the guessed closed form by induction.',
+        data: EX_REC,
+        steps: stepsForRec(EX_REC),
         answer: '2^n − 1',
         verify(M) {
           const terms = [0];
@@ -1075,23 +1219,150 @@
           const firstFive = [0, 1, 3, 7, 15].every((x, n) => terms[n] === x);
           return matchesClosedForm && firstFive;
         },
-        draw(stage, ctx, step) {
+        variants: [{
+          label: 'Variant: 3a(n-1) + 1',
+          problem: String.raw`<p>A sequence starts with \(a_0 = 0\) and follows \(a_n = 3a_{n-1} + 1\) for \(n \ge 1\). Compute the first terms by iteration, guess a closed form for \(a_n\), and prove the guess by induction.</p>`,
+          steps: stepsForRec(EX_REC_VAR),
+          answer: '(3^n − 1)/2',
+          verify(M) {
+            const terms = [0];
+            for (let n = 1; n <= 20; n++) terms.push(3 * terms[n - 1] + 1);
+            const matchesClosedForm = terms.every((x, n) => x === (3 ** n - 1) / 2);
+            const firstFive = [0, 1, 4, 13, 40].every((x, n) => terms[n] === x);
+            const shiftedArePowers = terms.slice(0, 5).every((x, n) => 2 * x + 1 === 3 ** n);
+            return matchesClosedForm && firstFive && shiftedArePowers && EX_REC_VAR.terms.join(',') === '0,1,4,13,40';
+          },
+          data: EX_REC_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const rows = EX_REC_TERMS.slice(0, step.rows).map((x, n) => h('tr', { class: n === step.rows - 1 && step.phase === 0 ? 'hit' : '' },
-            h('td', String(n)), h('td', String(x)), h('td', String(x + 1))));
+          const D = (preset && preset.data) || EX_REC;
+          const rows = D.terms.slice(0, step.rows).map((x, n) => h('tr', { class: n === step.rows - 1 && step.phase === 0 ? 'hit' : '' },
+            h('td', String(n)), h('td', String(x)), h('td', String(D.mult * x + D.add))));
           const table = h('table.tt', { style: { width: 'min(22rem, 100%)' } },
-            h('thead', h('tr', h('th', { html: '\\(n\\)' }), h('th', { html: '\\(a_n\\)' }), h('th', { html: '\\(a_n + 1\\)' }))),
+            h('thead', h('tr', h('th', { html: '\\(n\\)' }), h('th', { html: '\\(a_n\\)' }), h('th', { html: `\\(${tcolTex(D)}\\)` }))),
             h('tbody', rows.length ? rows : h('tr', h('td.muted', '·'), h('td.muted', '·'), h('td.muted', '·'))));
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } },
-            h('div.big-math', { html: String.raw`\(a_0 = 0, \qquad a_n = 2a_{n-1} + 1\)`, style: { fontSize: '1.05rem' } }),
+            h('div.big-math', { html: String.raw`\(a_0 = ${D.a0}, \qquad a_n = ${D.c}a_{n-1} + ${D.k}\)`, style: { fontSize: '1.05rem' } }),
             table,
             step.rows === 0 ? h('p.small.muted', { style: { margin: 0 } }, 'No terms computed yet — the table fills in as the rule is applied.') : null,
-            step.phase >= 1 ? h('div.big-math', { html: String.raw`Guess: \(a_n + 1 = 2^n\), so \(a_n = 2^n - 1\)`, style: { fontSize: '1.05rem' } }) : null,
+            step.phase >= 1 ? h('div.big-math', { html: String.raw`Guess: \(${tcolTex(D)} = ${D.c}^n\), so \(a_n = ${closedTexAt(D, 'n')}\)`, style: { fontSize: '1.05rem' } }) : null,
             step.phase >= 2 ? h('div.stack', { style: { gap: '0.15rem', alignItems: 'center', fontSize: '0.92rem' } },
-              h('div', { html: String.raw`Base case: \(a_0 = 2^0 - 1 = 0\) ✓` }),
-              h('div', { html: String.raw`Assume \(a_k = 2^k - 1\) for some \(k \ge 0\).` }),
-              h('div', { html: String.raw`Then \(a_{k+1} = 2a_k + 1 = 2(2^k - 1) + 1 = 2^{k+1} - 1\).` })) : null,
-            step.answer ? h('div.ex-answer', 'Answer: a(n) = 2^n − 1 · check: a4 = 2^4 − 1 = 15 matches the table, and T(3) = 7 = a3') : null));
+              h('div', { html: String.raw`Base case: \(a_0 = ${closedTexAt(D, '0')} = ${D.a0}\) ✓` }),
+              h('div', { html: String.raw`Assume \(a_k = ${closedTexAt(D, 'k')}\) for some \(k \ge 0\).` }),
+              h('div', { html: String.raw`Then \(a_{k+1} = ${D.c}a_k + ${D.k} = ${D.c}(${closedTexAt(D, 'k')}) + ${D.k} = ${closedTexAt(D, 'k+1')}\).` })) : null,
+            step.answer ? h('div.ex-answer', `Answer: a(n) = ${closedPlainAt(D, 'n')} · check: a4 = ${closedPlainAt(D, '4')} = ${D.terms[4]} matches the table${D.c === 2 && D.k === 1 ? `, and T(3) = ${D.terms[3]} = a3` : ''}`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 3 */
+      {
+        title: 'Worked example: a recursion tree with level costs',
+        kind: 'example',
+        id: 'ex-recursion-tree',
+        problem: String.raw`<p>Merge sort on 8 items satisfies \(T(n) = 2T(n/2) + n\) with \(T(1) = 1\): two half-size sorts plus \(n\) units of merging work. Expand the recursion tree at \(n = 8\), compute the work on each level and the leaf total, and add the levels to find \(T(8)\).</p>`,
+        objective: 'Expand a recursion tree level by level, compute the work per level and the leaf total, and add the level totals to solve a divide-and-conquer recurrence.',
+        data: EX_TREE,
+        steps: stepsForTree(EX_TREE, 'Predict: level 0 is one call doing 8 units of work. Level 1 will have twice as many calls, each doing half as much — what will the level 1 total be?'),
+        answer: 32,
+        verify(M) {
+          const T = (n) => (n === 1 ? 1 : 2 * T(n / 2) + n);
+          let sum = 0;
+          for (let i = 0, cnt = 1, size = 8; ; cnt *= 2, size /= 2, i++) { sum += cnt * size; if (size === 1) break; }
+          return T(8) === 32 && sum === 32 && EX_TREE.levels.map((L) => L.tot).join(',') === '8,8,8,8' && EX_TREE.seq.join(',') === '1,4,12,32';
+        },
+        variants: [{
+          label: 'Variant: branching factor 3',
+          problem: String.raw`<p>Karatsuba multiplication on 8-digit numbers satisfies \(T(n) = 3T(n/2) + n\) with \(T(1) = 1\): three half-size multiplications plus linear combining work. Expand the recursion tree at \(n = 8\), compute the work on each level and the leaf total, and add the levels to find \(T(8)\).</p>`,
+          steps: stepsForTree(EX_TREE_VAR, 'Predict: level 1 will have 3 calls of size 4 instead of 2. Will its total be bigger or smaller than the 8 units of level 0, and by what factor?'),
+          answer: 65,
+          verify(M) {
+            const T = (n) => (n === 1 ? 1 : 3 * T(n / 2) + n);
+            let sum = 0;
+            for (let cnt = 1, size = 8; ; cnt *= 3, size /= 2) { sum += cnt * size; if (size === 1) break; }
+            return T(8) === 65 && sum === 65 && EX_TREE_VAR.levels.map((L) => L.tot).join(',') === '8,12,18,27' && EX_TREE_VAR.seq.join(',') === '1,5,19,65';
+          },
+          data: EX_TREE_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h, s } = ctx;
+          const D = (preset && preset.data) || EX_TREE;
+          const posFor = (L) => {
+            if (L.cnt > 9) return [{ x: 96, w: 408 }];
+            const bw = Math.min(54, 396 / L.cnt - 8), gap = 8, totW = L.cnt * bw + (L.cnt - 1) * gap, x0 = 300 - totW / 2;
+            return Array.from({ length: L.cnt }, (_, j) => ({ x: x0 + j * (bw + gap), w: bw }));
+          };
+          const kids = [s('text', { x: 300, y: 14, 'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 700, fill: 'var(--ink-2)', text: `T(n) = ${D.a}T(n/2) + n at n = ${D.n} — one box per call, labeled with its size` })];
+          D.levels.forEach((L, i) => {
+            if (i >= step.shown) return;
+            const y = 26 + i * 54, pos = posFor(L);
+            const nxt = D.levels[i + 1];
+            if (nxt && i + 1 < step.shown && nxt.cnt <= 9) {
+              const np = posFor(nxt);
+              pos.forEach((p, j) => { for (let c = 0; c < D.a; c++) { const q = np[j * D.a + c]; if (q) kids.push(s('line', { x1: p.x + p.w / 2, y1: y + 26, x2: q.x + q.w / 2, y2: y + 54, stroke: 'var(--ink-3)', 'stroke-width': 0.9, opacity: 0.7 })); } });
+            }
+            kids.push(s('text', { x: 8, y: y + 17, 'font-size': 11.5, fill: 'var(--ink-3)', 'font-family': 'var(--font-mono)', text: `L${i}` }));
+            pos.forEach((p) => {
+              kids.push(s('rect', { x: p.x, y, width: p.w, height: 26, rx: 5, fill: 'var(--accent)', 'fill-opacity': 0.25 + 0.1 * i, stroke: 'var(--accent)', 'stroke-width': 1.2 }));
+              kids.push(s('text', { x: p.x + p.w / 2, y: y + 17, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: 'var(--ink)', text: L.cnt > 9 ? `${L.cnt} calls, each of size ${L.size}` : String(L.size) }));
+            });
+            kids.push(s('text', { x: 520, y: y + 17, 'font-size': 12.5, 'font-weight': 700, fill: 'var(--accent)', text: `= ${L.tot}` }));
+          });
+          if (step.shown === 0) kids.push(s('text', { x: 300, y: 120, 'text-anchor': 'middle', 'font-size': 13, fill: 'var(--ink-3)', text: 'Nothing expanded yet — the root call comes first.' }));
+          const svg = s('svg', { viewBox: '0 0 640 248', role: 'img', 'aria-label': `Recursion tree for T(n) = ${D.a}T(n/2) + n`, style: 'width:min(40rem,100%);height:auto' }, ...kids);
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.35rem' } },
+            svg,
+            step.sum ? h('p.small.mono', { style: { margin: 0 } }, `Level totals: ${D.levels.map((L) => L.tot).join(' + ')} = ${D.total}`) : null,
+            step.answer ? h('div.ex-answer', `Answer: T(${D.n}) = ${D.total} · check: iterating the recurrence gives T(2) = ${D.seq[1]}, T(4) = ${D.seq[2]}, T(${D.n}) = ${D.seq[3]}, the same total`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 4 */
+      {
+        title: 'Worked example: characteristic roots with initial conditions',
+        kind: 'example',
+        id: 'ex-characteristic-roots',
+        problem: String.raw`<p>Solve \(a_n = 5a_{n-1} - 6a_{n-2}\) with \(a_0 = 7\) and \(a_1 = 16\) by the characteristic-equation method: form the equation, factor it, write the general solution, and use the initial conditions to fix the constants.</p>`,
+        objective: 'Solve a two-term linear recurrence by forming and factoring its characteristic equation, applying the initial conditions to fix the constants, and checking the closed form against iterated terms.',
+        data: EX_CHAR,
+        steps: stepsForChar(EX_CHAR, 'Predict: the characteristic equation is r^2 − 5r + 6 = 0. What are its roots, and will they be two different numbers or one number repeated?'),
+        answer: '5·2^n + 2·3^n',
+        verify(M) {
+          const t = [7, 16];
+          for (let n = 2; n <= 20; n++) t.push(5 * t[n - 1] - 6 * t[n - 2]);
+          return t.every((x, n) => x === 5 * 2 ** n + 2 * 3 ** n) && EX_CHAR.terms.join(',') === '7,16,38,94,242,646' && EX_CHAR.closed.join(',') === EX_CHAR.terms.join(',');
+        },
+        variants: [{
+          label: 'Variant: a repeated root',
+          problem: String.raw`<p>Solve \(a_n = 4a_{n-1} - 4a_{n-2}\) with \(a_0 = 1\) and \(a_1 = 4\) by the characteristic-equation method, and check the closed form against the iterated terms.</p>`,
+          steps: stepsForChar(EX_CHAR_VAR, 'Predict: the characteristic equation is r^2 − 4r + 4 = 0. Does it factor into two different factors or the same factor twice, and why does that change the shape of the general solution?'),
+          answer: '(1 + n)·2^n',
+          verify(M) {
+            const t = [1, 4];
+            for (let n = 2; n <= 20; n++) t.push(4 * t[n - 1] - 4 * t[n - 2]);
+            return t.every((x, n) => x === (1 + n) * 2 ** n) && EX_CHAR_VAR.terms.join(',') === '1,4,12,32,80,192' && EX_CHAR_VAR.closed.join(',') === EX_CHAR_VAR.terms.join(',');
+          },
+          data: EX_CHAR_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_CHAR;
+          const rep = D.kind === 'repeated';
+          const line = (html) => h('div.big-math', { html, style: { fontSize: '1.02rem' } });
+          const eq0 = rep ? String.raw`\(n = 0:\quad b = ${D.a0}\)` : String.raw`\(n = 0:\quad b + d = ${D.a0}\)`;
+          const eq1 = rep ? String.raw`\(n = 1:\quad (b + d) \cdot ${D.r} = ${D.a1}, \quad\text{so}\quad b = ${D.b},\ d = ${D.d}\)` : String.raw`\(n = 1:\quad ${D.r1}b + ${D.r2}d = ${D.a1}, \quad\text{so}\quad b = ${D.b},\ d = ${D.d}\)`;
+          const table = h('table.tt', { style: { width: 'min(24rem, 100%)' } },
+            h('thead', h('tr', h('th', { html: '\\(n\\)' }), [0, 1, 2, 3, 4].map((n) => h('th', String(n))))),
+            h('tbody',
+              h('tr', h('th.l', 'from the rule'), D.terms.slice(0, 5).map((x) => h('td', String(x)))),
+              h('tr', h('th.l', 'closed form'), D.closed.slice(0, 5).map((x) => h('td', String(x))))));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.35rem' } },
+            line(String.raw`\(a_n = ${combo([[D.c1, 'a_{n-1}'], [D.c2, 'a_{n-2}']])}, \qquad a_0 = ${D.a0}, \quad a_1 = ${D.a1}\)`),
+            step.phase >= 1 ? line(String.raw`Characteristic equation: \(${charEqTex(D)}\)`) : null,
+            step.phase >= 2 ? line(rep ? String.raw`Factored: \(${facTex(D.r)}^2 = 0\), so \(r = ${D.r}\) twice` : String.raw`Factored: \(${facTex(D.r1)}${facTex(D.r2)} = 0\), so \(r = ${D.r1}\) and \(r = ${D.r2}\)`) : null,
+            step.phase >= 3 ? line(String.raw`General solution: \(${charGeneralTex(D)}\)`) : null,
+            step.phase >= 4 ? line(eq0) : null,
+            step.phase >= 5 ? line(eq1) : null,
+            step.phase >= 6 ? table : null,
+            step.answer ? h('div.ex-answer', `Answer: a(n) = ${charClosedPlain(D)} · check: the closed form matches the iterated terms ${D.terms.slice(0, 5).join(', ')}`) : null));
         },
       },
       /* ---------------------------------------------------------------- 14 */

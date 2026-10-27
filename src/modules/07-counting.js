@@ -20,21 +20,158 @@
   // a small static Pascal triangle for the concept slide (rows 0..6)
   const miniTri = Array.from({ length: 7 }, (_, n) => `<div class="ct-trirow"><span class="ct-rl">${n}</span>${Array.from({ length: n + 1 }, (_, k) => `<span>${C(n, k)}</span>`).join('')}</div>`).join('');
 
-  // ---- worked example data: the ordered picks of 3 of {A, B, C, D}, and the committees they collapse to ----
-  const EX_MEMBERS = ['A', 'B', 'C', 'D'];
-  const EX_PERMS = perms(4, 3).map((ix) => ix.map((i) => EX_MEMBERS[i]).join('')); // all 24 ordered triples, in lexicographic order
-  const EX_GROUPS = combos(4, 3).map((ix) => { // the 4 committees, each with its 3! = 6 orders
-    const mem = ix.map((i) => EX_MEMBERS[i]);
-    return { set: `{${mem.join(', ')}}`, name: mem.join(''), orders: perms(3, 3).map((pp) => pp.map((j) => mem[j]).join('')) };
-  });
-  const EX_ABC_ORDERS = EX_GROUPS[0].orders; // ABC, ACB, BAC, BCA, CAB, CBA
+  // ---- worked-example generators (phase 2): each primary and its variant share one step builder ----
+  const NUM_WORD = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 8: 'eight', 10: 'ten', 12: 'twelve', 16: 'sixteen', 20: 'twenty', 24: 'twenty-four' };
+  const word = (x) => NUM_WORD[x] || String(x);
+  const joinList = (xs, conj) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ${conj} ${xs[xs.length - 1]}`);
+  // The data for one choose-collapse example: the ordered picks of r of the members, and the committees they collapse to.
+  function chooseData(members, r) {
+    const n = members.length;
+    const picks = perms(n, r).map((ix) => ix.map((i) => members[i]).join('')); // all P(n, r) ordered picks, in lexicographic order
+    const groups = combos(n, r).map((ix) => { // the C(n, r) committees, each with its r! orders
+      const mem = ix.map((i) => members[i]);
+      return { set: `{${mem.join(', ')}}`, name: mem.join(''), orders: perms(r, r).map((pp) => pp.map((j) => mem[j]).join('')) };
+    });
+    return { members, n, r, perms: picks, groups, firstOrders: groups[0].orders };
+  }
+  function stepsForChoose(D) {
+    const { n, r } = D;
+    const total = D.perms.length, grp = D.groups.length, over = fact(r);
+    const prodStr = Array.from({ length: r }, (_, i) => n - i).join(' × ');
+    const stageWord = r === 2 ? 'pairs' : r === 3 ? 'triples' : 'picks';
+    const first = D.groups[0];
+    return [
+      { phase: 0, head: `PICK 1 OF ${r} · ORDERED PICKS, ON PURPOSE`, note: `First pick: ${n} options — ${joinList(D.members, 'or')}.`, caption: `We count ordered picks on purpose first, even though a committee has no order. The first pick has ${n} options, one for each member ${joinList(D.members, 'and')}, and the tree starts with those ${n} branches.` },
+      { phase: 1, head: `PICK 2 OF ${r} · EACH BRANCH SPLITS INTO ${n - 1}`, note: `After two picks: ${n} × ${n - 1} = ${P(n, 2)} ${r === 2 ? 'ordered picks.' : 'partial picks.'}`, caption: `Each first pick splits into the ${n - 1} members still left, because nobody can be picked twice. The product rule multiplies the stages, so there are now ${n} × ${n - 1} = ${P(n, 2)} ${r === 2 ? 'ordered picks in all, and those picks are already complete because each one has both of its members' : 'partial picks'}.` },
+      { phase: 2, head: `PICK ${r} OF ${r} · ALL ${total} LEAVES`, note: `Ordered ${stageWord}: ${prodStr} = ${total} = P(${n}, ${r}).`, caption: `${r === 2 ? `No further pick is needed, because every ordered pick already has its ${r} members, and the tree stops at full ${stageWord}` : `Each partial pick splits once more into the ${n - r + 1} members still left, and the tree stops at full ${stageWord}`}. The product rule gives ${prodStr} = ${total} ordered picks, which is exactly P(${n}, ${r}).` },
+      { phase: 3, head: `ONE COMMITTEE, ${word(over).toUpperCase()} LEAVES`, note: `Highlighted: the ${over} orders of ${first.set}.`, caption: `Look at the highlighted leaves: ${joinList(first.orders, 'and')} are ${word(over)} different leaves but one and the same committee. Every committee is counted exactly ${r}! = ${over} times this way, once for each order of its ${r} members.`, checkpoint: `Predict: every committee hides among the leaves exactly ${over} times — what will ${total} ordered picks divided by ${over} give for the number of committees?` },
+      { phase: 4, head: 'DIVIDE BY THE OVERCOUNT', note: `${total} ordered picks ÷ ${over} orders per committee = ${grp} committees.`, caption: `Since every committee was counted the same number of times, dividing undoes the overcount fairly. There are ${total} / ${over} = ${grp} committees, and the leaves now sit in ${grp} groups, one group per committee.` },
+      { phase: 5, head: `THE ${grp} COMMITTEES`, note: 'Each committee listed once, with no order inside a committee.', caption: `Answer: C(${n}, ${r}) = ${grp}, and the committees are ${joinList(D.groups.map((g) => g.name), 'and')}. Check with the formula: ${n}! / (${r}! · ${n - r}!) = ${fact(n)} / ${fact(r) * fact(n - r)} = ${grp}, which matches the explicit list of exactly ${grp} committees.`, answer: true },
+    ];
+  }
+  const EX_CHOOSE = chooseData(['A', 'B', 'C', 'D'], 3);
+  const EX_CHOOSE_VAR = chooseData(['A', 'B', 'C', 'D', 'E'], 2); // variant: collapse factor 2! = 2 instead of 3! = 6
+  const EX_MEMBERS = EX_CHOOSE.members;
+  const EX_PERMS = EX_CHOOSE.perms; // all 24 ordered triples, in lexicographic order
+  const EX_GROUPS = EX_CHOOSE.groups; // the 4 committees, each with its 3! = 6 orders
+  const EX_ABC_ORDERS = EX_CHOOSE.firstOrders; // ABC, ACB, BAC, BCA, CAB, CBA
 
-  // ---- worked example data: Pascal's triangle down to row 5, built by the addition rule ----
-  const EX_TRI = (() => {
+  // Pascal's triangle down to a given row, built by the addition rule.
+  function triTo(maxN) {
     const rows = [[1]];
-    for (let n = 1; n <= 5; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
+    for (let n = 1; n <= maxN; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
     return rows;
-  })();
+  }
+  const ORD = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh'];
+  function pascalData(targetN, targetK) { return { tri: triTo(targetN), targetN, targetK }; }
+  function stepsForPascal(D) {
+    const { tri, targetN, targetK } = D;
+    const steps = [{ rows: 2, focus: [], parents: [], note: 'Rows 0 and 1 in place: 1 / 1 1. Edges are always 1.', caption: 'Rows 0 and 1 are already in place: a single 1, then 1 and 1. Every later entry is the sum of the two entries above it, and the edges stay 1 because there is exactly one way to choose all of a set or none of it.' }];
+    for (let n = 2; n <= targetN; n++) {
+      const k = n === targetN ? targetK : Math.floor(n / 2);
+      const row = tri[n], v = row[k], p1 = tri[n - 1][k - 1], p2 = tri[n - 1][k];
+      let note, caption;
+      if (n === targetN) {
+        note = `Row ${n}: C(${n}, ${k}) is the ${ORD[k]} entry, ${v} = ${p1} + ${p2} from its parents in row ${n - 1}.`;
+        caption = `Row ${n} appears as ${row.join(', ')}, completing the triangle we need. The marked ${ORD[k]} entry is C(${n}, ${k}), and it comes from its parents ${p1} and ${p2} in row ${n - 1}: ${v} = ${p1} + ${p2}.`;
+      } else if (n === 2) {
+        note = `Row ${n}: the middle entry is ${v} = ${p1} + ${p2}, from its two parents in row ${n - 1}.`;
+        caption = `Row ${n} appears as ${row.join(', ')}, and its middle entry is the first one that must be computed. It comes from its two parents in row ${n - 1}: ${v} = ${p1} + ${p2}, while the two edge entries are copied down as 1.`;
+      } else if (k * 2 === n) {
+        note = `Row ${n}: the middle entry is ${v} = ${p1} + ${p2}, and it is C(${n}, ${k}).`;
+        caption = `Row ${n} appears as ${row.join(', ')}, and its middle entry is worth remembering. It is ${v} = ${p1} + ${p2} from the two ${p1}s above it, and it is C(${n}, ${k}), the count for choosing ${k} of ${n}.`;
+      } else {
+        note = `Row ${n}: the marked entry is ${v} = ${p1} + ${p2}, from the parents ${p1} and ${p2} in row ${n - 1}.`;
+        caption = `Row ${n} appears as ${row.join(', ')}, built by adding neighboring pairs from row ${n - 1}. The marked entry shows the pattern clearly: ${v} = ${p1} + ${p2}, the sum of the entry above-left and the entry above-right.`;
+      }
+      const st = { rows: n + 1, focus: [[n, k]], parents: [[n - 1, k - 1], [n - 1, k]], note, caption };
+      if (n === targetN - 1) st.checkpoint = `Predict: row ${targetN} comes only from adding neighboring pairs in row ${targetN - 1} — what will its ${ORD[targetK]} entry be, the one equal to C(${targetN}, ${targetK})?`;
+      steps.push(st);
+    }
+    const tn = targetN, tk = targetK, v = tri[tn][tk];
+    const row = tri[tn], sum = row.reduce((a, b) => a + b, 0);
+    const focus = [[tn, tk]];
+    if (tn - tk !== tk) focus.push([tn, tn - tk]);
+    steps.push({ rows: tn + 1, focus, parents: [[tn - 1, tk - 1], [tn - 1, tk]], note: `Row ${tn} sums to ${row.join(' + ')} = ${sum} = 2^${tn}, one subset count per entry.`, caption: `Answer: C(${tn}, ${tk}) = ${v}, so there are ${v} ways to choose ${tk} books from ${tn}. Check with factorials: ${tn}! / (${tk}! · ${tn - tk}!) = ${fact(tn)} / ${fact(tk) * fact(tn - tk)} = ${v}, and symmetry gives the same ${v} at C(${tn}, ${tn - tk}), the mirrored entry in row ${tn}.`, answer: true });
+    return steps;
+  }
+  const EX_PASCAL = pascalData(5, 2);
+  const EX_PASCAL_VAR = pascalData(6, 3); // variant: one more row, target C(6, 3) = 20
+  const EX_TRI = EX_PASCAL.tri; // Pascal's triangle down to row 5, built by the addition rule
+
+  // choice tree: a two-stage product-rule count, then a disjoint alternatives group added by the sum rule
+  function treeData(stages, alt) {
+    const S = stages.map((s) => ({ ...s, count: s.opts.length }));
+    const A = { ...alt, count: alt.opts.length };
+    const prod = S.reduce((t, s) => t * s.count, 1);
+    return { stages: S, alt: A, prod, total: prod + A.count };
+  }
+  const EX_TREE_MAIN = treeData(
+    [{ name: 'Top', opts: ['red top', 'blue top', 'striped top'] }, { name: 'Bottom', opts: ['jeans', 'skirt'] }],
+    { name: 'Dress (one-piece alternative)', opts: ['green dress', 'black dress'] });
+  const EX_TREE_VAR = treeData(
+    [{ name: 'Top', opts: ['white top', 'gray top', 'navy top', 'polo'] }, { name: 'Bottom', opts: ['jeans'] }],
+    { name: 'Dress (one-piece alternative)', opts: ['green dress', 'black dress', 'red dress'] });
+  function stepsForTree(D) {
+    const [s1, s2] = D.stages;
+    const combos = [];
+    for (const a of s1.opts) for (const b of s2.opts) combos.push(`${a} + ${b}`);
+    return [
+      { phase: 0, caption: `Start at the root of the choice tree. An outfit is built in stages: first a ${s1.name.toLowerCase()}, then a ${s2.name.toLowerCase()}. Nothing has branched yet, so the tree is a single point and the count so far is 1 partial outfit.` },
+      { phase: 1, caption: `Level 1 branches by the first stage: there are ${s1.count} choices for a ${s1.name.toLowerCase()} (${s1.opts.join(', ')}), so the root splits into ${s1.count} branches. Each branch is one partial outfit waiting for its second stage.` },
+      { phase: 2, checkpoint: `Predict: each of the ${s1.count} branches is about to split into ${s2.count} second-stage choices. How many complete two-piece outfits will the tree have at its leaves?`, caption: `Level 2 completes each branch: every first-stage choice splits into the ${s2.count} choices for a ${s2.name.toLowerCase()} (${s2.opts.join(', ')}). The product rule multiplies independent stages, giving ${s1.count} × ${s2.count} = ${D.prod} leaves, one per complete two-piece outfit.` },
+      { phase: 3, caption: `Now add the disjoint alternative: ${D.alt.count} one-piece options (${D.alt.opts.join(', ')}) that are not two-piece outfits at all. Because the groups do not overlap — no outfit is both two-piece and one-piece — the sum rule, not the product rule, combines them.` },
+      { phase: 4, caption: `Combine the two counts with the sum rule: ${D.prod} two-piece outfits + ${D.alt.count} one-piece alternatives = ${D.total} outfits in all. The product rule worked inside one staged task; the sum rule works across separate groups that share no members.` },
+      { phase: 5, answer: true, caption: `Answer: ${D.total} outfits — ${D.prod} from the product rule (${s1.count} × ${s2.count} = ${D.prod}) plus ${D.alt.count} alternatives by the sum rule. Listing the leaves confirms it: ${combos.join('; ')}, plus ${D.alt.opts.join(' and ')}: exactly ${D.total} outfits, each counted once.` },
+    ];
+  }
+
+  // inclusion-exclusion on two overlapping sets, with the regions of the Venn diagram filled in one at a time
+  function ieData(aName, bName, aOnly, both, bOnly, universe) {
+    return { aName, bName, aOnly, both, bOnly, universe, nA: aOnly + both, nB: bOnly + both, union: aOnly + both + bOnly };
+  }
+  const EX_IE_MAIN = ieData('Math club', 'Science club', 11, 7, 8, 30);
+  const EX_IE_VAR = ieData('Math club', 'Science club', 10, 0, 14, 30);
+  function stepsForIe(D) {
+    const neither = D.universe - D.union;
+    const overlapNote = D.both === 0
+      ? `the two clubs share no members at all, so the overlap region is empty and there is nothing to subtract`
+      : `the ${D.both} students in both clubs were counted twice, once inside each club total, so that overlap must come back out exactly once`;
+    return [
+      { phase: 0, caption: `The universe is a class of ${D.universe} students. Two groups overlap on the Venn diagram: ${D.aName} and ${D.bName}. Before any counting, the diagram only frames the question — which regions hold how many students is what we have to find.` },
+      { phase: 1, caption: `Add the two group sizes the naive way: ${D.aName} has ${D.nA} students and ${D.bName} has ${D.nB}, for a running total of ${D.nA} + ${D.nB} = ${D.nA + D.nB}. This is the sum rule applied too early, because the groups are not yet known to be disjoint.` },
+      { phase: 2, checkpoint: `Predict: the running total is ${D.nA + D.nB}. The overlap of the two groups is ${D.both} students. Will the true number of students in at least one club be more than, less than, or equal to ${D.nA + D.nB}?`, caption: `Look at the overlap region in the middle of the diagram: it holds ${D.both} students. Those students sit inside both circles, so the naive total counted each of them twice — ${overlapNote}.` },
+      { phase: 3, caption: `Apply inclusion-exclusion: ${D.nA} + ${D.nB} − ${D.both} = ${D.union} students are in at least one club. Region by region that is ${D.aOnly} in ${D.aName} only, ${D.both} in both, and ${D.bOnly} in ${D.bName} only, and ${D.aOnly} + ${D.both} + ${D.bOnly} = ${D.union} checks the arithmetic.` },
+      { phase: 4, caption: `The students in neither club are what is left of the class: ${D.universe} − ${D.union} = ${neither}. Every student now sits in exactly one region of the diagram — ${D.aName} only, both, ${D.bName} only, or neither — and the four regions add back to the whole class of ${D.universe}.` },
+      { phase: 5, answer: true, caption: `Answer: ${D.union} students are in at least one club, by inclusion-exclusion: ${D.nA} + ${D.nB} − ${D.both} = ${D.union}${D.both === 0 ? ', which is just the sum rule, because disjoint groups have no overlap to subtract' : ''}. Direct enumeration of the class list gives the same regions — ${D.aOnly} only, ${D.both} both, ${D.bOnly} only, ${neither} neither — totaling ${D.union} in the union.` },
+    ];
+  }
+
+  // pigeonhole: place items into boxes in the worst possible order until one box is forced to reach the target
+  function pigeonData(boxes, target, item, unit) {
+    return { boxes, target, item, unit, worst: boxes.length * (target - 1), answerN: boxes.length * (target - 1) + 1 };
+  }
+  const EX_PIGEON_MAIN = pigeonData(['black', 'white', 'gray'], 2, 'socks', 'sock');
+  const EX_PIGEON_VAR = pigeonData(['black', 'white', 'gray'], 3, 'socks', 'sock');
+  function stepsForPigeon(D) {
+    const k = D.boxes.length;
+    const seq = [];
+    for (let round = 0; round < D.target - 1; round++) for (const b of D.boxes) seq.push(b);
+    seq.push(D.boxes[0]);
+    const countsAt = (n) => { const c = {}; D.boxes.forEach((b) => { c[b] = 0; }); seq.slice(0, n).forEach((b) => { c[b]++; }); return c; };
+    const desc = (n) => D.boxes.map((b) => `${countsAt(n)[b]} ${b}`).join(', ');
+    const steps = [{ placed: 0, caption: `The drawer holds ${D.item} in ${k} colors — ${D.boxes.join(', ')} — and you draw in the dark, so an unfriendly order is possible. The boxes start empty; the question is how many ${D.item} guarantee that some color reaches ${D.target}.` }];
+    for (let n = 1; n <= D.answerN; n++) {
+      const forced = n === D.answerN;
+      const st = { placed: n, caption: forced
+        ? `Draw number ${n} must land in one of the ${k} boxes, and every box already holds ${D.target - 1}. Whichever color it is, that box reaches ${D.target}: the guarantee moment. No arrangement of ${n} ${D.item} can avoid a box with ${D.target}.`
+        : `Place ${D.unit} number ${n} in the worst possible way, into a box that does not yet hold ${D.target}: the boxes now hold ${desc(n)}. ${n === D.worst ? `Every box sits at ${D.target - 1}, the most that avoids the target — the next draw has nowhere safe to go.` : `Spreading the draws out this way delays the target as long as possible, which is exactly the worst case the guarantee must survive.`}` };
+      if (n === D.worst) st.checkpoint = `Predict: ${D.worst} ${D.item} are placed with no box at ${D.target} yet. Will one more draw always force some box to ${D.target}, or could it still slip into a box safely?`;
+      steps.push(st);
+    }
+    steps.push({ placed: D.answerN, done: true, answer: true, caption: `Answer: ${D.answerN} ${D.item} guarantee ${D.target} of one color. The worst case fills each of the ${k} boxes with ${D.target - 1} first, using ${k} × ${D.target - 1} = ${D.worst} ${D.item}, and one more draw forces the target: ${D.worst} + 1 = ${D.answerN}, matching the ceiling formula for ${D.answerN} items in ${k} boxes.` });
+    return steps;
+  }
 
   DM.module({
     id: 'counting',
@@ -755,14 +892,9 @@
         kind: 'example',
         id: 'ex-choose-collapse',
         problem: String.raw`<p>A club has 4 members: A, B, C and D. How many different 3-person committees can the club form from these 4 members, that is, what is \(C(4, 3)\)?</p>`,
-        steps: [
-          { phase: 0, head: 'PICK 1 OF 3 · ORDERED PICKS, ON PURPOSE', note: 'First pick: 4 options — A, B, C or D.', caption: 'We count ordered picks on purpose first, even though a committee has no order. The first pick has 4 options, one for each member A, B, C and D, and the tree starts with those 4 branches.' },
-          { phase: 1, head: 'PICK 2 OF 3 · EACH BRANCH SPLITS INTO 3', note: 'After two picks: 4 × 3 = 12 partial picks.', caption: 'Each first pick splits into the 3 members still left, because nobody can be picked twice. The product rule multiplies the stages, so there are now 4 × 3 = 12 partial picks.' },
-          { phase: 2, head: 'PICK 3 OF 3 · ALL 24 LEAVES', note: 'Ordered triples: 4 × 3 × 2 = 24 = P(4, 3).', caption: 'Each partial pick splits once more into the 2 members still left, and the tree stops at full triples. The product rule gives 4 × 3 × 2 = 24 ordered picks, which is exactly P(4, 3).' },
-          { phase: 3, head: 'ONE COMMITTEE, SIX LEAVES', note: 'Highlighted: the 6 orders of {A, B, C}.', caption: 'Look at the highlighted leaves: ABC, ACB, BAC, BCA, CAB and CBA are six different leaves but one and the same committee. Every committee is counted exactly 3! = 6 times this way, once for each order of its 3 members.' },
-          { phase: 4, head: 'DIVIDE BY THE OVERCOUNT', note: '24 ordered picks ÷ 6 orders per committee = 4 committees.', caption: 'Since every committee was counted the same number of times, dividing undoes the overcount fairly. There are 24 / 6 = 4 committees, and the leaves now sit in 4 groups, one group per committee.' },
-          { phase: 5, head: 'THE 4 COMMITTEES', note: 'Each committee listed once, with no order inside a committee.', caption: 'Answer: C(4, 3) = 4, and the committees are ABC, ABD, ACD and BCD. Check with the formula: 4! / (3! · 1!) = 24 / 6 = 4, which matches the explicit list of exactly 4 committees.', answer: true },
-        ],
+        objective: 'Learn why combinations come from permutations by dividing out the r! orders of each group, watching every committee get overcounted the same number of times.',
+        data: EX_CHOOSE,
+        steps: stepsForChoose(EX_CHOOSE),
         answer: 4,
         verify(M) {
           let count = 0; const seen = [];
@@ -770,40 +902,54 @@
           for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) for (let k = j + 1; k < 4; k++) { count++; seen.push(mem[i] + mem[j] + mem[k]); }
           return M.C(4, 3) === 4 && count === 4 && seen.join(' ') === 'ABC ABD ACD BCD' && (4 * 3 * 2) / M.fact(3) === 4 && EX_PERMS.length === 24 && EX_GROUPS.length === 4;
         },
-        draw(stage, ctx, step) {
+        variants: [{
+          label: 'Variant: choose 2 of 5',
+          problem: String.raw`<p>A club has 5 members: A, B, C, D and E. How many different 2-person committees can the club form from these 5 members, that is, what is \(C(5, 2)\)?</p>`,
+          steps: stepsForChoose(EX_CHOOSE_VAR),
+          answer: 10,
+          verify(M) {
+            let count = 0; const seen = [];
+            const mem = ['A', 'B', 'C', 'D', 'E'];
+            for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) { count++; seen.push(mem[i] + mem[j]); }
+            return M.C(5, 2) === 10 && count === 10 && seen.join(' ') === 'AB AC AD AE BC BD BE CD CE DE' && (5 * 4) / M.fact(2) === 10 && EX_CHOOSE_VAR.perms.length === 20 && EX_CHOOSE_VAR.groups.length === 10;
+          },
+          data: EX_CHOOSE_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
+          const D = (preset && preset.data) || EX_CHOOSE;
           const chip = (txt, mode) => h('span.mono', { style: { display: 'inline-block', fontSize: mode === 'big' ? '1rem' : mode === 'tiny' ? '0.72rem' : '0.82rem', fontWeight: mode === 'hot' || mode === 'big' ? 700 : 400, border: mode === 'hot' ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: mode === 'tiny' ? '0.02rem 0.28rem' : '0.08rem 0.42rem', background: mode === 'hot' ? 'var(--mark)' : 'var(--sheet)', opacity: mode === 'dim' ? 0.5 : 1 } }, txt);
           const noteLine = h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, step.note);
           const head = h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, step.head);
           let body = null;
           if (step.phase === 0) {
             body = h('div.stack', { style: { alignItems: 'center', gap: '0.5rem' } },
-              h('div.big-math', 'Club {A, B, C, D}'),
+              h('div.big-math', `Club {${D.members.join(', ')}}`),
               h('div.small.muted', 'Pick a first member for the tree (the order will be removed later):'),
-              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_MEMBERS.map((m) => chip(m, 'big'))),
+              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, D.members.map((m) => chip(m, 'big'))),
               h('div.small', '4 branches leave the root, one per member.'));
           } else if (step.phase === 1) {
             body = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' } },
-              EX_MEMBERS.map((first) => h('div', { style: { border: '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--sheet)', textAlign: 'center' } },
+              D.members.map((first) => h('div', { style: { border: '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--sheet)', textAlign: 'center' } },
                 h('div.tiny.mono.muted', `first pick ${first}, then`),
-                h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', marginTop: '0.25rem' } }, EX_MEMBERS.filter((x) => x !== first).map((second) => chip(first + second, ''))))));
+                h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', marginTop: '0.25rem' } }, D.members.filter((x) => x !== first).map((second) => chip(first + second, ''))))));
           } else if (step.phase === 2 || step.phase === 3) {
-            const hot = new Set(EX_ABC_ORDERS);
+            const hot = new Set(D.firstOrders);
             body = h('div.stack', { style: { gap: '0.3rem', alignItems: 'center' } },
-              EX_MEMBERS.map((first) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } },
+              D.members.map((first) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } },
                 h('span.tiny.mono.muted', { style: { width: '1.2rem', textAlign: 'right' } }, first),
-                EX_PERMS.filter((p) => p[0] === first).map((p) => chip(p, step.phase === 3 ? (hot.has(p) ? 'hot' : 'dim') : '')))),
-              step.phase === 3 ? h('div.small', { style: { textAlign: 'center' } }, 'ABC, ACB, BAC, BCA, CAB, CBA — six leaves, one committee: {A, B, C}.') : h('div.small', '24 leaves, and every leaf is one ordered triple.'));
+                D.perms.filter((p) => p[0] === first).map((p) => chip(p, step.phase === 3 ? (hot.has(p) ? 'hot' : 'dim') : '')))),
+              step.phase === 3 ? h('div.small', { style: { textAlign: 'center' } }, `${D.firstOrders.join(', ')} — ${word(fact(D.r))} leaves, one committee: ${D.groups[0].set}.`) : h('div.small', `${D.perms.length} leaves, and every leaf is one ordered ${D.r === 2 ? 'pair' : D.r === 3 ? 'triple' : 'pick'}.`));
           } else if (step.phase === 4) {
             body = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center' } },
-              EX_GROUPS.map((g) => h('div', { style: { border: '2px solid var(--accent)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--accent-2)', textAlign: 'center', maxWidth: '14rem' } },
+              D.groups.map((g) => h('div', { style: { border: '2px solid var(--accent)', borderRadius: '0.4rem', padding: '0.35rem 0.5rem', background: 'var(--accent-2)', textAlign: 'center', maxWidth: '14rem' } },
                 h('div.mono', { style: { fontWeight: 700 } }, g.set),
                 h('div.row', { style: { gap: '0.25rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.25rem' } }, g.orders.map((o) => chip(o, 'tiny'))))));
           } else {
             body = h('div.stack', { style: { alignItems: 'center', gap: '0.5rem' } },
-              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, EX_GROUPS.map((g) => chip(g.set, 'big'))),
-              h('div.small', { style: { textAlign: 'center' } }, 'Formula: C(4, 3) = 4! / (3! · 1!) = 24 / 6 = 4.'),
-              h('div.ex-answer', 'Answer: C(4, 3) = 4 committees — ABC, ABD, ACD, BCD. Check: 4! / (3! · 1!) = 4 and the explicit list has exactly 4 entries.'));
+              h('div.row', { style: { gap: '0.45rem', justifyContent: 'center', flexWrap: 'wrap' } }, D.groups.map((g) => chip(g.set, 'big'))),
+              h('div.small', { style: { textAlign: 'center' } }, `Formula: C(${D.n}, ${D.r}) = ${D.n}! / (${D.r}! · ${D.n - D.r}!) = ${fact(D.n)} / ${fact(D.r) * fact(D.n - D.r)} = ${D.groups.length}.`),
+              h('div.ex-answer', `Answer: C(${D.n}, ${D.r}) = ${D.groups.length} committees — ${D.groups.map((g) => g.name).join(', ')}. Check: ${D.n}! / (${D.r}! · ${D.n - D.r}!) = ${D.groups.length} and the explicit list has exactly ${D.groups.length} entries.`));
           }
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } }, head, body, noteLine));
         },
@@ -814,24 +960,32 @@
         kind: 'example',
         id: 'ex-pascal-build',
         problem: String.raw`<p>Build Pascal's triangle down to row 5, one row at a time. Then use the finished triangle to find \(C(5, 2)\), the number of ways to choose 2 books from a set of 5 books.</p>`,
-        steps: [
-          { rows: 2, focus: [], parents: [], note: 'Rows 0 and 1 in place: 1 / 1 1. Edges are always 1.', caption: 'Rows 0 and 1 are already in place: a single 1, then 1 and 1. Every later entry is the sum of the two entries above it, and the edges stay 1 because there is exactly one way to choose all of a set or none of it.' },
-          { rows: 3, focus: [[2, 1]], parents: [[1, 0], [1, 1]], note: 'Row 2: the middle entry is 2 = 1 + 1, from its two parents in row 1.', caption: 'Row 2 appears as 1, 2, 1, and its middle entry is the first one that must be computed. It comes from its two parents in row 1: 2 = 1 + 1, while the two edge entries are copied down as 1.' },
-          { rows: 4, focus: [[3, 1]], parents: [[2, 0], [2, 1]], note: 'Row 3: the marked entry is 3 = 1 + 2, from the parents 1 and 2 in row 2.', caption: 'Row 3 appears as 1, 3, 3, 1, built by adding neighboring pairs from row 2. The marked entry shows the pattern clearly: 3 = 1 + 2, the sum of the entry above-left and the entry above-right.' },
-          { rows: 5, focus: [[4, 2]], parents: [[3, 1], [3, 2]], note: 'Row 4: the middle entry is 6 = 3 + 3, and it is C(4, 2).', caption: 'Row 4 appears as 1, 4, 6, 4, 1, and its middle entry is worth remembering. It is 6 = 3 + 3 from the two 3s above it, and it is C(4, 2), the count for choosing 2 of 4.' },
-          { rows: 6, focus: [[5, 2]], parents: [[4, 1], [4, 2]], note: 'Row 5: C(5, 2) is the third entry, 10 = 4 + 6 from its parents in row 4.', caption: 'Row 5 appears as 1, 5, 10, 10, 5, 1, completing the triangle we need. The marked third entry is C(5, 2), and it comes from its parents 4 and 6 in row 4: 10 = 4 + 6.' },
-          { rows: 6, focus: [[5, 2], [5, 3]], parents: [[4, 1], [4, 2]], note: 'Row 5 sums to 1 + 5 + 10 + 10 + 5 + 1 = 32 = 2^5, one subset count per entry.', caption: 'Answer: C(5, 2) = 10, so there are 10 ways to choose 2 books from 5. Check with factorials: 5! / (2! · 3!) = 120 / 12 = 10, and symmetry gives the same 10 at C(5, 3), the mirrored entry in row 5.', answer: true },
-        ],
+        objective: 'Learn to build Pascal\u2019s triangle row by row using only the addition rule for neighboring entries, then read a binomial coefficient straight from the finished row.',
+        data: EX_PASCAL,
+        steps: stepsForPascal(EX_PASCAL),
         answer: 10,
         verify(M) {
           const rows = [[1]];
           for (let n = 1; n <= 5; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
           return M.C(5, 2) === 10 && 120 / (2 * 6) === 10 && M.fact(5) / (M.fact(2) * M.fact(3)) === 10 && rows[5].join(',') === '1,5,10,10,5,1' && rows[5].reduce((a, b) => a + b, 0) === 32 && M.C(5, 3) === 10 && EX_TRI[5].join(',') === '1,5,10,10,5,1';
         },
-        draw(stage, ctx, step) {
+        variants: [{
+          label: 'Variant: C(6, 3)',
+          problem: String.raw`<p>Build Pascal's triangle down to row 6, one row at a time. Then use the finished triangle to find \(C(6, 3)\), the number of ways to choose 3 books from a set of 6 books.</p>`,
+          steps: stepsForPascal(EX_PASCAL_VAR),
+          answer: 20,
+          verify(M) {
+            const rows = [[1]];
+            for (let n = 1; n <= 6; n++) { const prev = rows[n - 1]; const row = [1]; for (let k = 1; k < n; k++) row.push(prev[k - 1] + prev[k]); row.push(1); rows.push(row); }
+            return M.C(6, 3) === 20 && M.fact(6) / (M.fact(3) * M.fact(3)) === 20 && rows[6].join(',') === '1,6,15,20,15,6,1' && rows[6].reduce((a, b) => a + b, 0) === 64 && EX_PASCAL_VAR.tri[6].join(',') === '1,6,15,20,15,6,1';
+          },
+          data: EX_PASCAL_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
+          const D = (preset && preset.data) || EX_PASCAL;
           const has = (list, n, k) => list.some(([a, b]) => a === n && b === k);
-          const tri = EX_TRI.slice(0, step.rows).map((row, n) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' } },
+          const tri = D.tri.slice(0, step.rows).map((row, n) => h('div.row', { style: { gap: '0.3rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' } },
             h('span.tiny.mono.muted', { style: { width: '3rem', textAlign: 'right' } }, `row ${n}`),
             row.map((v, k) => {
               const foc = has(step.focus, n, k), par = has(step.parents, n, k), isNew = n === step.rows - 1 && !step.answer;
@@ -842,7 +996,160 @@
             h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, 'PASCAL\u2019S TRIANGLE · EACH ENTRY = SUM OF THE TWO ABOVE IT'),
             h('div.stack', { style: { gap: '0.25rem', alignItems: 'center' } }, tri),
             h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, step.note),
-            step.answer ? h('div.ex-answer', 'Answer: C(5, 2) = 10 ways to choose 2 books from 5. Check: 5! / (2! · 3!) = 120 / 12 = 10, and C(5, 3) = 10 is the same 10 mirrored in row 5.') : null));
+            step.answer ? h('div.ex-answer', `Answer: C(${D.targetN}, ${D.targetK}) = ${D.tri[D.targetN][D.targetK]} ways to choose ${D.targetK} books from ${D.targetN}. Check: ${D.targetN}! / (${D.targetK}! · ${D.targetN - D.targetK}!) = ${fact(D.targetN)} / ${fact(D.targetK) * fact(D.targetN - D.targetK)} = ${D.tri[D.targetN][D.targetK]}, and C(${D.targetN}, ${D.targetN - D.targetK}) = ${D.tri[D.targetN][D.targetK]} is the same ${D.tri[D.targetN][D.targetK]} mirrored in row ${D.targetN}.`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 3 */
+      {
+        title: 'Worked example: a choice tree for the product and sum rules',
+        kind: 'example',
+        id: 'ex-choice-tree',
+        objective: 'Build a multi-stage choice as a tree level by level to apply the product rule, then add a disjoint alternatives group with the sum rule.',
+        problem: String.raw`<p>An outfit is either a two-piece outfit — one of 3 tops (red, blue, striped), then one of 2 bottoms (jeans, skirt) — or one of 2 one-piece dresses (green, black). How many different outfits are there?</p>`,
+        data: EX_TREE_MAIN,
+        steps: stepsForTree(EX_TREE_MAIN),
+        answer: 8,
+        verify(M) {
+          const tops = ['red top', 'blue top', 'striped top'], bots = ['jeans', 'skirt'], dresses = ['green dress', 'black dress'];
+          let n = 0; for (const a of tops) for (const b of bots) n++;
+          return n === 6 && n + dresses.length === 8 && 3 * 2 + 2 === 8;
+        },
+        variants: [{
+          label: 'Variant: a stage with one option',
+          problem: String.raw`<p>An outfit is either a two-piece outfit — one of 4 tops (white, gray, navy, polo), then the 1 available bottom (jeans) — or one of 3 one-piece dresses (green, black, red). How many different outfits are there?</p>`,
+          steps: stepsForTree(EX_TREE_VAR),
+          answer: 7,
+          verify(M) {
+            const tops = ['white top', 'gray top', 'navy top', 'polo'], bots = ['jeans'], dresses = ['green dress', 'black dress', 'red dress'];
+            let n = 0; for (const a of tops) for (const b of bots) n++;
+            return n === 4 && n + dresses.length === 7 && 4 * 1 + 3 === 7;
+          },
+          data: EX_TREE_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_TREE_MAIN;
+          const [s1, s2] = D.stages;
+          const chip = (txt, hot) => h('span.mono', { style: { display: 'inline-block', fontSize: '0.8rem', border: hot ? '2px solid var(--accent)' : '1px solid var(--rule)', borderRadius: '0.3rem', padding: '0.08rem 0.4rem', background: hot ? 'var(--mark)' : 'var(--sheet)' } }, txt);
+          const rows = [h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', alignItems: 'center' } }, h('span.tiny.mono.muted', 'root'), chip('start', false))];
+          if (step.phase >= 1) rows.push(h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } }, h('span.tiny.mono.muted', s1.name), s1.opts.map((o) => chip(o, false))));
+          if (step.phase >= 2) rows.push(h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center' } }, s1.opts.map((a) => h('div', { style: { border: '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.3rem 0.45rem', background: 'var(--sheet)', textAlign: 'center' } }, h('div.tiny.mono.muted', `${a}, then`), h('div.row', { style: { gap: '0.25rem', justifyContent: 'center', marginTop: '0.2rem' } }, s2.opts.map((b) => chip(`${a} + ${b}`, step.phase >= 4)))))));
+          if (step.phase >= 2) rows.push(h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, `Product rule: ${s1.count} × ${s2.count} = ${D.prod} two-piece outfits`));
+          if (step.phase >= 3) rows.push(h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' } }, h('span.tiny.mono.muted', 'or instead'), D.alt.opts.map((o) => chip(o, step.phase >= 4))));
+          if (step.phase >= 4) rows.push(h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, `Sum rule: ${D.prod} + ${D.alt.count} = ${D.total} outfits`));
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, 'CHOICE TREE · EACH LEVEL IS ONE STAGE, EACH LEAF ONE OUTFIT'),
+            rows,
+            step.answer ? h('div.ex-answer', `Answer: ${D.total} outfits — ${D.prod} two-piece (${s1.count} × ${s2.count}) plus ${D.alt.count} one-piece alternatives.`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 4 */
+      {
+        title: 'Worked example: inclusion-exclusion on a Venn diagram',
+        kind: 'example',
+        id: 'ex-inclusion-exclusion',
+        objective: 'Count the union of two overlapping sets with inclusion-exclusion, tracking each region of the Venn diagram so the overlap is neither missed nor counted twice.',
+        problem: String.raw`<p>In a class of 30 students, 18 are in the math club and 15 are in the science club, and 7 students are in both clubs. How many students are in at least one of the two clubs?</p>`,
+        data: EX_IE_MAIN,
+        steps: stepsForIe(EX_IE_MAIN),
+        answer: 26,
+        verify(M) {
+          const A = new Set(); for (let x = 1; x <= 18; x++) A.add(x);
+          const B = new Set(); for (let x = 12; x <= 26; x++) B.add(x);
+          const union = new Set([...A, ...B]);
+          let both = 0; A.forEach((x) => { if (B.has(x)) both++; });
+          return A.size === 18 && B.size === 15 && both === 7 && union.size === 26 && 18 + 15 - 7 === 26 && 30 - union.size === 4;
+        },
+        variants: [{
+          label: 'Variant: disjoint clubs',
+          problem: String.raw`<p>In a class of 30 students, 10 are in the math club and 14 are in the science club, and no student is in both clubs. How many students are in at least one of the two clubs?</p>`,
+          steps: stepsForIe(EX_IE_VAR),
+          answer: 24,
+          verify(M) {
+            const A = new Set(); for (let x = 1; x <= 10; x++) A.add(x);
+            const B = new Set(); for (let x = 11; x <= 24; x++) B.add(x);
+            const union = new Set([...A, ...B]);
+            let both = 0; A.forEach((x) => { if (B.has(x)) both++; });
+            return A.size === 10 && B.size === 14 && both === 0 && union.size === 24 && 10 + 14 - 0 === 24 && 30 - union.size === 6;
+          },
+          data: EX_IE_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h, s } = ctx;
+          const D = (preset && preset.data) || EX_IE_MAIN;
+          const neither = D.universe - D.union;
+          const showA = step.phase >= 1, showB = step.phase >= 1, showBoth = step.phase >= 2, showRegions = step.phase >= 3, showNeither = step.phase >= 4;
+          const svg = s('svg', { viewBox: '0 0 360 210', role: 'img', 'aria-label': 'Venn diagram of the two clubs', style: 'width:100%;max-width:26rem;height:auto;display:block' },
+            s('rect', { x: 6, y: 6, width: 348, height: 198, rx: 8, fill: 'none', stroke: 'var(--rule)' }),
+            s('text', { x: 16, y: 26, 'font-size': 11, fill: 'var(--ink-3)', text: `class of ${D.universe}` }),
+            s('circle', { cx: 145, cy: 108, r: 72, fill: 'var(--accent)', 'fill-opacity': showA ? 0.18 : 0.05, stroke: 'var(--accent)', 'stroke-width': 2 }),
+            s('circle', { cx: 215, cy: 108, r: 72, fill: 'var(--fnc)', 'fill-opacity': showB ? 0.18 : 0.05, stroke: 'var(--fnc)', 'stroke-width': 2 }),
+            s('text', { x: 105, y: 62, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, fill: 'var(--ink)', text: D.aName }),
+            s('text', { x: 255, y: 62, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, fill: 'var(--ink)', text: D.bName }),
+            showRegions ? s('text', { x: 108, y: 116, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 700, fill: 'var(--ink)', text: String(D.aOnly) }) : showA ? s('text', { x: 108, y: 116, 'text-anchor': 'middle', 'font-size': 13, fill: 'var(--ink-2)', text: `|A| = ${D.nA}` }) : null,
+            showRegions ? s('text', { x: 252, y: 116, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 700, fill: 'var(--ink)', text: String(D.bOnly) }) : showB ? s('text', { x: 252, y: 116, 'text-anchor': 'middle', 'font-size': 13, fill: 'var(--ink-2)', text: `|B| = ${D.nB}` }) : null,
+            showBoth ? s('text', { x: 180, y: 104, 'text-anchor': 'middle', 'font-size': showRegions ? 17 : 14, 'font-weight': 700, fill: 'var(--ink)', text: String(D.both) }) : null,
+            showBoth && !showRegions ? s('text', { x: 180, y: 122, 'text-anchor': 'middle', 'font-size': 10, fill: 'var(--ink-2)', text: 'in both' }) : null,
+            showNeither ? s('text', { x: 336, y: 192, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--ink-2)', text: `neither: ${neither}` }) : null);
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem', width: '100%' } },
+            svg,
+            step.phase === 1 ? h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, `Naive total: ${D.nA} + ${D.nB} = ${D.nA + D.nB}`) : null,
+            step.phase === 3 ? h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, `Union: ${D.nA} + ${D.nB} − ${D.both} = ${D.union}`) : null,
+            step.phase >= 4 ? h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, `Regions: ${D.aOnly} + ${D.both} + ${D.bOnly} + ${neither} = ${D.universe} students`) : null,
+            step.answer ? h('div.ex-answer', `Answer: ${D.union} students are in at least one club (${D.nA} + ${D.nB} − ${D.both} = ${D.union}), and ${neither} are in neither.`) : null));
+        },
+      },
+      /* ---------------------------------------------------------------- worked example 5 */
+      {
+        title: 'Worked example: pigeonhole — how many socks guarantee a pair?',
+        kind: 'example',
+        id: 'ex-pigeonhole',
+        objective: 'Use the pigeonhole principle by building the worst case placement by placement, so the guarantee is the first draw that has nowhere safe to go.',
+        problem: String.raw`<p>A drawer holds socks in 3 colors: black, white and gray. You draw socks in the dark, one at a time. How many socks must you draw to guarantee that two of them have the same color?</p>`,
+        data: EX_PIGEON_MAIN,
+        steps: stepsForPigeon(EX_PIGEON_MAIN),
+        answer: 4,
+        verify(M) {
+          const worstAvoid = 3 * (2 - 1);
+          const seq = ['black', 'white', 'gray'];
+          const counts = {}; seq.forEach((c) => { counts[c] = (counts[c] || 0) + 1; });
+          const avoids = Object.values(counts).every((v) => v < 2);
+          return worstAvoid === 3 && avoids && worstAvoid + 1 === 4 && Math.ceil(4 / 3) === 2;
+        },
+        variants: [{
+          label: 'Variant: guarantee three of a color',
+          problem: String.raw`<p>A drawer holds socks in 3 colors: black, white and gray. You draw socks in the dark, one at a time. How many socks must you draw to guarantee that three of them have the same color?</p>`,
+          steps: stepsForPigeon(EX_PIGEON_VAR),
+          answer: 7,
+          verify(M) {
+            const worstAvoid = 3 * (3 - 1);
+            const seq = ['black', 'white', 'gray', 'black', 'white', 'gray'];
+            const counts = {}; seq.forEach((c) => { counts[c] = (counts[c] || 0) + 1; });
+            const avoids = Object.values(counts).every((v) => v < 3);
+            return worstAvoid === 6 && avoids && worstAvoid + 1 === 7 && Math.ceil(7 / 3) === 3;
+          },
+          data: EX_PIGEON_VAR,
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h } = ctx;
+          const D = (preset && preset.data) || EX_PIGEON_MAIN;
+          const seq = [];
+          for (let round = 0; round < D.target - 1; round++) for (const b of D.boxes) seq.push(b);
+          seq.push(D.boxes[0]);
+          const counts = {}; D.boxes.forEach((b) => { counts[b] = 0; });
+          seq.slice(0, step.placed).forEach((b) => { counts[b]++; });
+          const forced = step.placed >= D.answerN;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem', width: '100%' } },
+            h('div.tiny.mono.muted', { style: { textAlign: 'center' } }, `DRAWING ${D.item.toUpperCase()} IN THE DARK · WORST CASE FIRST`),
+            h('div.row', { style: { gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' } }, D.boxes.map((b) => {
+              const full = counts[b] >= D.target;
+              return h('div', { style: { border: full ? '2px solid var(--ink)' : '1px solid var(--rule)', borderRadius: '0.4rem', padding: '0.4rem 0.6rem', background: full ? 'var(--mark)' : 'var(--sheet)', textAlign: 'center', minWidth: '5.2rem' } },
+                h('div.small', { style: { fontWeight: 700 } }, b),
+                h('div.mono', { style: { fontSize: '1.15rem' } }, '●'.repeat(counts[b]) || '—'),
+                h('div.tiny.muted', `${counts[b]} of ${D.target} needed`));
+            })),
+            h('div.small', { style: { textAlign: 'center', fontWeight: 600 } }, step.placed === 0 ? 'No socks drawn yet.' : forced ? `${step.placed} drawn: a box has reached ${D.target} — the pair is forced.` : `${step.placed} drawn: ${D.boxes.map((b) => `${counts[b]} ${b}`).join(', ')} — no box at ${D.target} yet.`),
+            step.answer ? h('div.ex-answer', `Answer: ${D.answerN} socks guarantee ${D.target} of one color (${D.boxes.length} boxes × ${D.target - 1} safe draws = ${D.worst}, plus 1).`) : null));
         },
       },
       /* ---------------------------------------------------------------- 14 */

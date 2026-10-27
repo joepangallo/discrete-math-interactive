@@ -1096,29 +1096,58 @@ onmessage = (e) => {
      frame plus every caption in order — so the PDF never shows a question without its answer. */
   DM.kinds.example = (body, sl, ctx) => {
     if (sl.html) body.append(...rich('div', sl.html).childNodes);
-    const prob = h('div.ex-problem', h('span.ex-problem-tag', 'Problem'));
-    if (sl.problem) prob.append(...rich('div', sl.problem).childNodes);
+    const probTag = h('span.ex-problem-tag', 'Problem');
+    const prob = h('div.ex-problem', probTag);
+    const setProblem = (html) => { rc(prob); prob.append(probTag); if (html) prob.append(...rich('div', html).childNodes); renderMath(prob); };
+    setProblem(sl.problem);
     body.append(prob);
     const last = sl.steps.length - 1;
     if (ctx.print) {
       const stage = h('div.ex-stage.ex-final');
-      try { sl.draw(stage, ctx, sl.steps[last], last); } catch (e) { console.error('[DM] example print frame failed:', e); }
+      try { sl.draw(stage, ctx, sl.steps[last], last, null); } catch (e) { console.error('[DM] example print frame failed:', e); }
       body.append(stage, h('ol.ex-board', sl.steps.map((st) => { const li = rich('li', st.caption || ''); if (st.answer) li.className = 'ex-answer-line'; return li; })));
       return;
     }
-    const player = ctx.player({ steps: sl.steps, draw: (stage, step, k) => sl.draw(stage, ctx, step, k) });
-    body.append(player.el);
+    /* Presets: the slide's own steps are the main problem; sl.variants carries alternate or
+       boundary-case versions of the same problem, each with its own computed steps, answer and
+       verify. The switcher swaps the whole player (and the problem statement when the variant
+       restates it); switching always resets to step 0. Print above always uses the main preset. */
+    const presets = [{ label: sl.presetLabel || 'Main problem', problem: sl.problem, steps: sl.steps, answer: sl.answer, verify: sl.verify, data: sl.data },
+      ...(Array.isArray(sl.variants) ? sl.variants : [])];
+    const hook = { slide: sl, player: null, presets: presets.map((p) => p.label) };
+    let active = null;
+    const holder = h('div.ex-holder');
+    let seg = null;
+    function mount(j) {
+      if (active) active.stop();
+      rc(holder);
+      const p = presets[j];
+      setProblem(p.problem !== undefined ? p.problem : sl.problem);
+      active = ctx.player({ steps: p.steps, draw: (stage, step, k) => sl.draw(stage, ctx, step, k, p) });
+      hook.player = active;
+      holder.append(active.el);
+      if (seg) $$('button', seg).forEach((b, bj) => b.setAttribute('aria-pressed', String(bj === j)));
+    }
+    hook.setPreset = (j) => mount(j);
+    if (presets.length > 1) {
+      seg = h('div.seg', { role: 'tablist', 'aria-label': 'Choose a version of this problem' },
+        presets.map((p, j) => h('button', { 'aria-pressed': String(j === 0), onclick: () => mount(j) }, p.label)));
+      body.append(h('div.ex-presets', h('span.small.muted', 'Problem:'), seg));
+    }
+    body.append(holder);
+    mount(0);
     const pr = ctx.module.slides.find((x) => x.kind === 'practice');
     if (pr) body.append(h('div.row.ex-try',
       h('button.btn.primary', { onclick: () => ctx.go(`${ctx.module.id}-${pr._key}`) }, 'Now you try: practice problems →'),
       h('span.small.muted', 'Same method, fresh numbers, checked as you go.')));
     ctx.keys = (e) => {
-      if (e.key === 'ArrowDown') { player.next(); return true; }
-      if (e.key === 'ArrowUp') { player.prev(); return true; }
+      if (!active) return false;
+      if (e.key === 'ArrowDown') { active.next(); return true; }
+      if (e.key === 'ArrowUp') { active.prev(); return true; }
       return false;
     };
-    ctx.onHide(player.stop);
-    DM._exampleHooks.push({ slide: sl, player });
+    ctx.onHide(() => { if (active) active.stop(); });
+    DM._exampleHooks.push(hook);
   };
   DM._exampleHooks = [];
 
@@ -1228,7 +1257,10 @@ onmessage = (e) => {
           counter. Play stops at the last step and when the slide is hidden (via `hide`), and
           nothing ever autoplays on load, so prefers-reduced-motion needs no special path beyond
           the global CSS that stills transitions. The caption is announced politely for manual
-          steps and muted during autoplay, like the code-trace player. */
+          steps and muted during autoplay, like the code-trace player. A step may carry a
+          `checkpoint` prompt ("Predict: ...?"): autoplay pauses on that step and shows the
+          prompt in a banner, so the student commits to a prediction and then steps forward
+          manually to reveal the outcome. Manual stepping is unaffected. */
       player(opts) {
         const steps = opts.steps;
         const n = steps.length;
@@ -1237,6 +1269,7 @@ onmessage = (e) => {
         let timer = null;
         const stage = h('div.ex-stage');
         const caption = h('div.ex-caption', { 'aria-live': 'polite' });
+        const check = h('div.ex-checkpoint', { hidden: true });
         const count = h('span.ex-count');
         const backB = h('button.btn.sm', { onclick: () => { stop(); go(i - 1); }, 'aria-label': 'Previous step' }, '◀ Back');
         const playB = h('button.btn.sm.primary', { onclick: () => toggle(), 'aria-label': 'Play the steps', 'aria-pressed': 'false' }, '▶ Play');
@@ -1246,7 +1279,7 @@ onmessage = (e) => {
         const speedSeg = h('div.seg', { 'aria-label': 'Playback speed' },
           [0.5, 1, 2].map((sp) => h('button', { 'aria-pressed': String(sp === 1), onclick: () => setSpeed(sp) }, `${sp}×`)));
         const el = h('div.ex-player',
-          stage, caption,
+          stage, caption, check,
           h('div.ex-ctl', backB, playB, fwdB, restartB, h('div.ex-scrub', scrub), speedSeg, count),
           h('p.tiny.muted.ex-keys', 'Keys: ', h('kbd', '↑'), ' / ', h('kbd', '↓'), ' step through the example · ', h('kbd', 'Space'), ' plays or pauses when the player has focus'));
         el.addEventListener('keydown', (e) => {
@@ -1260,7 +1293,7 @@ onmessage = (e) => {
         }
         function start() {
           if (timer || PRINT || i >= n - 1) return;
-          timer = setInterval(() => { if (i >= n - 1) { stop(); return; } go(i + 1); if (i >= n - 1) stop(); }, 1500 / speed);
+          timer = setInterval(() => { if (i >= n - 1) { stop(); return; } go(i + 1); if (i >= n - 1 || steps[i].checkpoint) stop(); }, 1500 / speed);
           syncPlay();
         }
         function stop() { if (timer) clearInterval(timer); timer = null; syncPlay(); }
@@ -1277,6 +1310,9 @@ onmessage = (e) => {
           renderMath(stage);
           caption.innerHTML = steps[i].caption || '';
           renderMath(caption);
+          const cp = steps[i].checkpoint;
+          check.hidden = !cp;
+          if (cp) { check.innerHTML = cp; renderMath(check); }
           count.textContent = `Step ${i + 1} of ${n}`;
           scrub.value = String(i);
           scrub.setAttribute('aria-valuetext', `Step ${i + 1} of ${n}`);
@@ -1287,7 +1323,7 @@ onmessage = (e) => {
         }
         hide.push(stop);
         go(0);
-        return { el, go, stop, next() { stop(); go(i + 1); }, prev() { stop(); go(i - 1); }, get index() { return i; }, get playing() { return !!timer; } };
+        return { el, go, stop, next() { stop(); go(i + 1); }, prev() { stop(); go(i - 1); }, get index() { return i; }, get playing() { return !!timer; }, get checkpoint() { return steps[i].checkpoint || null; } };
       },
     };
   }
@@ -1645,6 +1681,30 @@ onmessage = (e) => {
     }
     return pages;
   }
+  /* Print fit pass for worked examples: a storyboard page holds the problem, the final frame
+     and every caption on one 16:9 page. A tall final frame (a big graph, a wide table) can
+     overflow the stage box and push the caption board past the page foot, so shrink the drawn
+     frame with zoom — a layout-affecting scale, so the printed page honestly fits — until
+     both the stage and the page fit. Runs once fonts and math have settled (see buildPrint). */
+  function fitPrintExamples() {
+    for (const pg of $$('.print-page')) {
+      const slide = pg.querySelector('.slide');
+      const stage = pg.querySelector('.ex-stage.ex-final');
+      if (!slide || !stage || !stage.children.length) continue;
+      let z = 1;
+      for (let i = 0; i < 6; i++) {
+        const over = slide.scrollHeight - slide.clientHeight;
+        const sOver = stage.scrollHeight - stage.clientHeight;
+        if (over <= 2 && sOver <= 2) break;
+        const need = stage.clientHeight - Math.max(over, 0) - 6;
+        if (need < 40 || stage.scrollHeight <= 0) break;
+        const f = need / stage.scrollHeight;
+        if (f >= 0.999) break;
+        z *= f;
+        for (const child of stage.children) child.style.zoom = String(z);
+      }
+    }
+  }
   function buildPrint() {
     document.body.classList.add('print-mode');
     document.documentElement.dataset.theme = 'light';
@@ -1694,7 +1754,16 @@ onmessage = (e) => {
       }
       void idx;
     }
-    document.body.dataset.printReady = '1';
+    /* printReady is the PDF pipeline's gate: hold it until the fonts have arrived and the
+       math renderer has settled (ready or failed), then run the fit pass on final metrics. */
+    let fontsDone = false;
+    DM._tryFinishPrint = () => {
+      if (!fontsDone || DM.mathState === 'loading' || document.body.dataset.printReady) return;
+      requestAnimationFrame(() => { fitPrintExamples(); document.body.dataset.printReady = '1'; });
+    };
+    const fontsP = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    fontsP.then(() => { fontsDone = true; DM._tryFinishPrint(); });
+    setTimeout(() => { if (!document.body.dataset.printReady) { fitPrintExamples(); document.body.dataset.printReady = '1'; } }, 20000);
   }
 
   /* ---------------- math renderer arrives asynchronously ---------------- */
@@ -1714,9 +1783,11 @@ onmessage = (e) => {
     DM.mathState = 'ready';
     notice('');
     $$('.slide, dialog .dlg-body, #term-pop').forEach(renderMath);
+    if (DM._tryFinishPrint) DM._tryFinishPrint();
   };
   DM.mathFailed = () => {
     DM.mathState = 'failed';
+    if (DM._tryFinishPrint) DM._tryFinishPrint();
     notice('The formula renderer could not be downloaded, so math appears as plain notation such as \\(a^2 + b^2\\). Reload this page when you are back online.');
   };
 

@@ -128,37 +128,76 @@
     return col;
   }
 
-  /* ---------- worked-example data: BFS layers and Dijkstra snapshots, precomputed ---------- */
-  const EX_BFS_VERTS = ['A', 'B', 'C', 'D', 'E', 'F'];
-  const EX_BFS_POS = { A: [60, 105], B: [175, 40], C: [175, 170], D: [295, 105], E: [415, 170], F: [415, 40] };
-  const EX_BFS_EDGES = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']];
-  const EX_BFS_ANSWER = { order: ['A', 'B', 'C', 'D', 'E', 'F'], dist: { A: 0, B: 1, C: 1, D: 2, E: 2, F: 3 } };
-  const EX_BFS_SNAP = (() => {
-    const adj = Object.fromEntries(EX_BFS_VERTS.map((v) => [v, []]));
-    EX_BFS_EDGES.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
-    EX_BFS_VERTS.forEach((v) => adj[v].sort());
-    const dist = { A: 0 }, parent = {}, order = [], q = ['A'];
-    const snaps = [{ queue: ['A'], order: [], discovered: ['A'], parent: {}, current: null }];
+  /* ---------- worked-example data: BFS and Dijkstra, computed by shared generators ---------- */
+  /* Each preset (primary and variant) carries its own data object: vertex list, positions,
+     edges, source and a prediction checkpoint. The run functions simulate the algorithm on
+     that data, and the stepsFor functions narrate the simulation, so a variant's steps are
+     computed from its own input by exactly the code that builds the primary steps. */
+  function bfsRun(verts, edges, src) {
+    const adj = Object.fromEntries(verts.map((v) => [v, []]));
+    edges.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
+    verts.forEach((v) => adj[v].sort());
+    const dist = { [src]: 0 }, parent = {}, order = [], enqueued = {}, q = [src];
+    const snaps = [{ queue: [src], order: [], discovered: [src], parent: {}, current: null }];
     while (q.length) {
-      const u = q.shift(); order.push(u);
-      for (const w of adj[u]) if (!(w in dist)) { dist[w] = dist[u] + 1; parent[w] = u; q.push(w); }
+      const u = q.shift(); order.push(u); enqueued[u] = [];
+      for (const w of adj[u]) if (!(w in dist)) { dist[w] = dist[u] + 1; parent[w] = u; q.push(w); enqueued[u].push(w); }
       snaps.push({ queue: [...q], order: [...order], discovered: Object.keys(dist), parent: { ...parent }, current: u });
     }
-    return snaps;
-  })();
-  const EX_DIJ_VERTS = ['A', 'B', 'C', 'D', 'E'];
-  const EX_DIJ_POS = { A: [55, 115], B: [185, 40], C: [185, 190], D: [325, 115], E: [465, 190] };
-  const EX_DIJ_EDGES = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
-  const EX_DIJ_ANSWER = { A: 0, B: 3, C: 2, D: 8, E: 10 };
-  const EX_DIJ_SNAP = (() => {
-    const adj = Object.fromEntries(EX_DIJ_VERTS.map((v) => [v, []]));
-    EX_DIJ_EDGES.forEach(([a, b, w]) => { adj[a].push([b, w]); adj[b].push([a, w]); });
-    EX_DIJ_VERTS.forEach((v) => adj[v].sort((x, y) => x[0].localeCompare(y[0])));
-    const dist = Object.fromEntries(EX_DIJ_VERTS.map((v) => [v, v === 'A' ? 0 : Infinity]));
+    return { snaps, order, dist, parent, enqueued };
+  }
+  function bfsData(verts, edges, pos, src, checkpoint) {
+    const run = bfsRun(verts, edges, src);
+    const unreached = verts.filter((v) => !(v in run.dist));
+    return {
+      verts, edges, pos, src, checkpoint, snaps: run.snaps, order: run.order, dist: run.dist, parent: run.parent, enqueued: run.enqueued, unreached,
+      answer: unreached.length ? { order: run.order, dist: run.dist, unreached } : { order: run.order, dist: run.dist },
+    };
+  }
+  function bfsStepsFor(D) {
+    const steps = [{ visited: 0, caption: `Start with the graph and the queue holding only ${D.src}, marked as the source at layer 0. Nothing is visited yet, because BFS visits a vertex only when it reaches the front of the queue, and that first-in, first-out order is what processes nearer vertices before farther ones.` }];
+    D.order.forEach((u, i) => {
+      const kids = D.enqueued[u];
+      const snap = D.snaps[i + 1];
+      const found = kids.length
+        ? `enqueue ${kids.map((w) => `${w} at layer ${D.dist[w]}`).join(' and ')}, discovered now for the first time along a shortest path from ${D.src}`
+        : `enqueue nothing new, because every neighbor of ${u} has already been discovered`;
+      const tail = snap.queue.length
+        ? `The queue now holds ${snap.queue.join(', ')}, and its front is the next vertex to be visited.`
+        : 'The queue is now empty, so no discovered vertex is left waiting to be visited.';
+      steps.push({ visited: i + 1, caption: `Visit ${u} and ${found}. ${u} is processed at this moment because it reached the front of the queue, and everything enqueued behind it sits at the same layer or one layer farther out. ${tail}` });
+    });
+    const distList = D.verts.map((v) => `${v} ${v in D.dist ? D.dist[v] : 'unreached'}`).join(', ');
+    const reachedEdges = D.edges.filter(([a, b]) => a in D.dist && b in D.dist);
+    const maxGap = reachedEdges.length ? Math.max(...reachedEdges.map(([a, b]) => Math.abs(D.dist[a] - D.dist[b]))) : 0;
+    const unText = D.unreached.length ? ` ${D.unreached.join(', ')} is never discovered: no edge connects it to the part of the graph containing ${D.src}, so no queue can ever hold it and BFS from ${D.src} ends without reaching it.` : '';
+    steps.push({ visited: D.order.length, answer: true, caption: `Answer: the visit order is ${D.order.join(', ')}, with distances ${distList}. Check: every edge between two reached vertices joins layers differing by at most ${maxGap}, which is exactly what a breadth-first layering must satisfy.${unText}` });
+    const cp = steps.find((st) => st.visited === D.checkpoint.at);
+    if (cp) cp.checkpoint = D.checkpoint.text;
+    return steps;
+  }
+  const EX_BFS_POS = { A: [60, 105], B: [175, 40], C: [175, 170], D: [295, 105], E: [415, 170], F: [415, 40] };
+  const EX_BFS_DATA = bfsData(
+    ['A', 'B', 'C', 'D', 'E', 'F'],
+    [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']],
+    EX_BFS_POS, 'A',
+    { at: 3, text: 'Predict: D sits at layer 2 and is visited next — which new vertex will D discover, and at what layer will it land?' });
+  const EX_BFS_ANSWER = EX_BFS_DATA.answer;
+  const VAR_BFS_DATA = bfsData(
+    ['A', 'B', 'C', 'D', 'E', 'F'],
+    [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E']],
+    EX_BFS_POS, 'A',
+    { at: 4, text: 'Predict: only E is left in the queue and F has never been discovered — will F appear before the queue empties?' });
+
+  function dijkstraRun(verts, edges, src) {
+    const adj = Object.fromEntries(verts.map((v) => [v, []]));
+    edges.forEach(([a, b, w]) => { adj[a].push([b, w]); adj[b].push([a, w]); });
+    verts.forEach((v) => adj[v].sort((x, y) => x[0].localeCompare(y[0])));
+    const dist = Object.fromEntries(verts.map((v) => [v, v === src ? 0 : Infinity]));
     const prev = {}, settled = [];
     const snaps = [{ dist: { ...dist }, prev: {}, settled: [], improved: [], current: null }];
     for (;;) {
-      const cand = EX_DIJ_VERTS.filter((v) => !settled.includes(v) && dist[v] < Infinity).sort((a, b) => dist[a] - dist[b] || a.localeCompare(b));
+      const cand = verts.filter((v) => !settled.includes(v) && dist[v] < Infinity).sort((a, b) => dist[a] - dist[b] || a.localeCompare(b));
       if (!cand.length) break;
       const u = cand[0]; settled.push(u);
       const improved = [];
@@ -168,8 +207,177 @@
       }
       snaps.push({ dist: { ...dist }, prev: { ...prev }, settled: [...settled], improved, current: u });
     }
-    return snaps;
-  })();
+    return { snaps, dist, prev, settled };
+  }
+  function dijkstraData(verts, edges, pos, src, target, checkpoint) {
+    const run = dijkstraRun(verts, edges, src);
+    const unreached = verts.filter((v) => run.dist[v] === Infinity);
+    const path = run.dist[target] < Infinity ? pathTo(run.prev, src, target) : null;
+    const wOf = (a, b) => edges.find(([x, y]) => (x === a && y === b) || (x === b && y === a))[2];
+    const pathSum = path ? path.slice(1).reduce((sum, v, i) => sum + wOf(path[i], v), 0) : null;
+    return { verts, edges, pos, src, target, checkpoint, snaps: run.snaps, dist: run.dist, prev: run.prev, settled: run.settled, unreached, path, pathSum };
+  }
+  function dijkstraStepsFor(D) {
+    const fmt = (d) => (d === Infinity ? 'infinity' : String(d));
+    const steps = [{ settled: 0, caption: `Setup: ${D.src} starts at distance 0 and every other vertex is at infinity, meaning no route to it is known yet. Dijkstra settles the closest unsettled vertex next, because with all weights positive no alternative route could reach that vertex more cheaply.` }];
+    D.snaps.slice(1).forEach((snap, i) => {
+      const u = snap.current;
+      const changes = snap.improved.length
+        ? snap.improved.map(([w, o, n]) => (o === Infinity ? `${w} appears at ${n} via ${u}` : `${w} improves from ${o} to ${n} via ${u}`)).join(', and ')
+        : 'no tentative label improves, because every neighbor of ' + u + ' is already settled or already carries a label the route through ' + u + ' cannot beat';
+      steps.push({ settled: i + 1, caption: `Settle ${u} at ${snap.dist[u]}, the smallest tentative label among the unsettled vertices, and relax its edges: ${changes}. The label of ${u} is final from this moment, since any other route to ${u} would have to leave through an unsettled vertex whose label is already at least ${snap.dist[u]}.` });
+    });
+    const distList = D.verts.map((v) => `${v} ${fmt(D.dist[v])}`).join(', ');
+    const pathText = D.path ? ` The shortest path to ${D.target} is ${D.path.join('-')}, and its edges sum to ${D.pathSum}, matching the distance of ${D.target}.` : '';
+    const unText = D.unreached.length ? ` The algorithm stops even though ${D.unreached.join(', ')} was never settled: no unsettled vertex has a finite label, so there is no candidate left to settle, and a vertex with no path from ${D.src} keeps distance infinity.` : '';
+    steps.push({ settled: D.settled.length, answer: true, caption: `Answer: the shortest distances from ${D.src} are ${distList}.${pathText} Check: the settled order ${D.settled.join(', ')} has nondecreasing distances, which is exactly the pattern Dijkstra guarantees.${unText}` });
+    const cp = steps.find((st) => st.settled === D.checkpoint.at);
+    if (cp) cp.checkpoint = D.checkpoint.text;
+    return steps;
+  }
+  const EX_DIJ_POS = { A: [55, 115], B: [185, 40], C: [185, 190], D: [325, 115], E: [465, 190] };
+  const EX_DIJ_EDGES = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
+  const EX_DIJ_DATA = dijkstraData(
+    ['A', 'B', 'C', 'D', 'E'], EX_DIJ_EDGES, EX_DIJ_POS, 'A', 'E',
+    { at: 1, text: 'Predict: C is settled next at 2 — will relaxing the edge C-B improve the tentative label of B, currently 4?' });
+  const EX_DIJ_ANSWER = { A: 0, B: 3, C: 2, D: 8, E: 10 };
+  const VAR_DIJ_DATA = dijkstraData(
+    ['A', 'B', 'C', 'D', 'E', 'F'], EX_DIJ_EDGES, { ...EX_DIJ_POS, F: [465, 40] }, 'A', 'E',
+    { at: 5, text: 'Predict: every reachable vertex is settled but F still sits at infinity — will the algorithm settle F next, or stop?' });
+  const VAR_DIJ_ANSWER = { A: 0, B: 3, C: 2, D: 8, E: 10, F: 'unreachable' };
+
+  /* ---------- Stage D worked-example data: representation, DFS, Euler, coloring ---------- */
+  const adjListOf = (verts, edges) => { const adj = Object.fromEntries(verts.map((v) => [v, []])); edges.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); }); verts.forEach((v) => adj[v].sort()); return adj; };
+
+  /* (c) representation, degrees and a path question, all from one edge list */
+  function repData(verts, edges, pos, src, tgt, cp) {
+    const adj = adjListOf(verts, edges);
+    const deg = Object.fromEntries(verts.map((v) => [v, adj[v].length]));
+    const par = { [src]: null }, q = [src];
+    while (q.length) { const u = q.shift(); for (const w of adj[u]) if (!(w in par)) { par[w] = u; q.push(w); } }
+    let path = null;
+    if (tgt in par) { path = [tgt]; while (path[0] !== src) path.unshift(par[path[0]]); }
+    return { verts, edges, pos, src, tgt, cp, adj, deg, path, comp: Object.keys(par).sort(), answer: { adj, deg, edges: edges.length, path } };
+  }
+  function repStepsFor(D) {
+    const steps = [{ b: 0, ph: 0, caption: `Start with only the picture: ${D.verts.length} vertices and ${D.edges.length} edges, and no written record of the graph yet. A computer cannot store a picture, so the first job is to turn the drawing into an adjacency list without losing or inventing a single edge.` }];
+    D.verts.forEach((v, i) => steps.push({ b: i + 1, ph: 0, caption: `Write the row for ${v}: its neighbors are ${D.adj[v].length ? D.adj[v].join(', ') : 'none at all'}, because those are exactly the vertices joined to ${v} by an edge in the picture. Every undirected edge will appear twice in the finished list, once in the row of each endpoint, which is what makes the list a faithful copy of the graph.` }));
+    const sum = D.verts.reduce((s, v) => s + D.deg[v], 0);
+    steps.push({ b: D.verts.length, ph: 1, caption: `Count the entries in each row to get the degrees: ${D.verts.map((v) => `${v} has degree ${D.deg[v]}`).join(', ')}. A row length is a degree because each entry is one edge end at that vertex. The degrees add to ${sum}, and the handshake check demands exactly twice the edge count: 2 times ${D.edges.length} is ${2 * D.edges.length}, so the count closes with nothing double-counted or missed.` });
+    steps.push({ b: D.verts.length, ph: 2, checkpoint: D.cp, caption: `Now use the list for the path question: is there a path from ${D.src} to ${D.tgt}? Work outward from ${D.src} through the rows, marking every vertex you can reach, because a path exists exactly when ${D.tgt} gets marked before the reachable set stops growing.` });
+    steps.push({ b: D.verts.length, ph: 3, answer: true, caption: D.path
+      ? `Answer: yes, there is a path: ${D.path.join('-')} uses ${D.path.length - 1} edges, and every consecutive pair in it is an edge, since each step follows one entry of the adjacency list. The full reachable set from ${D.src} is {${D.comp.join(', ')}}, which contains ${D.tgt}, and the degrees and the handshake sum from the earlier steps are part of the same answer.`
+      : `Answer: no, there is no path from ${D.src} to ${D.tgt}. Working outward from ${D.src} marks exactly {${D.comp.join(', ')}} and then stops, because no edge leaves that set, and ${D.tgt} is never marked. In particular ${D.tgt} has degree ${D.deg[D.tgt]}, so not a single edge touches it and no path could ever arrive there.` });
+    return steps;
+  }
+  const EX_REP_POS = { A: [70, 120], B: [200, 45], C: [200, 195], D: [330, 120], E: [460, 120] };
+  const EX_REP_DATA = repData(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['A', 'C'], ['B', 'C'], ['B', 'D'], ['C', 'D'], ['D', 'E']], EX_REP_POS, 'A', 'E',
+    'Predict: is there a path from A to E in this graph, and if there is, how many edges does the shortest one use?');
+  const VAR_REP_DATA = repData(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D']], EX_REP_POS, 'A', 'E',
+    'Predict: E has degree 0 in the audit above — is there a path from A to E, or does the reachable set stop before it?');
+
+  /* (d) DFS with an explicit stack, simulated the way the BFS/DFS lab simulates it */
+  function dfsRun(verts, edges, src) {
+    const adj = adjListOf(verts, edges);
+    const stack = [{ v: src, from: null }], seen = new Set(), order = [], parent = {};
+    const snaps = [{ stack: [src], order: [], parent: {}, current: null, pushed: [], skip: false }];
+    while (stack.length) {
+      const { v, from } = stack.pop();
+      if (seen.has(v)) { snaps.push({ stack: stack.map((x) => x.v), order: [...order], parent: { ...parent }, current: v, pushed: [], skip: true }); continue; }
+      seen.add(v); order.push(v); if (from) parent[v] = from;
+      const pushed = adj[v].filter((w) => !seen.has(w)).reverse();
+      pushed.forEach((w) => stack.push({ v: w, from: v }));
+      snaps.push({ stack: stack.map((x) => x.v), order: [...order], parent: { ...parent }, current: v, pushed, skip: false });
+    }
+    return { snaps, order, unvisited: verts.filter((v) => !seen.has(v)) };
+  }
+  function dfsData(verts, edges, pos, src, cp) {
+    const run = dfsRun(verts, edges, src);
+    return { verts, edges, pos, src, cp, snaps: run.snaps, order: run.order, unvisited: run.unvisited, answer: run.unvisited.length ? { order: run.order, unvisited: run.unvisited } : { order: run.order } };
+  }
+  function dfsStepsFor(D) {
+    const steps = D.snaps.map((snap, i) => {
+      if (i === 0) return { si: 0, n: 0, caption: `Start with ${D.src} alone on the stack and nothing visited. Depth-first search always takes the vertex on top of the stack next, last in, first out, which is the opposite discipline from the BFS queue and is exactly what makes it dive along one branch instead of spreading in layers.` };
+      if (snap.skip) return { si: i, n: snap.order.length, caption: `Pop ${snap.current} from the top and find it already visited, so skip it and change nothing. A vertex can be pushed by two different neighbors before it is visited, and this visited check on popping is what keeps those stale entries from restarting the search or looping forever.` };
+      const v = snap.current;
+      const tail = snap.pushed.length
+        ? `Push its unvisited neighbors ${snap.pushed.join(', ')} in that order, which leaves ${snap.pushed[snap.pushed.length - 1]} on top, so the search dives to ${snap.pushed[snap.pushed.length - 1]} next instead of returning to older waiting vertices.`
+        : `It has no unvisited neighbors, so nothing is pushed: this is a dead end, and the search backtracks to whatever is waiting underneath in the stack.`;
+      return { si: i, n: snap.order.length, caption: `Pop ${v} from the top of the stack and visit it, number ${snap.order.length} in the discovery order. ${tail}` };
+    });
+    steps.push({ si: D.snaps.length - 1, n: D.order.length, answer: true, caption: `Answer: the discovery order from ${D.src} is ${D.order.join(', ')}, and the stack is empty, so every vertex the search pushed has been accounted for.${D.unvisited.length ? ` But ${D.unvisited.join(', ')} was never visited: no edge joins it to the part of the graph containing ${D.src}, the stack emptied before any such vertex could be pushed, and DFS from one source only ever explores that source's own component.` : ' Every vertex of the graph was reached, because this graph is connected, so a single DFS from any source visits all of it.'}` });
+    const cp = steps.find((st) => st.n === D.cp.at && !st.skip);
+    if (cp) cp.checkpoint = D.cp.text;
+    return steps;
+  }
+  const EX_DFS_POS = { A: [60, 120], B: [170, 40], C: [170, 200], D: [300, 40], E: [300, 120], F: [430, 200] };
+  const EX_DFS_DATA = dfsData(['A', 'B', 'C', 'D', 'E', 'F'], [['A', 'B'], ['A', 'C'], ['B', 'D'], ['B', 'E'], ['C', 'F'], ['E', 'F']], EX_DFS_POS, 'A',
+    { at: 2, text: 'Predict: D sits on top of the stack — when it is popped and visited, will it push any new vertex, or is it a dead end?' });
+  const VAR_DFS_DATA = dfsData(['A', 'B', 'C', 'D', 'E', 'F'], [['A', 'B'], ['A', 'C'], ['B', 'D'], ['E', 'F']], EX_DFS_POS, 'A',
+    { at: 3, text: 'Predict: D was a dead end and only C is left in the stack — after C is visited, will the search ever reach E and F?' });
+
+  /* (e) Euler audit and trace; the trace itself comes from the module's eulerTrail (Hierholzer) */
+  function eulerData(verts, edges, pos, cp) {
+    const deg = Object.fromEntries(verts.map((v) => [v, edges.filter(([a, b]) => a === v || b === v).length]));
+    const odd = verts.filter((v) => deg[v] % 2 === 1);
+    let circuit = null, edgeOrder = [];
+    if (odd.length === 0 || odd.length === 2) {
+      const start = odd.length ? odd[0] : verts.find((v) => deg[v] > 0);
+      const tr = eulerTrail(verts, edges, start, (v) => LET.indexOf(v));
+      circuit = tr.map(([v]) => v); edgeOrder = tr.slice(1).map(([, ei]) => ei);
+    }
+    return { verts, edges, pos, deg, odd, circuit, edgeOrder, cp, answer: odd.length === 0 ? { verdict: 'circuit', circuit, odd } : odd.length === 2 ? { verdict: 'open trail', circuit, odd } : { verdict: 'none', odd } };
+  }
+  function eulerStepsFor(D) {
+    const n = D.verts.length;
+    const steps = [{ a: 0, u: 0, caption: `Start with the graph and the question: can one trail use every one of its ${D.edges.length} edges exactly once? Do not guess from the picture. First audit every degree, because Euler's theorem says the parity pattern alone decides whether such a trail can exist at all.` }];
+    let oddSoFar = 0;
+    D.verts.forEach((v, i) => {
+      if (D.deg[v] % 2) oddSoFar++;
+      const mine = D.edges.filter(([a, b]) => a === v || b === v).map(([a, b]) => (a === v ? b : a)).sort();
+      steps.push({ a: i + 1, u: 0, caption: `Audit ${v}: it is joined to ${mine.join(', ')}, so its degree is ${D.deg[v]}, which is ${D.deg[v] % 2 ? 'odd' : 'even'}, and the running count of odd-degree vertices is now ${oddSoFar}. Parity is what matters because a trail passing through a vertex spends its edges two at a time, one arriving and one leaving, so only a trail's two ends can sit at odd-degree vertices.` });
+    });
+    if (D.circuit) D.edgeOrder.forEach((ei, k) => steps.push({ a: n, u: k + 1, caption: `Cross edge ${D.circuit[k]}-${D.circuit[k + 1]}, edge ${k + 1} of ${D.edges.length}, and mark it used so it can never be crossed again. The trail so far is ${D.circuit.slice(0, k + 2).join('-')}, and building it by splicing detours (Hierholzer's method) guarantees that no unused edge is ever stranded in a part of the graph the trail has left.` }));
+    steps.push({ a: n, u: D.edgeOrder.length, answer: true, caption: D.circuit
+      ? `Answer: every degree is even (odd count 0), so an Euler circuit exists, and here it is: ${D.circuit.join('-')}. It crosses each of the ${D.edges.length} edges exactly once and ends where it started, which is exactly what the audit promised. Check the used-edge numbers on the picture: they run from 1 to ${D.edges.length} with no repeat and no gap.`
+      : `Answer: the audit ends with ${D.odd.length} odd-degree vertices (${D.odd.join(', ')}), and an Euler trail allows at most two, the start and the finish. So no trail, open or closed, can use every edge exactly once in this graph, no matter where it starts or how cleverly it routes: the parity count has already settled the question.` });
+    const cp = steps.find((st) => st.a === n - 1);
+    if (cp) cp.checkpoint = D.cp;
+    return steps;
+  }
+  const EX_EUL_DATA = eulerData(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['C', 'A'], ['C', 'D'], ['D', 'E'], ['E', 'C']], { A: [90, 170], B: [90, 50], C: [240, 110], D: [390, 50], E: [390, 170] },
+    'Predict: A, B, C and D are all even so far — will E also be even, and if every degree is even, what kind of Euler trail must exist?');
+  const VAR_EUL_DATA = eulerData(['A', 'B', 'C', 'D'], [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['A', 'C'], ['B', 'D']], { A: [140, 40], B: [380, 40], C: [380, 180], D: [140, 180] },
+    'Predict: A, B and C are all odd so far — will D be odd too, and what will four odd-degree vertices mean for an Euler trail?');
+
+  /* (f) greedy coloring with explicit conflict checks, in a stated vertex order */
+  function colorData(verts, edges, pos, order, cp, why) {
+    const adj = adjListOf(verts, edges);
+    const colors = {}, assign = [];
+    for (const v of order) {
+      const usedBy = adj[v].filter((w) => w in colors);
+      const ruled = [...new Set(usedBy.map((w) => colors[w]))].sort((a, b) => a - b);
+      let c = 1; while (ruled.includes(c)) c++;
+      colors[v] = c; assign.push({ v, c, ruled, usedBy });
+    }
+    return { verts, edges, pos, order, adj, assign, colors, used: Math.max(...Object.values(colors)), cp, why, answer: { colors, used: Math.max(...Object.values(colors)) } };
+  }
+  function colorStepsFor(D) {
+    const steps = [{ n: 0, caption: `Start with every vertex uncolored and the goal of using as few colors as possible, in the order ${D.order.join(', ')}. The rule is greedy: give each vertex the smallest color that none of its already colored neighbors uses, and check the conflicts out loud each time, because a coloring only counts if the two ends of every edge end up different.` }];
+    D.assign.forEach((a, i) => steps.push({ n: i + 1, caption: a.usedBy.length
+      ? `Color ${a.v}: its colored neighbors are ${a.usedBy.map((w) => `${w} with color ${D.colors[w]}`).join(' and ')}, which rule out color${a.ruled.length > 1 ? 's' : ''} ${a.ruled.join(' and ')} — using any of those would put the same color on both ends of an edge. The smallest color not ruled out is ${a.c}, so ${a.v} takes color ${a.c}.`
+      : `Color ${a.v}: none of its neighbors is colored yet, so no color is ruled out and the smallest color, 1, is available. ${a.v} takes color 1, and later neighbors will have to work around this choice.` }));
+    steps.push({ n: D.order.length, answer: true, caption: `Answer: the coloring is ${D.order.map((v) => `${v} gets color ${D.colors[v]}`).join(', ')}, using ${D.used} colors, and every edge joins two different colors, so the coloring is proper. Fewer colors cannot work here: ${D.why}` });
+    const cp = steps.find((st) => st.n === D.cp.at);
+    if (cp) cp.checkpoint = D.cp.text;
+    return steps;
+  }
+  const EX_COL_DATA = colorData(['A', 'B', 'C', 'D', 'E'], [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'], ['E', 'A'], ['A', 'C']], { A: [110, 45], B: [280, 35], C: [350, 140], D: [230, 220], E: [90, 175] }, ['A', 'B', 'C', 'D', 'E'],
+    { at: 2, text: 'Predict: C touches A with color 1 and B with color 2 — which color will C have to take?' },
+    'A, B and C are pairwise adjacent (a triangle), so they need three different colors all by themselves.');
+  const VAR_COL_DATA = colorData(['A', 'B', 'C', 'D'], [['A', 'B'], ['A', 'C'], ['A', 'D'], ['B', 'C'], ['B', 'D'], ['C', 'D']], { A: [130, 40], B: [390, 40], C: [390, 190], D: [130, 190] }, ['A', 'B', 'C', 'D'],
+    { at: 3, text: 'Predict: D touches color 1 on A, color 2 on B and color 3 on C — can a palette of 3 colors finish this graph?' },
+    'all four vertices are pairwise adjacent (this is K4, a clique of size 4), so each one needs its own color.');
 
   DM.module({
     id: 'graphs',
@@ -625,6 +833,73 @@
           draw();
         },
       },
+      /* ---------------------------------------------------------------- worked example: Euler audit */
+      {
+        title: 'Worked example: Euler audit and building a circuit',
+        kind: 'example',
+        id: 'ex-euler-audit',
+        objective: 'Audit the degree parity of every vertex to decide whether an Euler trail exists, then trace a circuit edge by edge, marking each edge used exactly once.',
+        problem: '<p>Two triangles share the vertex C: the edges are A-B, B-C, C-A, C-D, D-E and E-C. First audit every degree, then either build an Euler circuit that uses every edge exactly once or explain why none exists.</p>',
+        data: EX_EUL_DATA,
+        steps: eulerStepsFor(EX_EUL_DATA),
+        answer: EX_EUL_DATA.answer,
+        verify(M) {
+          const E = [['A', 'B'], ['B', 'C'], ['C', 'A'], ['C', 'D'], ['D', 'E'], ['E', 'C']];
+          const deg = {}; E.forEach(([a, b]) => { deg[a] = (deg[a] || 0) + 1; deg[b] = (deg[b] || 0) + 1; });
+          const key = (a, b) => [a, b].sort().join('-');
+          const c = EX_EUL_DATA.answer.circuit;
+          const used = c.slice(1).map((v, i) => key(c[i], v)).sort();
+          const want = E.map(([a, b]) => key(a, b)).sort();
+          return EX_EUL_DATA.answer.verdict === 'circuit' && Object.values(deg).every((d) => d % 2 === 0)
+            && c[0] === c[c.length - 1] && c.length === E.length + 1 && JSON.stringify(used) === JSON.stringify(want);
+        },
+        variants: [{
+          label: 'Variant: four odd vertices',
+          problem: '<p>The complete graph K4 has vertices A, B, C, D and all six edges A-B, A-C, A-D, B-C, B-D and C-D. First audit every degree, then either build an Euler trail that uses every edge exactly once or explain why none exists.</p>',
+          data: VAR_EUL_DATA,
+          steps: eulerStepsFor(VAR_EUL_DATA),
+          answer: VAR_EUL_DATA.answer,
+          verify(M) {
+            const E = [['A', 'B'], ['A', 'C'], ['A', 'D'], ['B', 'C'], ['B', 'D'], ['C', 'D']];
+            const deg = {}; E.forEach(([a, b]) => { deg[a] = (deg[a] || 0) + 1; deg[b] = (deg[b] || 0) + 1; });
+            const odd = ['A', 'B', 'C', 'D'].filter((v) => deg[v] % 2 === 1);
+            return VAR_EUL_DATA.answer.verdict === 'none' && odd.length === 4 && VAR_EUL_DATA.circuit === null
+              && JSON.stringify(VAR_EUL_DATA.answer.odd) === JSON.stringify(odd) && E.length === 6;
+          },
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h, s, rc } = ctx;
+          const D = (preset && preset.data) || EX_EUL_DATA;
+          const usedEdges = new Set(D.edgeOrder.slice(0, step.u));
+          const numOf = new Map(D.edgeOrder.slice(0, step.u).map((ei, i) => [ei, i + 1]));
+          const kids = [];
+          D.edges.forEach(([a, b], ei) => {
+            kids.push(s('line', { x1: D.pos[a][0], y1: D.pos[a][1], x2: D.pos[b][0], y2: D.pos[b][1], stroke: usedEdges.has(ei) ? 'var(--accent)' : 'var(--rule)', 'stroke-width': usedEdges.has(ei) ? 4.5 : 2.2, 'stroke-linecap': 'round' }));
+            if (numOf.has(ei)) {
+              const mx = (D.pos[a][0] + D.pos[b][0]) / 2, my = (D.pos[a][1] + D.pos[b][1]) / 2;
+              kids.push(s('circle', { cx: mx, cy: my, r: 10, fill: 'var(--accent)', stroke: 'var(--sheet)', 'stroke-width': 2 }), s('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: 'var(--accent-ink)', text: String(numOf.get(ei)) }));
+            }
+          });
+          for (const v of D.verts) {
+            const [x, y] = D.pos[v];
+            const audited = D.verts.indexOf(v) < step.a, oddDeg = D.deg[v] % 2 === 1;
+            kids.push(s('g', {},
+              s('circle', { cx: x, cy: y, r: 20, fill: audited ? (oddDeg ? 'var(--false-bg)' : 'var(--accent-2)') : 'var(--sheet)', stroke: audited ? (oddDeg ? 'var(--false)' : 'var(--accent)') : 'var(--ink-3)', 'stroke-width': audited ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: v }),
+              audited ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: oddDeg ? 'var(--false)' : 'var(--ink-2)', text: `deg ${D.deg[v]}${oddDeg ? ' odd' : ' even'}` }) : null));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 230', role: 'img', 'aria-label': 'Graph for the Euler audit, with audited degrees below the vertices and used edges numbered', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const oddSoFar = D.verts.slice(0, step.a).filter((v) => D.deg[v] % 2 === 1).length;
+          const status = h('p.small.mono', { style: { margin: 0, textAlign: 'center' } }, step.u > 0 && D.circuit
+            ? `Trail so far: ${D.circuit.slice(0, step.u + 1).join('-')} · ${step.u} of ${D.edges.length} edges used`
+            : `Audited ${step.a} of ${D.verts.length} vertices · odd-degree count so far: ${oddSoFar}`);
+          const banner = step.answer ? h('div.ex-answer', D.circuit
+            ? `Answer: all degrees even · Euler circuit ${D.circuit.join('-')} · check: the numbered edges run 1 to ${D.edges.length} with no repeat, and the trail ends back at ${D.circuit[0]} ✓`
+            : `Answer: no Euler trail or circuit · odd-degree vertices: ${D.odd.join(', ')} (${D.odd.length} of them) · check: a trail can have at most 2 odd ends, and ${D.odd.length} is more than 2 ✓`) : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, status, banner));
+        },
+      },
       /* ---------------------------------------------------------------- 6 */
       {
         title: 'Representing a graph in a computer',
@@ -660,6 +935,84 @@
               <div class="ai">A graph neural network layer updates every node from its neighbors by multiplying the feature table by \(A\). Stacking \(k\) layers mixes in information from \(k\) steps away, exactly the walks that \(A^k\) counts.</div>
             </div>
           </div>`,
+      },
+      /* ---------------------------------------------------------------- worked example: representation */
+      {
+        title: 'Worked example: adjacency list, degrees and a path',
+        kind: 'example',
+        id: 'ex-rep-degrees-path',
+        objective: 'Build the adjacency list of a small graph from its picture, read every degree off the list, check the handshake sum, and use the list to settle a path question.',
+        problem: '<p>The graph has vertices A, B, C, D, E and edges A-B, A-C, B-C, B-D, C-D and D-E. Build its adjacency list, give the degree of every vertex and check the handshake sum, then decide: is there a path from A to E, and if so, exhibit one?</p>',
+        data: EX_REP_DATA,
+        steps: repStepsFor(EX_REP_DATA),
+        answer: EX_REP_DATA.answer,
+        verify(M) {
+          // independent check: adjacency matrix row sums for degrees, Warshall closure for reachability
+          const V = ['A', 'B', 'C', 'D', 'E'], E = [['A', 'B'], ['A', 'C'], ['B', 'C'], ['B', 'D'], ['C', 'D'], ['D', 'E']];
+          const ix = Object.fromEntries(V.map((v, i) => [v, i]));
+          const A = V.map(() => V.map(() => 0));
+          E.forEach(([a, b]) => { A[ix[a]][ix[b]] = 1; A[ix[b]][ix[a]] = 1; });
+          const deg = Object.fromEntries(V.map((v, i) => [v, A[i].reduce((s, x) => s + x, 0)]));
+          const reach = A.map((row, i) => row.map((x, j) => x === 1 || i === j));
+          for (const k2 of V) for (const i of V) for (const j of V) reach[ix[i]][ix[j]] = reach[ix[i]][ix[j]] || (reach[ix[i]][ix[k2]] && reach[ix[k2]][ix[j]]);
+          const ans = EX_REP_DATA.answer, p = ans.path;
+          const pathOk = p && p[0] === 'A' && p[p.length - 1] === 'E' && p.slice(1).every((v, i) => A[ix[p[i]]][ix[v]] === 1);
+          return V.every((v) => deg[v] === ans.deg[v] && JSON.stringify(A[ix[v]].map((x, j) => (x ? V[j] : null)).filter(Boolean)) === JSON.stringify(ans.adj[v]))
+            && ans.edges === E.length && reach[ix.A][ix.E] && pathOk;
+        },
+        variants: [{
+          label: 'Variant: an isolated vertex',
+          problem: '<p>The graph has vertices A, B, C, D, E and edges A-B, A-C, B-D and C-D, so E touches no edge at all. Build its adjacency list, give the degree of every vertex and check the handshake sum, then decide: is there a path from A to E, and if so, exhibit one?</p>',
+          data: VAR_REP_DATA,
+          steps: repStepsFor(VAR_REP_DATA),
+          answer: VAR_REP_DATA.answer,
+          verify(M) {
+            const V = ['A', 'B', 'C', 'D', 'E'], E = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D']];
+            const ix = Object.fromEntries(V.map((v, i) => [v, i]));
+            const A = V.map(() => V.map(() => 0));
+            E.forEach(([a, b]) => { A[ix[a]][ix[b]] = 1; A[ix[b]][ix[a]] = 1; });
+            const deg = Object.fromEntries(V.map((v, i) => [v, A[i].reduce((s, x) => s + x, 0)]));
+            const reach = A.map((row, i) => row.map((x, j) => x === 1 || i === j));
+            for (const k2 of V) for (const i of V) for (const j of V) reach[ix[i]][ix[j]] = reach[ix[i]][ix[j]] || (reach[ix[i]][ix[k2]] && reach[ix[k2]][ix[j]]);
+            const ans = VAR_REP_DATA.answer;
+            return V.every((v) => deg[v] === ans.deg[v]) && ans.edges === E.length && ans.path === null && !reach[ix.A][ix.E] && deg.E === 0 && ans.adj.E.length === 0;
+          },
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h, s, rc } = ctx;
+          const D = (preset && preset.data) || EX_REP_DATA;
+          const onPath = new Set();
+          if (step.ph === 3 && D.path) for (let i = 1; i < D.path.length; i++) onPath.add([D.path[i - 1], D.path[i]].sort().join());
+          const inComp = new Set(D.comp);
+          const kids = [];
+          for (const [a, b] of D.edges) {
+            const key = [a, b].sort().join();
+            const hot = onPath.has(key) || (step.ph === 3 && !D.path && inComp.has(a) && inComp.has(b));
+            kids.push(s('line', { x1: D.pos[a][0], y1: D.pos[a][1], x2: D.pos[b][0], y2: D.pos[b][1], stroke: hot ? 'var(--accent)' : 'var(--rule)', 'stroke-width': hot ? 4.5 : 2.2, 'stroke-linecap': 'round' }));
+          }
+          for (const v of D.verts) {
+            const [x, y] = D.pos[v];
+            const marked = step.ph >= 2 && (v === D.src || v === D.tgt);
+            const reached = step.ph === 3 && inComp.has(v);
+            kids.push(s('g', {},
+              marked ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+              s('circle', { cx: x, cy: y, r: 20, fill: reached ? 'var(--accent)' : 'var(--sheet)', 'fill-opacity': reached ? 0.3 : 1, stroke: reached ? 'var(--accent)' : 'var(--ink-3)', 'stroke-width': reached ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: v }),
+              step.ph >= 1 ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: 'var(--ink-2)', text: `deg ${D.deg[v]}` }) : null,
+              marked ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--ink)', text: v === D.src ? '▼ from' : '▼ to' }) : null));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 240', role: 'img', 'aria-label': 'Graph being written as an adjacency list, with degrees shown once counted', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const rows = D.verts.slice(0, step.b).map((v) => h('div.mono.small', `${v}: ${D.adj[v].length ? D.adj[v].join(', ') : '(no neighbors)'}`));
+          const list = h('div', { style: { width: '100%' } }, h('div.tiny.mono.muted', 'ADJACENCY LIST'), rows.length ? rows : h('div.small.muted', 'no rows written yet'));
+          const degs = step.ph >= 1 ? h('div', { style: { width: '100%' } }, h('div.tiny.mono.muted', 'DEGREES AND HANDSHAKE CHECK'),
+            h('div.gr-chips', D.verts.map((v) => h('span.chip', `${v}: ${D.deg[v]}`))),
+            h('div.small.mono', `${D.verts.map((v) => D.deg[v]).join(' + ')} = ${D.verts.reduce((sm, v) => sm + D.deg[v], 0)} = 2 x ${D.edges.length} edges`)) : null;
+          const banner = step.answer ? h('div.ex-answer', D.path
+            ? `Answer: degrees ${D.verts.map((v) => `${v} ${D.deg[v]}`).join(', ')} · sum ${D.verts.reduce((sm, v) => sm + D.deg[v], 0)} = 2 x ${D.edges.length} · path from ${D.src} to ${D.tgt}: ${D.path.join('-')} ✓`
+            : `Answer: degrees ${D.verts.map((v) => `${v} ${D.deg[v]}`).join(', ')} · sum ${D.verts.reduce((sm, v) => sm + D.deg[v], 0)} = 2 x ${D.edges.length} · no path from ${D.src} to ${D.tgt}: ${D.tgt} has degree 0 and the reachable set is {${D.comp.join(', ')}} ✓`) : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, list, degs, banner));
+        },
       },
       /* ---------------------------------------------------------------- 7 */
       {
@@ -763,6 +1116,74 @@
           }
           reset();
           draw();
+        },
+      },
+      /* ---------------------------------------------------------------- worked example: DFS */
+      {
+        title: 'Worked example: depth-first search with a stack',
+        kind: 'example',
+        id: 'ex-dfs-stack',
+        objective: 'Run depth-first search with an explicit stack, showing every push and pop, the discovery order, the dead-end backtracks, and what happens to a stale stack entry.',
+        problem: '<p>Run depth-first search from A in the graph with edges A-B, A-C, B-D, B-E, C-F and E-F, using a stack: push the source, then repeatedly pop the top vertex, visit it if it is new, and push its unvisited neighbors in reverse alphabetical order so the smallest neighbor lands on top. Give the discovery order.</p>',
+        data: EX_DFS_DATA,
+        steps: dfsStepsFor(EX_DFS_DATA),
+        answer: EX_DFS_DATA.answer,
+        verify(M) {
+          // independent check: recursive DFS, no stack at all
+          const adj = adjListOf(['A', 'B', 'C', 'D', 'E', 'F'], [['A', 'B'], ['A', 'C'], ['B', 'D'], ['B', 'E'], ['C', 'F'], ['E', 'F']]);
+          const order = [], seen = new Set();
+          const go = (u) => { seen.add(u); order.push(u); for (const w of adj[u]) if (!seen.has(w)) go(w); };
+          go('A');
+          return JSON.stringify(order) === JSON.stringify(EX_DFS_DATA.answer.order) && order.length === 6;
+        },
+        variants: [{
+          label: 'Variant: a second component',
+          problem: '<p>Run depth-first search from A in the graph with edges A-B, A-C, B-D and E-F, using the same stack discipline as the main example. Give the discovery order, and say which vertices are never visited and why.</p>',
+          data: VAR_DFS_DATA,
+          steps: dfsStepsFor(VAR_DFS_DATA),
+          answer: VAR_DFS_DATA.answer,
+          verify(M) {
+            const adj = adjListOf(['A', 'B', 'C', 'D', 'E', 'F'], [['A', 'B'], ['A', 'C'], ['B', 'D'], ['E', 'F']]);
+            const order = [], seen = new Set();
+            const go = (u) => { seen.add(u); order.push(u); for (const w of adj[u]) if (!seen.has(w)) go(w); };
+            go('A');
+            const un = ['A', 'B', 'C', 'D', 'E', 'F'].filter((v) => !seen.has(v));
+            return JSON.stringify(order) === JSON.stringify(VAR_DFS_DATA.answer.order) && JSON.stringify(un) === JSON.stringify(VAR_DFS_DATA.answer.unvisited);
+          },
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h, s, rc } = ctx;
+          const D = (preset && preset.data) || EX_DFS_DATA;
+          const snap = D.snaps[step.si];
+          const visited = new Set(snap.order);
+          const inStack = new Set(snap.stack.filter((v) => !visited.has(v)));
+          const kids = [];
+          for (const [a, b] of D.edges) {
+            const tree = snap.parent[b] === a || snap.parent[a] === b;
+            kids.push(s('line', { x1: D.pos[a][0], y1: D.pos[a][1], x2: D.pos[b][0], y2: D.pos[b][1], stroke: tree ? 'var(--accent)' : 'var(--rule)', 'stroke-width': tree ? 4.5 : 2.2, 'stroke-linecap': 'round' }));
+          }
+          for (const v of D.verts) {
+            const [x, y] = D.pos[v];
+            const isV = visited.has(v), isS = inStack.has(v), cur = snap.current === v && !step.answer;
+            kids.push(s('g', {},
+              cur ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2, 'stroke-dasharray': snap.skip ? '4 3' : null }) : null,
+              s('circle', { cx: x, cy: y, r: 20, fill: isV ? 'var(--accent)' : isS ? 'var(--warn-bg)' : 'var(--sheet)', 'fill-opacity': isV ? 0.3 : 1, stroke: isV ? 'var(--accent)' : isS ? 'var(--warn)' : 'var(--ink-3)', 'stroke-width': isV || isS ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: v }),
+              isV ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: 'var(--ink-2)', text: `#${snap.order.indexOf(v) + 1}` }) : null,
+              cur ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--ink)', text: snap.skip ? '▼ stale: skip' : '▼ popped' }) : null));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 250', role: 'img', 'aria-label': 'Graph for depth-first search, with the stack shown below', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const stackBox = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'STACK (LAST IN, FIRST OUT)'),
+            h('div.gr-box', h('span.end', 'bottom'), snap.stack.length ? snap.stack.map((v) => h('span.cell', { class: visited.has(v) ? 'stale' : '' }, v)) : h('span.small.muted', 'empty'), h('span.end', '← top')));
+          const orderStrip = h('div', { style: { width: '100%' } },
+            h('div.tiny.mono.muted', 'DISCOVERY ORDER'),
+            h('div.gr-order', snap.order.length ? snap.order.map((v, i) => h('span', h('b', String(i + 1)), v)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing visited yet')));
+          const banner = step.answer ? h('div.ex-answer', D.unvisited.length
+            ? `Answer: discovery order ${D.order.join(' → ')} · check: the stack emptied, yet ${D.unvisited.join(', ')} was never pushed, because no edge joins it to the component of ${D.src} ✓`
+            : `Answer: discovery order ${D.order.join(' → ')} · check: a recursive DFS that always takes the smallest unvisited neighbor first gives the same order, and the last stale entry was skipped, not revisited ✓`) : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, stackBox, orderStrip, banner));
         },
       },
       /* ---------------------------------------------------------------- 8 */
@@ -1105,6 +1526,68 @@
             </div>
           </div>`,
       },
+      /* ---------------------------------------------------------------- worked example: coloring */
+      {
+        title: 'Worked example: coloring a graph, checking conflicts',
+        kind: 'example',
+        id: 'ex-graph-coloring',
+        objective: 'Color a graph greedily in a stated vertex order, ruling colors out from neighbor conflicts at each step, and prove the number of colors used cannot be reduced.',
+        problem: '<p>Color the graph with vertices A, B, C, D, E and edges A-B, B-C, C-D, D-E, E-A and A-C, going in the order A, B, C, D, E and giving each vertex the smallest color (numbered 1, 2, 3, ...) that no already colored neighbor uses. Give the final coloring and the number of colors used.</p>',
+        data: EX_COL_DATA,
+        steps: colorStepsFor(EX_COL_DATA),
+        answer: EX_COL_DATA.answer,
+        verify(M) {
+          // independent check: stated coloring is proper, and exhaustive backtracking finds none with fewer colors
+          const E = [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'], ['E', 'A'], ['A', 'C']];
+          const adj = adjListOf(['A', 'B', 'C', 'D', 'E'], E);
+          const col = EX_COL_DATA.answer.colors;
+          const proper = E.every(([a, b]) => col[a] !== col[b]);
+          const tryK = (k2) => { const c = {}; const go = (i) => { if (i === 5) return true; const v = 'ABCDE'[i]; for (let x = 1; x <= k2; x++) { if (adj[v].every((w) => c[w] !== x)) { c[v] = x; if (go(i + 1)) return true; delete c[v]; } } return false; }; return go(0); };
+          return proper && EX_COL_DATA.answer.used === 3 && !tryK(2) && tryK(3);
+        },
+        variants: [{
+          label: 'Variant: K4 needs a fourth color',
+          problem: '<p>Color the complete graph K4 on vertices A, B, C, D (all six edges between them), going in the order A, B, C, D and giving each vertex the smallest color that no already colored neighbor uses, with a hoped-for palette of only 3 colors. Give the final coloring, the number of colors used, and say whether the 3-color hope survives.</p>',
+          data: VAR_COL_DATA,
+          steps: colorStepsFor(VAR_COL_DATA),
+          answer: VAR_COL_DATA.answer,
+          verify(M) {
+            const E = [['A', 'B'], ['A', 'C'], ['A', 'D'], ['B', 'C'], ['B', 'D'], ['C', 'D']];
+            const adj = adjListOf(['A', 'B', 'C', 'D'], E);
+            const col = VAR_COL_DATA.answer.colors;
+            const proper = E.every(([a, b]) => col[a] !== col[b]);
+            const tryK = (k2) => { const c = {}; const go = (i) => { if (i === 4) return true; const v = 'ABCD'[i]; for (let x = 1; x <= k2; x++) { if (adj[v].every((w) => c[w] !== x)) { c[v] = x; if (go(i + 1)) return true; delete c[v]; } } return false; }; return go(0); };
+            const clique = E.length === 6;
+            return proper && VAR_COL_DATA.answer.used === 4 && !tryK(3) && tryK(4) && clique;
+          },
+        }],
+        draw(stage, ctx, step, k, preset) {
+          const { h, s, rc } = ctx;
+          const D = (preset && preset.data) || EX_COL_DATA;
+          const PAL = ['var(--accent)', 'var(--fnc)', 'var(--warn)', 'var(--str)'];
+          const colored = Object.fromEntries(D.assign.slice(0, step.n).map((a) => [a.v, a.c]));
+          const kids = [];
+          for (const [a, b] of D.edges) {
+            const checked = a in colored && b in colored;
+            kids.push(s('line', { x1: D.pos[a][0], y1: D.pos[a][1], x2: D.pos[b][0], y2: D.pos[b][1], stroke: checked ? 'var(--true)' : 'var(--rule)', 'stroke-width': checked ? 3.2 : 2.2, 'stroke-linecap': 'round' }));
+          }
+          for (const v of D.verts) {
+            const [x, y] = D.pos[v];
+            const c = colored[v], just = step.n > 0 && !step.answer && D.assign[step.n - 1].v === v;
+            kids.push(s('g', {},
+              just ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+              s('circle', { cx: x, cy: y, r: 20, fill: c ? PAL[c - 1] : 'var(--sheet)', 'fill-opacity': c ? 0.45 : 1, stroke: c ? PAL[c - 1] : 'var(--ink-3)', 'stroke-width': c ? 3 : 1.5 }),
+              s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: v }),
+              c ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 700, fill: 'var(--ink-2)', text: `color ${c}` }) : null));
+          }
+          const svg = s('svg', { viewBox: '0 0 520 260', role: 'img', 'aria-label': 'Graph being colored vertex by vertex; an edge turns green once both ends are colored differently', style: 'width:min(34rem,100%);height:auto' });
+          rc(svg, kids);
+          const palette = h('div', { style: { width: '100%' } }, h('div.tiny.mono.muted', 'COLORS USED SO FAR'),
+            h('div.gr-chips', step.n ? D.assign.slice(0, step.n).map((a) => h('span.chip', `${a.v}: color ${a.c}`)) : h('span.small.muted', 'none yet')));
+          const banner = step.answer ? h('div.ex-answer', `Answer: ${D.order.map((v) => `${v} color ${D.colors[v]}`).join(' · ')} · ${D.used} colors used · check: every edge joins different colors, and ${D.why} ✓`) : null;
+          stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, palette, banner));
+        },
+      },
       /* ---------------------------------------------------------------- 14 */
       {
         id: 'iso-lab',
@@ -1246,17 +1729,10 @@
         title: 'Worked example: breadth-first search order and layers',
         kind: 'example',
         id: 'ex-bfs-order',
+        objective: 'Run breadth-first search from a source vertex and read off the visit order and the layer (the fewest edges from the source) of every vertex it reaches.',
         problem: '<p>Run breadth-first search from vertex A in the graph with vertices A, B, C, D, E, F and edges A-B, A-C, B-D, C-D, C-E, D-F and E-F, visiting neighbors in alphabetical order. Give the visit order and the distance (layer) of each vertex from A.</p>',
-        steps: [
-          { visited: 0, caption: 'Start with the graph and the queue holding only A, marked as the source at layer 0. Nothing is visited yet, because BFS visits a vertex only when it reaches the front of the queue.' },
-          { visited: 1, caption: 'Visit A and move its undiscovered neighbors B and C to the back of the queue at layer 1. A is finished first because the queue is first in, first out, so nearer vertices are always processed before farther ones.' },
-          { visited: 2, caption: 'Visit B, the front of the queue, and enqueue its only undiscovered neighbor D at layer 2; A and C are already known. D gets layer 2 because BFS first reaches it along a shortest path, A-B-D, while layer-1 C is still waiting.' },
-          { visited: 3, caption: 'Visit C and enqueue E at layer 2, while D is already waiting in the queue and so is not added a second time. C is processed before D because every layer-1 vertex leaves the queue before any layer-2 vertex.' },
-          { visited: 4, caption: 'Visit D and enqueue F at layer 3, its first discovery, reached along the path A-B-D. F cannot sit closer than layer 3, because both of its neighbors are at layer 2 and BFS discovers vertices in order of distance.' },
-          { visited: 5, caption: 'Visit E and enqueue nothing new: both of its neighbors, C and F, have already been discovered. The queue still holds F, so the search continues until the last layer-2 vertex is done and F reaches the front.' },
-          { visited: 6, caption: 'Visit F, the last vertex in the queue, and the queue empties, which ends the search. F sits at layer 3 because it was discovered from a layer-2 vertex, and the queue order guarantees no shorter route to it exists.' },
-          { visited: 6, answer: true, caption: 'Answer: the visit order is A, B, C, D, E, F, with distances A 0, B 1, C 1, D 2, E 2 and F 3. Check: every edge joins layers differing by at most 1 — A-B is 0 to 1 and D-F is 2 to 3 — and F at layer 3 also matches the path A-C-E-F of length 3.' },
-        ],
+        data: EX_BFS_DATA,
+        steps: bfsStepsFor(EX_BFS_DATA),
         answer: EX_BFS_ANSWER,
         verify(M) {
           const edges = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']];
@@ -1271,28 +1747,60 @@
           const layersOk = edges.every(([a, b]) => Math.abs(EX_BFS_ANSWER.dist[a] - EX_BFS_ANSWER.dist[b]) <= 1);
           return sameOrder && sameDist && layersOk;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: disconnected graph',
+            problem: '<p>Run breadth-first search from vertex A in the graph with vertices A, B, C, D, E, F and edges A-B, A-C, B-D, C-D and C-E, so F has no edges at all, visiting neighbors in alphabetical order. Give the visit order, the layer of each reached vertex, and say what happens to F.</p>',
+            data: VAR_BFS_DATA,
+            steps: bfsStepsFor(VAR_BFS_DATA),
+            answer: VAR_BFS_DATA.answer,
+            verify(M) {
+              // independent check: expand the reached set one whole layer at a time, no queue
+              const edges = [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E']];
+              const verts = ['A', 'B', 'C', 'D', 'E', 'F'];
+              const dist = { A: 0 }, order = ['A'];
+              let frontier = ['A'];
+              while (frontier.length) {
+                const next = [];
+                for (const u of frontier) for (const w of verts) {
+                  const joined = edges.some(([a, b]) => (a === u && b === w) || (a === w && b === u));
+                  if (joined && !(w in dist)) { dist[w] = dist[u] + 1; next.push(w); }
+                }
+                next.sort();
+                order.push(...next);
+                frontier = next;
+              }
+              const ans = VAR_BFS_DATA.answer;
+              const sameOrder = JSON.stringify(order) === JSON.stringify(ans.order);
+              const sameDist = Object.keys(dist).every((v) => dist[v] === ans.dist[v]) && Object.keys(ans.dist).length === Object.keys(dist).length;
+              const unOk = JSON.stringify(ans.unreached) === JSON.stringify(['F']) && !('F' in dist);
+              return sameOrder && sameDist && unOk;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h, s, rc } = ctx;
-          const snap = EX_BFS_SNAP[step.visited];
+          const D = (preset && preset.data) || EX_BFS_DATA;
+          const snap = D.snaps[step.visited];
           const visited = new Set(snap.order);
           const discovered = new Set(snap.discovered);
           const kids = [];
-          for (const [a, b] of EX_BFS_EDGES) {
+          for (const [a, b] of D.edges) {
             const tree = snap.parent[b] === a || snap.parent[a] === b;
-            kids.push(s('line', { x1: EX_BFS_POS[a][0], y1: EX_BFS_POS[a][1], x2: EX_BFS_POS[b][0], y2: EX_BFS_POS[b][1], stroke: tree ? 'var(--accent)' : 'var(--rule)', 'stroke-width': tree ? 4.5 : 2.2, 'stroke-linecap': 'round' }));
+            kids.push(s('line', { x1: D.pos[a][0], y1: D.pos[a][1], x2: D.pos[b][0], y2: D.pos[b][1], stroke: tree ? 'var(--accent)' : 'var(--rule)', 'stroke-width': tree ? 4.5 : 2.2, 'stroke-linecap': 'round' }));
           }
-          for (const v of EX_BFS_VERTS) {
-            const [x, y] = EX_BFS_POS[v];
+          for (const v of D.verts) {
+            const [x, y] = D.pos[v];
             const isV = visited.has(v), isQ = discovered.has(v) && !isV, cur = snap.current === v && !step.answer;
             kids.push(s('g', {},
-              cur || (step.visited === 0 && v === 'A') ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
+              cur || (step.visited === 0 && v === D.src) ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
               s('circle', { cx: x, cy: y, r: 20, fill: isV ? 'var(--accent)' : isQ ? 'var(--warn-bg)' : 'var(--sheet)', 'fill-opacity': isV ? 0.3 : 1, stroke: isV ? 'var(--accent)' : isQ ? 'var(--warn)' : 'var(--ink-3)', 'stroke-width': isV || isQ ? 3 : 1.5 }),
               s('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)', text: v }),
-              isV ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: 'var(--ink-2)', text: `layer ${EX_BFS_ANSWER.dist[v]}` }) : null,
+              isV ? s('text', { x, y: y + 38, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: 'var(--ink-2)', text: `layer ${D.dist[v]}` }) : null,
               cur ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--ink)', text: '▼ current' }) : null,
-              step.visited === 0 && v === 'A' ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--accent)', text: '▼ source' }) : null));
+              step.visited === 0 && v === D.src ? s('text', { x, y: y - 31, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 700, fill: 'var(--accent)', text: '▼ source' }) : null));
           }
-          const svg = s('svg', { viewBox: '0 0 520 235', role: 'img', 'aria-label': 'Graph for breadth-first search from A, with visited vertices filled and the queue shown below', style: 'width:min(34rem,100%);height:auto' });
+          const svg = s('svg', { viewBox: '0 0 520 235', role: 'img', 'aria-label': 'Graph for breadth-first search from the source, with visited vertices filled and the queue shown below', style: 'width:min(34rem,100%);height:auto' });
           rc(svg, kids);
           const queue = h('div', { style: { width: '100%' } },
             h('div.tiny.mono.muted', 'QUEUE'),
@@ -1301,9 +1809,11 @@
             h('div.tiny.mono.muted', 'VISIT ORDER'),
             h('div.gr-order', snap.order.length ? snap.order.map((v, i) => h('span', h('b', String(i + 1)), v)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing visited yet')));
           const table = step.answer ? h('table.tt',
-            h('thead', h('tr', h('th', 'vertex'), EX_BFS_VERTS.map((v) => h('th', v)))),
-            h('tbody', h('tr', h('td', 'distance'), EX_BFS_VERTS.map((v) => h('td', String(EX_BFS_ANSWER.dist[v])))))) : null;
-          const banner = step.answer ? h('div.ex-answer', 'Answer: visit order A → B → C → D → E → F · distances A 0, B 1, C 1, D 2, E 2, F 3 · check: every edge joins layers at most 1 apart (A-B: 0-1, D-F: 2-3), and F = 3 matches the path A-C-E-F ✓') : null;
+            h('thead', h('tr', h('th', 'vertex'), D.verts.map((v) => h('th', v)))),
+            h('tbody', h('tr', h('td', 'distance'), D.verts.map((v) => h('td', v in D.dist ? String(D.dist[v]) : 'unreached'))))) : null;
+          const banner = step.answer ? h('div.ex-answer', D.unreached.length
+            ? `Answer: visit order ${D.order.join(' → ')} · distances ${D.verts.map((v) => `${v} ${v in D.dist ? D.dist[v] : 'unreached'}`).join(', ')} · check: ${D.unreached.join(', ')} has no edges, so BFS from ${D.src} can never reach it ✓`
+            : `Answer: visit order ${D.order.join(' → ')} · distances ${D.verts.map((v) => `${v} ${D.dist[v]}`).join(', ')} · check: every edge joins layers at most 1 apart (A-B: 0-1, D-F: 2-3), and F = 3 matches the path A-C-E-F ✓`) : null;
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, queue, orderStrip, table, banner));
         },
       },
@@ -1312,16 +1822,10 @@
         title: 'Worked example: Dijkstra shortest distances from A',
         kind: 'example',
         id: 'ex-dijkstra',
+        objective: 'Run Dijkstra\'s algorithm one settled vertex at a time, relaxing edges after each settle, to find the shortest distance from the source to every reachable vertex.',
         problem: '<p>Find the shortest distances from A in the weighted graph with edges A-B 4, A-C 2, C-B 1, B-D 5, C-D 8, C-E 10 and D-E 2. Show the tentative distance of every vertex after each vertex is settled, and give the shortest path to E.</p>',
-        steps: [
-          { settled: 0, caption: 'Setup: A starts at distance 0 and every other vertex is infinity, meaning no route to it is known yet. Dijkstra settles the closest unsettled vertex next, because with all weights positive no alternative route could reach that vertex more cheaply.' },
-          { settled: 1, caption: 'Settle A at 0, the smallest tentative label, and relax its edges: B gets 4 and C gets 2. These labels are only tentative, not final, because a shorter route to either vertex could still show up through the other one.' },
-          { settled: 2, caption: 'Settle C at 2, the smallest tentative label, and relax its edges: B improves from 4 to 3 via C, while D appears at 10 and E at 12. The improvement to B is exactly why a label is never finalized until its vertex is the minimum unsettled one.' },
-          { settled: 3, caption: 'Settle B at 3 and relax its edge to D: D improves from 10 to 8 via B, beating the route through C. B has no edge to E in this graph, so E keeps its tentative label of 12 for now.' },
-          { settled: 4, caption: 'Settle D at 8 and relax its edge to E: E improves from 12 to 10 via D. Every other neighbor of D is already settled, so this is the last improvement the algorithm will make.' },
-          { settled: 5, caption: 'Settle E at 10, the only vertex left, and there is nothing left to relax because all of its neighbors are settled. The settled order A, C, B, D, E increases in distance, which is exactly the pattern Dijkstra guarantees.' },
-          { settled: 5, answer: true, caption: 'Answer: the shortest distances from A are A 0, B 3, C 2, D 8 and E 10. Check: the path A-C-B-D-E sums to 2 + 1 + 5 + 2 = 10, matching the distance of E, and D via C would cost 2 + 8 = 10, more than 8, so the route through B really is better.' },
-        ],
+        data: EX_DIJ_DATA,
+        steps: dijkstraStepsFor(EX_DIJ_DATA),
         answer: EX_DIJ_ANSWER,
         verify(M) {
           const edges = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
@@ -1337,22 +1841,46 @@
           const pathSum = wOf('A', 'C') + wOf('C', 'B') + wOf('B', 'D') + wOf('D', 'E');
           return verts.every((v) => dist[v] === EX_DIJ_ANSWER[v]) && pathSum === 10 && pathSum === EX_DIJ_ANSWER.E;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: unreachable vertex',
+            problem: '<p>Find the shortest distances from A in the weighted graph with edges A-B 4, A-C 2, C-B 1, B-D 5, C-D 8, C-E 10 and D-E 2, plus one extra vertex F that has no edges at all. Give every distance, the shortest path to E, and the distance of F.</p>',
+            data: VAR_DIJ_DATA,
+            steps: dijkstraStepsFor(VAR_DIJ_DATA),
+            answer: VAR_DIJ_ANSWER,
+            verify(M) {
+              // independent check: Bellman-Ford relaxation over the variant graph
+              const edges = [['A', 'B', 4], ['A', 'C', 2], ['C', 'B', 1], ['B', 'D', 5], ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2]];
+              const verts = ['A', 'B', 'C', 'D', 'E', 'F'];
+              const dist = Object.fromEntries(verts.map((v) => [v, v === 'A' ? 0 : Infinity]));
+              for (let i = 0; i < verts.length - 1; i++) {
+                for (const [a, b, w] of edges) {
+                  if (dist[a] + w < dist[b]) dist[b] = dist[a] + w;
+                  if (dist[b] + w < dist[a]) dist[a] = dist[b] + w;
+                }
+              }
+              const finiteOk = ['A', 'B', 'C', 'D', 'E'].every((v) => dist[v] === VAR_DIJ_ANSWER[v]);
+              return finiteOk && dist.F === Infinity && VAR_DIJ_ANSWER.F === 'unreachable' && VAR_DIJ_ANSWER.E === 10;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h, s, rc } = ctx;
-          const snap = EX_DIJ_SNAP[step.settled];
+          const D = (preset && preset.data) || EX_DIJ_DATA;
+          const snap = D.snaps[step.settled];
           const settled = new Set(snap.settled);
           const improved = new Map(snap.improved.map(([v, o, n]) => [v, [o, n]]));
           const fmtD = (d) => (d === Infinity ? '∞' : String(d));
           const kids = [];
-          for (const [a, b, w] of EX_DIJ_EDGES) {
+          for (const [a, b, w] of D.edges) {
             const tree = snap.prev[b] === a || snap.prev[a] === b;
-            const mx = (EX_DIJ_POS[a][0] + EX_DIJ_POS[b][0]) / 2, my = (EX_DIJ_POS[a][1] + EX_DIJ_POS[b][1]) / 2;
-            kids.push(s('line', { x1: EX_DIJ_POS[a][0], y1: EX_DIJ_POS[a][1], x2: EX_DIJ_POS[b][0], y2: EX_DIJ_POS[b][1], stroke: tree ? 'var(--accent)' : 'var(--ink-3)', 'stroke-width': tree ? 4 : 1.8, 'stroke-linecap': 'round' }));
+            const mx = (D.pos[a][0] + D.pos[b][0]) / 2, my = (D.pos[a][1] + D.pos[b][1]) / 2;
+            kids.push(s('line', { x1: D.pos[a][0], y1: D.pos[a][1], x2: D.pos[b][0], y2: D.pos[b][1], stroke: tree ? 'var(--accent)' : 'var(--ink-3)', 'stroke-width': tree ? 4 : 1.8, 'stroke-linecap': 'round' }));
             kids.push(s('circle', { cx: mx, cy: my, r: 10.5, fill: 'var(--sheet)', stroke: 'var(--rule)', 'stroke-width': 1.2 }));
             kids.push(s('text', { x: mx, y: my + 4, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 700, fill: 'var(--ink)', text: String(w) }));
           }
-          for (const v of EX_DIJ_VERTS) {
-            const [x, y] = EX_DIJ_POS[v];
+          for (const v of D.verts) {
+            const [x, y] = D.pos[v];
             const isF = settled.has(v), front = !isF && snap.dist[v] < Infinity, cur = snap.current === v && !step.answer, imp = improved.has(v);
             kids.push(s('g', {},
               cur ? s('circle', { cx: x, cy: y, r: 27, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.2 }) : null,
@@ -1371,9 +1899,11 @@
             h('div.tiny.mono.muted', 'SETTLED ORDER'),
             h('div.gr-order', snap.settled.length ? snap.settled.map((v, i) => h('span', h('b', String(i + 1)), `${v}:${snap.dist[v]}`)) : h('span.small.muted', { style: { background: 'none' } }, 'nothing settled yet')));
           const table = step.answer ? h('table.tt',
-            h('thead', h('tr', h('th', 'vertex'), EX_DIJ_VERTS.map((v) => h('th', v)))),
-            h('tbody', h('tr', h('td', 'distance'), EX_DIJ_VERTS.map((v) => h('td', String(EX_DIJ_ANSWER[v])))))) : null;
-          const banner = step.answer ? h('div.ex-answer', 'Answer: distances from A — A 0, B 3, C 2, D 8, E 10 · shortest path to E: A-C-B-D-E = 2 + 1 + 5 + 2 = 10 · check: D via C would be 2 + 8 = 10 > 8, so the route through B is better ✓') : null;
+            h('thead', h('tr', h('th', 'vertex'), D.verts.map((v) => h('th', v)))),
+            h('tbody', h('tr', h('td', 'distance'), D.verts.map((v) => h('td', fmtD(D.dist[v])))))) : null;
+          const banner = step.answer ? h('div.ex-answer', D.unreached.length
+            ? `Answer: distances from ${D.src} — ${D.verts.map((v) => `${v} ${fmtD(D.dist[v])}`).join(', ')} · shortest path to ${D.target}: ${D.path.join('-')} = ${D.pathSum} · check: ${D.unreached.join(', ')} has no edges, so its distance stays at infinity and the algorithm stops without settling it ✓`
+            : `Answer: distances from A — A 0, B 3, C 2, D 8, E 10 · shortest path to E: A-C-B-D-E = 2 + 1 + 5 + 2 = 10 · check: D via C would be 2 + 8 = 10 > 8, so the route through B is better ✓`) : null;
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.4rem' } }, svg, note, orderStrip, table, banner));
         },
       },

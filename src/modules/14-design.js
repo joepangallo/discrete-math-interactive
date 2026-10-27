@@ -301,6 +301,269 @@
     ['probability', 'Quantify uncertainty: probabilities, expected values, collision risks and reproducible experiments.'],
   ];
 
+  /* ---------- worked-example builder: one design case, primary and variant alike ---------- */
+  // A case carries its four phase cards plus its phase prose; the builder assembles the same
+  // six-step shape (setup, model, specify, analyze, verify, answer) from whichever case it gets.
+  function designStepsFor(D) {
+    const steps = [
+      { phase: -1, caption: D.setup },
+      { phase: 0, caption: D.model },
+      { phase: 1, caption: D.specify },
+      { phase: 2, caption: D.analyze },
+      { phase: 3, caption: D.verifyText },
+      { phase: 3, answer: true, banner: D.banner, caption: D.answerCaption },
+    ];
+    if (D.checkpoint) steps[D.checkpoint.at].checkpoint = D.checkpoint.text;
+    return steps;
+  }
+  const EX_SIGNUP_DATA = {
+    header: 'reject a new sign-up exactly when its e-mail address has registered before. Scale: up to 10⁶ registered addresses. Four phases, four artifacts — no code until the last card is filled.',
+    phases: [
+      { name: '1 · Model', empty: 'the structure goes here', body: 'A set of addresses. The only operation is membership: is this address in the set? Order does not matter, and repeats are what get rejected.' },
+      { name: '2 · Specify', empty: 'the contract goes here', body: 'Invariant: the set never holds an address twice. Rule: if the address is in the set, reject the sign-up; otherwise add the address and accept.' },
+      { name: '3 · Analyze: count the cost', empty: 'the cost figures go here', body: 'List scan: about n²/2 = 5 × 10¹¹ comparisons for n = 10⁶. Hash set: O(1) average lookup, about 10⁶ steps in total.' },
+      { name: '4 · Verify and measure', empty: 'the checks go here', body: 'Correctness by induction on sign-ups; testing against a nested-loop oracle on 1,000 random lists; a million simulated sign-ups in about 0.4 s confirm the estimate.' },
+    ],
+    setup: 'Setup: the service must reject a sign-up exactly when its address has registered before, at a scale of up to a million addresses. Run it through the design loop before coding, because each phase produces one artifact and coding first would bury the decisions inside the code.',
+    model: 'Model: the only question is "has this address been seen?", so the accepted addresses form a set and the only operation is membership. A set is the honest model because order does not matter and repeats are exactly what must be rejected, not stored twice.',
+    specify: 'Specify: the contract says the set never holds an address twice, and a sign-up is rejected exactly when its address is already in the set; otherwise the address is added and the sign-up is accepted. Writing that invariant down turns the requirement into something code and tests can both be checked against.',
+    analyze: String.raw`Analyze: count the cost before choosing storage, because scanning a list costs \(O(n)\) per sign-up and about \(n^2/2 = 5 \times 10^{11}\) comparisons in total for \(n = 10^6\), while a hash set answers membership in \(O(1)\) average time, about \(10^6\) steps in total. The count, not taste, is what eliminates the list.`,
+    verifyText: 'Verify and measure: induction on the number of sign-ups proves the invariant — it holds after 0 sign-ups, and each step adds an address only when it is absent — and testing against a nested-loop oracle on 1,000 random lists backs the proof. A simulation of a million sign-ups taking about 0.4 seconds then confirms the cost model; an hour would send us back to the count.',
+    answerCaption: String.raw`Answer: store the addresses in a hash set, because membership is the only operation the model needs and the invariant is exactly the requirement. The check closes the loop: about \(5 \times 10^{11}\) list comparisons against about \(10^6\) hash steps is roughly half a million times less work, and correctness and cost were both verified before any code shipped.`,
+    banner: 'Decision: store the addresses in a hash set · check: 5 × 10¹¹ list comparisons vs about 10⁶ hash steps — roughly 500,000 times less work, with the invariant proved by induction',
+    checkpoint: { at: 2, text: 'Predict: scanning a list of a million addresses once per sign-up — roughly how many comparisons in total: thousands, millions, or hundreds of billions?' },
+  };
+  const EX_HASH32_DATA = {
+    header: 'reject a new sign-up exactly when its address has registered before — but the set may store only a 32-bit hash of each address. Scale: up to 10⁶ registered addresses. Four phases, four artifacts — no code until the last card is filled.',
+    phases: [
+      { name: '1 · Model', empty: 'the structure goes here', body: 'A set again — but of 32-bit hash values, not addresses. Membership is still the only operation; what changes is what counts as equal: two different addresses with the same hash are indistinguishable to the set.' },
+      { name: '2 · Specify', empty: 'the contract goes here', body: 'Invariant: reject exactly when this address registered before. A hash-only set can break it — a brand-new address whose hash collides with a stored one is rejected even though it never registered.' },
+      { name: '3 · Analyze: count the collisions', empty: 'the collision figures go here', body: 'Pairs of users: about 5 × 10¹¹. Each pair shares a 32-bit hash with probability 1/2³², so expected collisions ≈ 5 × 10¹¹ / 4.3 × 10⁹ ≈ 116. The birthday bound puts the first likely collision near 77,000 users.' },
+      { name: '4 · Verify and measure', empty: 'the checks go here', body: 'Test against an oracle that stores full addresses: feed both systems the same million sign-ups and count disagreements. Expect on the order of a hundred real people wrongly rejected — the model, not the code, is at fault.' },
+    ],
+    setup: 'Setup: the proposal changes only the storage — a set of 32-bit hashes instead of a set of addresses — at the same scale of up to a million sign-ups. Run it through the same design loop, because the flaw, if there is one, will show up in the counting phase rather than in any line of code.',
+    model: 'Model: the accepted items still form a set and the only operation is still membership, so the model looks unchanged at first glance. The subtle change is in the elements themselves: hashes, not addresses, so equality of hashes quietly replaces equality of addresses.',
+    specify: 'Specify: the contract is unchanged — reject exactly when the address itself has registered before, and accept otherwise. Against that contract the proposal has a hole: a first-time address can share a hash with an earlier address, and a set of hashes has no way to tell the two apart.',
+    analyze: 'Analyze: count pairs, because collisions live on pairs. A million sign-ups form about 5 × 10¹¹ pairs, and each pair shares a 32-bit hash with probability 1/2³², so the expected number of colliding pairs is about 5 × 10¹¹ / 4.3 × 10⁹ ≈ 116. The birthday bound agrees: collisions become likely after only about 77,000 users, far below the target scale.',
+    verifyText: 'Verify and measure: the induction from the primary case still goes through — the set never holds the same hash twice — so the code can be perfectly correct while the design is wrong. Testing against a full-address oracle on a million simulated sign-ups exposes the gap: expect roughly a hundred sign-ups rejected whose addresses never registered.',
+    answerCaption: 'Answer: do not adopt the 32-bit hash shortcut; store the full addresses in the hash set. The check closes the loop: about 116 expected hash collisions at a million users means about 116 real people wrongly rejected, while full addresses cannot collide at all, so the memory saving costs exactly the correctness the specification demands.',
+    banner: 'Decision: store the full addresses in the hash set, not 32-bit hashes · check: about 116 expected collisions at 10⁶ users with 32-bit hashes, versus zero possible when full addresses are stored',
+    checkpoint: { at: 2, text: 'Predict: a million users squeezed into 2³² possible hash values — how many pairs of different addresses will share a hash: none, a handful, or around a hundred?' },
+  };
+
+  /* ---------- Stage D: two more design cases, each through all seven steps of the loop ---------- */
+  // Schedules: Kahn topological order + depth pass + a subset-DP count of valid orders.
+  function schedCalc(courses) {
+    const depth = {}, order = [], done = new Set();
+    let rem = [...courses];
+    while (rem.length) {
+      const nx = rem.filter((c) => c.pre.every((p) => done.has(p))).sort((a, b) => (a.id < b.id ? -1 : 1));
+      if (!nx.length) return { stuck: order };
+      for (const c of nx) { depth[c.id] = 1 + Math.max(0, ...c.pre.map((p) => depth[p])); order.push(c.id); done.add(c.id); }
+      rem = rem.filter((c) => !done.has(c.id));
+    }
+    const sems = [];
+    for (const id of order) (sems[depth[id] - 1] = sems[depth[id] - 1] || []).push(id);
+    let cur = order.filter((id) => depth[id] === sems.length).pop();
+    const chain = [cur];
+    for (;;) { const c = courses.find((x) => x.id === cur); if (!c || !c.pre.length) break; cur = c.pre.slice().sort((a, b) => depth[b] - depth[a] || (a < b ? -1 : 1))[0]; chain.unshift(cur); }
+    const n = courses.length, idx = new Map(courses.map((c, i) => [c.id, i]));
+    const pm = courses.map((c) => c.pre.reduce((a, p) => a | (1 << idx.get(p)), 0));
+    const dp = new Array(1 << n).fill(0); dp[0] = 1;
+    for (let m = 0; m < (1 << n); m++) if (dp[m]) for (let i = 0; i < n; i++) if (!(m & (1 << i)) && (pm[i] & ~m) === 0) dp[m | (1 << i)] += dp[m];
+    return { depth, order, sems, chain, orders: dp[(1 << n) - 1], edges: courses.reduce((a, c) => a + c.pre.length, 0) };
+  }
+  const semText = (r) => r.sems.map((g, i) => `Semester ${i + 1}: ${g.join(', ')}`).join('\n');
+  const pairOk = (courses, r) => courses.every((c) => c.pre.every((p) => r.depth[p] < r.depth[c.id]));
+
+  function schedStepsFor(D) {
+    const base = schedCalc(D.courses), rev = schedCalc([...D.courses, D.revision]);
+    const cyc = schedCalc(D.courses.map((c) => (c.pre.length ? c : { ...c, pre: [base.chain[base.chain.length - 1]] })));
+    const steps = [
+      { phase: 0, card: `${D.courses.length} courses · ${base.edges} prerequisite pairs · fewest semesters, every prerequisite in an earlier semester`, show: D.courses.map((c) => `${c.id}${c.pre.length ? ` after ${c.pre.join(' + ')}` : ' (no prerequisites)'}`).join('\n'),
+        caption: `Understand the question: ${D.setting} The inputs are ${D.courses.length} courses and ${base.edges} prerequisite pairs; the output is a semester plan. Tricky cases: a course with two prerequisites from different chains must wait for the slower chain, and the prerequisites might contain a cycle, which would make any plan impossible.` },
+      { phase: 1, card: 'a directed graph: vertices are courses, an edge X → Y means "X before Y"; a plan exists exactly when the graph is acyclic', show: D.courses.flatMap((c) => c.pre.map((p) => `${p} → ${c.id}`)).join('\n'),
+        caption: 'Choose a discrete structure: courses are vertices and each prerequisite is a directed edge from the prerequisite to the course that needs it — the prerequisite model from the pick-the-structure lab. A valid plan exists exactly when this graph has no directed cycle, because a cycle would force each course on it to come before itself.' },
+      { phase: 2, card: `postcondition: semester(prerequisite) < semester(course) for all ${base.edges} pairs, every course placed once; minimize the number of semesters`, show: `For every pair (X before Y): semester(X) < semester(Y)\nEvery course placed exactly once\nGoal: the smallest possible number of semesters`,
+        caption: 'Specify with logic: the postcondition says that for every prerequisite pair, the prerequisite sits in a strictly earlier semester than the course, and every course is placed exactly once. The goal clause fixes what "best" means before any algorithm runs: minimize the number of semesters over all plans satisfying that condition.' },
+      { phase: 3, card: `Kahn topological sort; depth(course) = 1 + max depth of its prerequisites — one pass, ${D.courses.length + base.edges} basic steps`, show: `Topological order: ${base.order.join(' → ')}\nEarliest semester by course: ${base.order.map((id) => `${id} ${base.depth[id]}`).join(' · ')}`,
+        caption: `Choose and analyze the algorithm: Kahn's topological sort repeatedly takes a course whose prerequisites are all placed, and one depth pass — depth is 1 plus the largest prerequisite depth — gives every earliest semester at once. The work is proportional to vertices plus edges, ${D.courses.length + base.edges} basic steps here.`, checkpoint: D.checkpoint },
+      { phase: 4, card: `longest chain ${base.chain.join(' → ')} forces at least ${base.sems.length} semesters · ${base.orders} valid topological orders`, show: semText(base),
+        caption: `Count and estimate: the depth pass already proves a lower bound, because the chain ${base.chain.join(' → ')} has ${base.chain.length} courses in a line and no plan can compress a line. A subset DP counts ${base.orders} valid orders, so there is real choice about which courses share a semester — but the finishing semester is fixed by that one chain.` },
+      { phase: 5, card: `mechanical pair check on every prerequisite + a cycle test: on cyclic input the algorithm stalls (${cyc.stuck.length} of ${D.courses.length} placed) instead of answering wrongly`, show: `${semText(base)}\nPair check: ${pairOk(D.courses, base) ? `${base.edges} of ${base.edges}` : 'FAILED'} prerequisites land in an earlier semester`,
+        caption: `Verify: check the plan mechanically, pair by pair — all ${base.edges} prerequisites land in an earlier semester. Then a negative test: if ${base.chain[base.chain.length - 1]} were also a prerequisite of the entry courses, the graph would contain a cycle, and Kahn's algorithm places only ${cyc.stuck.length} of ${D.courses.length} courses before stalling. The stall is the cycle detector: an impossible requirement is reported, never silently misplanned.` },
+      { phase: 6, card: `revision: ${D.revision.id} added after ${D.revision.pre.join(' + ')} · program now needs ${rev.sems.length} semesters`, show: semText(rev),
+        caption: `Measure, and go around the loop again: the plan went out for review and the requirement changed — ${D.revisionWhy} The same depth pass recomputes everything: the new course's prerequisites sit in semesters ${D.revision.pre.map((p) => rev.depth[p]).join(' and ')}, so it lands in semester ${rev.depth[D.revision.id]}, the critical chain grows, and the program now needs ${rev.sems.length} semesters. No other course moves, because adding a final course changes no earlier depth.` },
+      { phase: 6, answer: true, banner: `Final plan: ${rev.sems.length} semesters · ${rev.sems.map((g, i) => `semester ${i + 1}: ${g.join(', ')}`).join(' · ')} · critical chain ${rev.chain.join(' → ')}`, show: `${semText(rev)}\nCritical chain: ${rev.chain.join(' → ')} (${rev.chain.length} courses)`,
+        caption: `Answer: the revised program takes ${rev.sems.length} semesters. The checks close the loop: all ${rev.edges} prerequisite pairs land in an earlier semester (checked mechanically), the critical chain ${rev.chain.join(' → ')} proves no ${rev.sems.length - 1}-semester plan exists, and the cycle test shows the method refuses an impossible requirement instead of papering over it.` },
+    ];
+    return steps;
+  }
+  function schedVerify(D, expected) {
+    const courses = [...D.courses, D.revision];
+    let longest = 0;
+    const walk = (id, seen) => { longest = Math.max(longest, seen.size); for (const c of courses) if (c.pre.includes(id) && !seen.has(c.id)) walk(c.id, new Set([...seen, c.id])); };
+    courses.filter((c) => !c.pre.length).forEach((c) => walk(c.id, new Set([c.id])));
+    const depth = {}; courses.forEach((c) => (depth[c.id] = 1));
+    for (let i = 0; i < courses.length; i++) for (const c of courses) for (const p of c.pre) depth[c.id] = Math.max(depth[c.id], depth[p] + 1);
+    return longest === expected && Math.max(...Object.values(depth)) === expected;
+  }
+
+  // Access rules: a rule is a list of conjunction terms over literals like 'E' and '!S';
+  // the generator enumerates the whole truth table from the preset's terms.
+  function termRows(vars, terms) {
+    const rows = [];
+    for (let m = 0; m < (1 << vars.length); m++) {
+      const a = {}; vars.forEach((v, i) => (a[v] = !!(m & (1 << (vars.length - 1 - i)))));
+      rows.push(terms.some((t) => t.every((l) => (l[0] === '!' ? !a[l.slice(1)] : a[l]))));
+    }
+    return rows;
+  }
+  const rowText = (vars, m) => vars.map((v, i) => (m & (1 << (vars.length - 1 - i)) ? v : '¬' + v)).join(' ');
+  function accessStepsFor(D) {
+    const orig = termRows(D.vars, D.orig), simp = termRows(D.vars, D.simp);
+    const diff = orig.map((g, m) => (g !== simp[m] ? m : -1)).filter((m) => m >= 0);
+    const gO = orig.filter(Boolean).length, gS = simp.filter(Boolean).length, rows = simp.length;
+    const revVars = [...D.vars, D.revVar];
+    const revR = termRows(revVars, D.simp.map((t) => [...t, D.revVar]));
+    const gR = revR.filter(Boolean).length;
+    const grantList = simp.map((g, m) => (g ? rowText(D.vars, m) : null)).filter(Boolean);
+    const spots = D.spots.map((sp) => `${sp.label}: ${D.simp.some((t) => t.every((l) => (l[0] === '!' ? !sp.a[l.slice(1)] : sp.a[l]))) ? 'GRANT' : 'DENY'}`);
+    const steps = [
+      { phase: 0, card: `one bit out per request — grant or deny · conditions: ${D.legend.map((x) => x.split(' = ')[0]).join(', ')}`, show: D.legend.join('\n'),
+        caption: `Understand the question: ${D.setting} The output for each request is a single bit, grant or deny, and the tricky cases are the ones where the conditions pull in opposite directions: ${D.tricky}. Getting those two cases right is the whole design problem in miniature.` },
+      { phase: 1, card: `a Boolean formula · ${D.origName}: ${D.origText} · specification rule: ${D.simpText}`, show: `Rule as proposed: grant iff ${D.origText}\nSpecification rule: grant iff ${D.simpText}`,
+        caption: `Choose a discrete structure: each condition is a Boolean variable, so a request is one row of a truth table and the rule is a Boolean formula — the access-rule model from the pick-the-structure lab. ${D.origName} is ${D.origText}; the specification rule is ${D.simpText}. Whether the two are really the same rule is a Module 12 equivalence question, settled by brute force in the verify step.` },
+      { phase: 2, card: `postcondition: grant exactly when ${D.simpText} holds`, show: D.spec,
+        caption: `Specify with logic: the postcondition is a single sentence that support staff and tests can both use: ${D.spec} Every later argument about the rule is an argument about this sentence, not about anyone's memory of a meeting.` },
+      { phase: 3, card: `truth table: ${rows} rows — few enough to check every one · evaluating the formula is a handful of Boolean operations per request`, show: `Variables: ${D.vars.length} · rows: ${rows}\nGranting rows under the proposed rule: ${gO}\nGranting rows under the specification rule: counted in the next step`,
+        caption: `Choose and analyze the algorithm: evaluating the formula costs a handful of Boolean operations per request, however the rule is written. The analysis that matters here is the truth table: ${D.vars.length} variables make ${rows} rows, few enough that the design can be checked on every single one — no sampling and no spot guesses at this stage.`, checkpoint: D.checkpoint },
+      { phase: 4, card: `${gS} of ${rows} rows grant · ${rows - gS} deny`, show: `Granting rows: ${grantList.join(' · ')}\nDenying rows: ${rows - gS} of ${rows}`,
+        caption: `Count and estimate: enumerating the table, the specification rule grants on exactly ${gS} of the ${rows} rows — ${grantList.join('; ')} — and denies the other ${rows - gS}. A random combination of conditions thus has a ${gS}/${rows} chance of being granted, worth knowing before anyone calls the rule "basically open" or "basically closed".` },
+      { phase: 5, card: diff.length ? `equivalence check: the proposed rule FAILS on ${diff.length} rows — caught at design time, not in production` : `equivalence check: 0 disagreements over all ${rows} rows — the simplification is exact`, show: `Rows compared: ${rows} · disagreements: ${diff.length}${diff.length ? ` (${diff.map((m) => rowText(D.vars, m)).join(' · ')})` : ''}\n${spots.join('\n')}`,
+        caption: diff.length
+          ? `Verify: run both formulas over all ${rows} rows and compare. They disagree on ${diff.length} rows — ${diff.map((m) => rowText(D.vars, m)).join(' and ')} — where the proposed rule grants and the specification denies. The proposal is therefore rejected and the specification rule stands; the named spot checks confirm it on the cases people actually argue about: ${spots.join('; ')}.`
+          : `Verify: run both formulas over all ${rows} rows and compare — they disagree on 0 rows, so the simplification is exactly equivalent to the rule as circulated, not approximately. The named spot checks agree too: ${spots.join('; ')}. The truth-table equivalence check turns "surely these are the same rule" into a proved fact.` },
+      { phase: 6, card: `revision: condition ${D.revVar} (${D.revName}) added · revised rule grants on ${gR} of ${revR.length} rows`, show: `Revised rule: grant iff ${D.simpText} ∧ ${D.revVar}\nRows: ${revR.length} · granting rows: ${gR}`,
+        caption: `Measure, and go around the loop again: after a pilot period the requirement changes — ${D.revWhy} Conjoining ${D.revVar} gives grant iff ${D.simpText} ∧ ${D.revVar}; the table grows to ${revR.length} rows and exactly ${gR} grant, since every old granting row survives only in its ${D.revVar}-true half. The test suite grows with the table, from ${rows} cases to ${revR.length}.` },
+      { phase: 6, answer: true, banner: `Final rule: grant iff ${D.simpText} ∧ ${D.revVar} · check: ${gR} granting rows out of ${revR.length}; the proposed rule was compared with the specification on all ${rows} rows (${diff.length} disagreement${diff.length === 1 ? '' : 's'}${diff.length ? ', in the rejected proposal' : ''})`, show: `Revised rule: grant iff ${D.simpText} ∧ ${D.revVar}\nGranting rows: ${revR.map((g, m) => (g ? rowText(revVars, m) : null)).filter(Boolean).join(' · ')}`,
+        caption: `Answer: ship the specification rule with the revision folded in — grant exactly when ${D.simpText} ∧ ${D.revVar}. The loop's checks are the reason to trust it: the count says only ${gR} of ${revR.length} condition combinations are granted, the exhaustive comparison policed the proposed form of the rule before it shipped, and the spot checks cover the two tricky cases by name.` },
+    ];
+    return steps;
+  }
+  function ieCount(vars, terms) {
+    let total = 0;
+    for (let mask = 1; mask < (1 << terms.length); mask++) {
+      const lits = {}; let ok = true, bits = 0, taken = 0;
+      for (let i = 0; i < terms.length; i++) if (mask & (1 << i)) { taken++; for (const l of terms[i]) { const v = l.replace('!', ''), val = l[0] !== '!'; if (v in lits && lits[v] !== val) ok = false; if (!(v in lits)) { lits[v] = val; bits++; } } }
+      if (ok) total += (taken % 2 ? 1 : -1) * 2 ** (vars.length - bits);
+    }
+    return total;
+  }
+  function accessVerify(D, exp) {
+    const revVars = [...D.vars, D.revVar];
+    return ieCount(D.vars, D.simp) === exp.grant && ieCount(D.vars, D.orig) === exp.orig && ieCount(revVars, D.simp.map((t) => [...t, D.revVar])) === exp.revGrant && (1 << revVars.length) === exp.revRows;
+  }
+
+  // Shared draw for the two Stage D cases: the seven loop steps as cards that fill in,
+  // plus the current step's computed artifact (a schedule, a rule table) under them.
+  function design7Draw(fallback) {
+    return function (stage, ctx, step, k, preset) {
+      const { h } = ctx;
+      const D = (preset && preset.data) || fallback;
+      const steps = (preset && preset.steps) || [];
+      const cards = LOOP.map((L, j) => {
+        const filled = step.phase >= j;
+        const current = step.phase === j && !step.answer;
+        const src = steps.find((x) => x.phase === j && !x.answer);
+        return h('div', {
+          style: {
+            flex: '1 1 11rem', minWidth: '0', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius)', background: 'var(--paper)',
+            border: current ? '2px solid var(--accent)' : filled ? '1px solid var(--true)' : '1px dashed var(--rule)',
+          },
+        },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem' } },
+            h('b', { style: { fontSize: '0.9rem' } }, `${j + 1} · ${L.name}`),
+            h('span.tiny.mono', { style: { color: current ? 'var(--accent)' : filled ? 'var(--true)' : 'var(--ink-3)', fontWeight: '700', textTransform: 'uppercase' } }, current ? 'current' : filled ? 'done' : 'waiting')),
+          filled && src
+            ? h('p.small', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, src.card)
+            : h('p.small.muted', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, 'Waiting — this step of the loop has not run yet.'));
+      });
+      stage.append(h('div.stack', { style: { alignItems: 'stretch', gap: '0.55rem', width: 'min(62rem, 100%)' } },
+        h('div', { style: { padding: '0.45rem 0.7rem', border: '1px solid var(--rule)', borderLeft: '3px solid var(--accent)', borderRadius: 'var(--radius)', background: 'var(--paper)', fontSize: '0.92rem', lineHeight: '1.45' } },
+          h('b', 'The problem: '), D.header),
+        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem' } }, cards),
+        h('div', { style: { padding: '0.45rem 0.7rem', border: '1px solid var(--rule)', borderRadius: 'var(--radius)', background: 'var(--sheet)', fontFamily: 'var(--font-mono)', fontSize: '0.82rem', lineHeight: '1.55', whiteSpace: 'pre-line' } }, step.show || ''),
+        step.answer ? h('div.ex-answer', step.banner) : null));
+    };
+  }
+
+  const EX_SCHED_DATA = {
+    header: 'plan a 7-course computing certificate in as few semesters as possible, each course only after its prerequisites. Run all seven steps of the design loop — and expect one requirement to change before the design is finished.',
+    setting: 'a student must finish a seven-course computing certificate, taking each course only after its prerequisites.',
+    courses: [
+      { id: 'CS1', pre: [] }, { id: 'CS2', pre: ['CS1'] }, { id: 'DS', pre: ['CS2', 'M2'] }, { id: 'ALG', pre: ['DS'] },
+      { id: 'M1', pre: [] }, { id: 'M2', pre: ['M1'] }, { id: 'OS', pre: ['CS2'] },
+    ],
+    revision: { id: 'CAP', pre: ['ALG', 'OS'] },
+    revisionWhy: 'the certificate now ends with a capstone, CAP, which requires both ALG and OS.',
+    checkpoint: 'Predict: two chains merge at DS — one through CS1 and CS2, one through M1 and M2. What is the longest chain of courses, and so the smallest possible number of semesters: 3, 4, or 5?',
+  };
+  const EX_SCHED_VAR_DATA = {
+    header: 'the same 7-course certificate with one requirement changed: CS2 now requires M2 as well as CS1. Same seven steps of the design loop, every number recomputed — and the same capstone change arrives before the design is finished.',
+    setting: 'a student must finish a seven-course computing certificate, taking each course only after its prerequisites.',
+    courses: [
+      { id: 'CS1', pre: [] }, { id: 'CS2', pre: ['CS1', 'M2'] }, { id: 'DS', pre: ['CS2', 'M2'] }, { id: 'ALG', pre: ['DS'] },
+      { id: 'M1', pre: [] }, { id: 'M2', pre: ['M1'] }, { id: 'OS', pre: ['CS2'] },
+    ],
+    revision: { id: 'CAP', pre: ['ALG', 'OS'] },
+    revisionWhy: 'the certificate now ends with a capstone, CAP, which requires both ALG and OS.',
+    checkpoint: 'Predict: CS2 now waits for M2 as well as CS1, which pushes it to semester 3. How far does the delay cascade — will the program, before any capstone is added, take 4, 5, or 6 semesters?',
+  };
+  const EX_ACCESS_DATA = {
+    header: 'decide, for each student who badges into the campus makerspace, whether the door unlocks: enrolled, fees paid or waived, not suspended — plus one condition that arrives before the design is finished.',
+    setting: 'the campus makerspace door must decide, for each student who badges in, whether to unlock.',
+    tricky: 'a scholarship student who has not paid fees, whose waiver should unlock the door, and a student who paid in full but is currently suspended, whose payment must not unlock it',
+    vars: ['E', 'P', 'W', 'S'],
+    legend: ['E = enrolled', 'P = fees paid', 'W = fee waiver (scholarship)', 'S = suspended'],
+    origName: 'The rule as the office circulated it',
+    origText: '(E ∧ P ∧ ¬S) ∨ (E ∧ W ∧ ¬S) ∨ (E ∧ P ∧ W ∧ ¬S)',
+    simpText: 'E ∧ (P ∨ W) ∧ ¬S',
+    orig: [['E', 'P', '!S'], ['E', 'W', '!S'], ['E', 'P', 'W', '!S']],
+    simp: [['E', 'P', '!S'], ['E', 'W', '!S']],
+    spec: 'grant exactly when the student is enrolled, has paid fees or holds a waiver, and is not suspended — in particular, no suspended student is ever granted, whatever they paid.',
+    spots: [
+      { label: 'scholarship student, fees unpaid, not suspended', a: { E: 1, P: 0, W: 1, S: 0 } },
+      { label: 'paid in full but suspended', a: { E: 1, P: 1, W: 0, S: 1 } },
+      { label: 'enrolled, unpaid, no waiver', a: { E: 1, P: 0, W: 0, S: 0 } },
+    ],
+    revVar: 'T', revName: 'safety training completed',
+    revWhy: 'the safety office adds a condition: only students who have completed safety training may enter, whether supervised or not.',
+    checkpoint: 'Predict: the specification rule E ∧ (P ∨ W) ∧ ¬S over 4 variables has 16 truth-table rows. How many of those rows grant access: 3, 8, or 13?',
+  };
+  const EX_ACCESS_VAR_DATA = {
+    header: 'decide, for each promo code typed at checkout, whether the discount applies: valid, unexpired, and not already used by this customer. A teammate has proposed a shorter rule — the loop will check it, and one more condition arrives before the design is finished.',
+    setting: 'the checkout must decide, for each promo code a customer types, whether to apply the discount.',
+    tricky: 'a code that is valid and unused but expired yesterday, and a code that is valid and unexpired but already used by this same customer',
+    vars: ['V', 'X', 'U'],
+    legend: ['V = code is valid', 'X = code is expired', 'U = code already used by this customer'],
+    origName: 'The shortcut a teammate proposed',
+    origText: '(V ∧ ¬X) ∨ (V ∧ ¬U)',
+    simpText: 'V ∧ ¬X ∧ ¬U',
+    orig: [['V', '!X'], ['V', '!U']],
+    simp: [['V', '!X', '!U']],
+    spec: 'apply the discount exactly when the code is valid, unexpired, and not already used by this customer — all three at once, which is the promo-code scenario from the pick-the-structure lab.',
+    spots: [
+      { label: 'valid, expired, never used', a: { V: 1, X: 1, U: 0 } },
+      { label: 'valid, unexpired, already used by this customer', a: { V: 1, X: 0, U: 1 } },
+      { label: 'valid, unexpired, unused', a: { V: 1, X: 0, U: 0 } },
+    ],
+    revVar: 'G', revName: 'account in good standing',
+    revWhy: 'the finance team adds a condition: the discount now also requires the customer account to be in good standing.',
+    checkpoint: 'Predict: the specification rule V ∧ ¬X ∧ ¬U over 3 variables has 8 truth-table rows. How many rows satisfy all three conditions at once: 1, 3, or 5?',
+  };
+
+
   DM.module({
     id: 'design',
     num: 14,
@@ -1044,14 +1307,9 @@
         kind: 'example',
         id: 'ex-duplicate-signups',
         problem: String.raw`<p>A sign-up service expects up to \(10^6\) registered e-mail addresses. Every new sign-up must be rejected if its address has registered before, and accepted otherwise. Take this problem through the design loop — model, specify, analyze the cost, then verify and measure — and decide how to store the addresses.</p>`,
-        steps: [
-          { phase: -1, caption: 'Setup: the service must reject a sign-up exactly when its address has registered before, at a scale of up to a million addresses. Run it through the design loop before coding, because each phase produces one artifact and coding first would bury the decisions inside the code.' },
-          { phase: 0, caption: 'Model: the only question is "has this address been seen?", so the accepted addresses form a set and the only operation is membership. A set is the honest model because order does not matter and repeats are exactly what must be rejected, not stored twice.' },
-          { phase: 1, caption: 'Specify: the contract says the set never holds an address twice, and a sign-up is rejected exactly when its address is already in the set; otherwise the address is added and the sign-up is accepted. Writing that invariant down turns the requirement into something code and tests can both be checked against.' },
-          { phase: 2, caption: String.raw`Analyze: count the cost before choosing storage, because scanning a list costs \(O(n)\) per sign-up and about \(n^2/2 = 5 \times 10^{11}\) comparisons in total for \(n = 10^6\), while a hash set answers membership in \(O(1)\) average time, about \(10^6\) steps in total. The count, not taste, is what eliminates the list.` },
-          { phase: 3, caption: 'Verify and measure: induction on the number of sign-ups proves the invariant — it holds after 0 sign-ups, and each step adds an address only when it is absent — and testing against a nested-loop oracle on 1,000 random lists backs the proof. A simulation of a million sign-ups taking about 0.4 seconds then confirms the cost model; an hour would send us back to the count.' },
-          { phase: 3, answer: true, caption: String.raw`Answer: store the addresses in a hash set, because membership is the only operation the model needs and the invariant is exactly the requirement. The check closes the loop: about \(5 \times 10^{11}\) list comparisons against about \(10^6\) hash steps is roughly half a million times less work, and correctness and cost were both verified before any code shipped.` },
-        ],
+        objective: 'Run one real design problem through the whole loop — model, specification, cost analysis, then verification — and let the counting, not taste, choose the data structure.',
+        data: EX_SIGNUP_DATA,
+        steps: designStepsFor(EX_SIGNUP_DATA),
         answer: 'hash set',
         verify(M) {
           const n = 1e6;
@@ -1059,14 +1317,27 @@
           const hashSteps = n;
           return listComparisons === 499999500000 && listComparisons > 1e11 && Math.abs(listComparisons / 5e11 - 1) < 0.01 && hashSteps === 1e6 && listComparisons / hashSteps > 1e5;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: the 32-bit hash shortcut',
+            problem: String.raw`<p>The same sign-up service at the same scale of up to \(10^6\) addresses. To save memory, a teammate proposes storing only a 32-bit hash of each address in the set instead of the address itself: a new sign-up is rejected when its hash is already stored. Take this proposal through the design loop — model, specify, analyze the counting, then verify — and decide whether to adopt it.</p>`,
+            data: EX_HASH32_DATA,
+            steps: designStepsFor(EX_HASH32_DATA),
+            answer: 'full addresses',
+            verify(M) {
+              const n = 1e6;
+              const pairs = (n * (n - 1)) / 2;
+              const expected = pairs / 2 ** 32;
+              const pAtLeastOne = 1 - Math.exp(-expected);
+              const birthday = 1.18 * Math.sqrt(2 ** 32);
+              return pairs === 499999500000 && expected > 100 && expected < 130 && pAtLeastOne > 0.999999 && birthday > 70000 && birthday < 80000;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
           const { h } = ctx;
-          const phases = [
-            { name: '1 · Model', empty: 'the structure goes here', body: 'A set of addresses. The only operation is membership: is this address in the set? Order does not matter, and repeats are what get rejected.' },
-            { name: '2 · Specify', empty: 'the contract goes here', body: 'Invariant: the set never holds an address twice. Rule: if the address is in the set, reject the sign-up; otherwise add the address and accept.' },
-            { name: '3 · Analyze: count the cost', empty: 'the cost figures go here', body: 'List scan: about n\u00B2/2 = 5 \u00D7 10\u00B9\u00B9 comparisons for n = 10\u2076. Hash set: O(1) average lookup, about 10\u2076 steps in total.' },
-            { name: '4 · Verify and measure', empty: 'the checks go here', body: 'Correctness by induction on sign-ups; testing against a nested-loop oracle on 1,000 random lists; a million simulated sign-ups in about 0.4 s confirm the estimate.' },
-          ];
+          const D = (preset && preset.data) || EX_SIGNUP_DATA;
+          const phases = D.phases;
           const cards = phases.map((p, j) => {
             const filled = step.phase >= j;
             const current = step.phase === j && !step.answer;
@@ -1082,14 +1353,60 @@
                 h('span.tiny.mono', { style: { color: current ? 'var(--accent)' : filled ? 'var(--true)' : 'var(--ink-3)', fontWeight: '700', textTransform: 'uppercase' } }, current ? 'current' : filled ? 'done' : 'waiting')),
               filled
                 ? h('p.small', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, p.body)
-                : h('p.small.muted', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, 'Empty slot \u2014 ' + p.empty + '.'));
+                : h('p.small.muted', { style: { margin: '0.3rem 0 0', lineHeight: '1.45' } }, 'Empty slot — ' + p.empty + '.'));
           });
           stage.append(h('div.stack', { style: { alignItems: 'stretch', gap: '0.55rem', width: 'min(62rem, 100%)' } },
             h('div', { style: { padding: '0.45rem 0.7rem', border: '1px solid var(--rule)', borderLeft: '3px solid var(--accent)', borderRadius: 'var(--radius)', background: 'var(--paper)', fontSize: '0.92rem', lineHeight: '1.45' } },
-              h('b', 'The problem: '), 'reject a new sign-up exactly when its e-mail address has registered before. Scale: up to 10\u2076 registered addresses. Four phases, four artifacts \u2014 no code until the last card is filled.'),
+              h('b', 'The problem: '), D.header),
             h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem' } }, cards),
-            step.answer ? h('div.ex-answer', 'Decision: store the addresses in a hash set \u00B7 check: 5 \u00D7 10\u00B9\u00B9 list comparisons vs about 10\u2076 hash steps \u2014 roughly 500,000 times less work, with the invariant proved by induction') : null));
+            step.answer ? h('div.ex-answer', step.banner) : null));
         },
+      },
+      /* ---------------------------------------------------------------- worked example 2 */
+      {
+        title: 'Worked example: designing a prerequisite-proof course schedule',
+        kind: 'example',
+        id: 'ex-course-schedule',
+        problem: String.raw`<p>A computing certificate has seven courses: CS1, CS2, DS (data structures), ALG (algorithms), M1, M2 and OS. The prerequisites are: CS2 after CS1; DS after CS2 and M2; ALG after DS; M2 after M1; OS after CS2. Take this through the seven steps of the design loop — understand, model, specify, analyze, count, verify, measure — and produce a plan that finishes in as few semesters as possible, folding in any requirement that changes along the way.</p>`,
+        objective: 'Design a course schedule by modeling prerequisites as a directed acyclic graph, computing earliest semesters from the longest chain, verifying the plan mechanically against every prerequisite pair, and folding in a changed requirement.',
+        data: EX_SCHED_DATA,
+        steps: schedStepsFor(EX_SCHED_DATA),
+        answer: 5,
+        verify(M) { return schedVerify(EX_SCHED_DATA, 5); },
+        variants: [
+          {
+            label: 'Variant: CS2 also requires M2',
+            problem: String.raw`<p>The same seven-course certificate with one requirement changed: CS2 now requires M2 as well as CS1, so the prerequisites are: CS2 after CS1 and M2; DS after CS2 and M2; ALG after DS; M2 after M1; OS after CS2. Take it through the same seven steps, recompute every number, and fold in the same capstone change when it arrives. How many semesters does the program need now?</p>`,
+            data: EX_SCHED_VAR_DATA,
+            steps: schedStepsFor(EX_SCHED_VAR_DATA),
+            answer: 6,
+            verify(M) { return schedVerify(EX_SCHED_VAR_DATA, 6); },
+          },
+        ],
+        draw: design7Draw(EX_SCHED_DATA),
+      },
+      /* ---------------------------------------------------------------- worked example 3 */
+      {
+        title: 'Worked example: designing an access rule and checking its form',
+        kind: 'example',
+        id: 'ex-access-rule',
+        problem: String.raw`<p>The campus makerspace door unlocks for a student who badges in exactly when the student is enrolled, has paid fees or holds a fee waiver, and is not suspended. The office circulates the rule in the long form \((E \land P \land \lnot S) \lor (E \land W \land \lnot S) \lor (E \land P \land W \land \lnot S)\). Take the design through the seven steps of the loop — understand, model, specify, analyze, count, verify, measure — decide whether the short form \(E \land (P \lor W) \land \lnot S\) is really the same rule, and fold in any new condition that arrives.</p>`,
+        objective: 'Design a grant/deny rule as a Boolean formula, count its granting truth-table rows, verify a proposed form of the rule by exhaustive row-by-row comparison, and fold in an added condition.',
+        data: EX_ACCESS_DATA,
+        steps: accessStepsFor(EX_ACCESS_DATA),
+        answer: 3,
+        verify(M) { return accessVerify(EX_ACCESS_DATA, { grant: 3, orig: 3, revGrant: 3, revRows: 32 }); },
+        variants: [
+          {
+            label: 'Variant: the promo-code shortcut',
+            problem: String.raw`<p>The checkout version of the same design problem (the promo-code scenario from the pick-the-structure lab): apply a discount exactly when the code is valid, unexpired, and not already used by this customer. A teammate proposes the shorter rule \((V \land \lnot X) \lor (V \land \lnot U)\) — valid and unexpired, or valid and unused. Take it through the same seven steps, check the proposal against the specification on every row, and fold in any new condition that arrives.</p>`,
+            data: EX_ACCESS_VAR_DATA,
+            steps: accessStepsFor(EX_ACCESS_VAR_DATA),
+            answer: 1,
+            verify(M) { return accessVerify(EX_ACCESS_VAR_DATA, { grant: 1, orig: 3, revGrant: 1, revRows: 16 }); },
+          },
+        ],
+        draw: design7Draw(EX_ACCESS_DATA),
       },
       /* ---------------------------------------------------------------- 12 */
       {

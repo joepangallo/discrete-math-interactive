@@ -1,0 +1,1688 @@
+{
+  "baseline": 1676736,
+  "maxBytes": 2515104,
+  "total": 63,
+  "examples": [
+    {
+      "id": "ex-sort-into-sets",
+      "module": "welcome",
+      "num": 0,
+      "title": "Worked example: sort the tray (meet the player)",
+      "objective": "Learn the worked-example player controls (Step, Play, prediction checkpoints and the preset switcher) while sorting numbers into even/odd and prime/composite sets.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": {
+        "evens": [
+          6,
+          10,
+          14
+        ],
+        "odds": [
+          7,
+          13,
+          21
+        ],
+        "primes": [
+          7,
+          13
+        ],
+        "composites": [
+          6,
+          10,
+          14,
+          21
+        ],
+        "neither": []
+      },
+      "variants": [
+        {
+          "label": "Variant: a tray with troublemakers",
+          "steps": 8,
+          "checkpoints": 1,
+          "answer": {
+            "evens": [
+              2,
+              8,
+              12
+            ],
+            "odds": [
+              1,
+              5,
+              27
+            ],
+            "primes": [
+              2,
+              5
+            ],
+            "composites": [
+              8,
+              12,
+              27
+            ],
+            "neither": [
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-shortest-route",
+      "module": "welcome",
+      "num": 0,
+      "title": "Worked example: the shortest route across campus",
+      "objective": "Learn prediction checkpoints and answer-checking on the player while finding the shortest route through a small weighted graph, settling one vertex at a time.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": {
+        "route": [
+          "Gate",
+          "Fountain",
+          "Library",
+          "Cafe",
+          "Lab",
+          "Dorm"
+        ],
+        "minutes": 9
+      },
+      "variants": [
+        {
+          "label": "Variant: the tempting direct road",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": {
+            "route": [
+              "Gate",
+              "Library",
+              "Cafe",
+              "Lab",
+              "Dorm"
+            ],
+            "minutes": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-power-set",
+      "module": "sets",
+      "num": 1,
+      "title": "Worked example: building a power set by doubling",
+      "objective": "Build a power set by the include/exclude decision process, watching the subset count double at each element until it reaches 2^n.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": [
+        "∅",
+        "{a}",
+        "{b}",
+        "{a, b}",
+        "{c}",
+        "{a, c}",
+        "{b, c}",
+        "{a, b, c}"
+      ],
+      "variants": [
+        {
+          "label": "Variant: the two-element case",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": [
+            "∅",
+            "{p}",
+            "{q}",
+            "{p, q}"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-cartesian-product",
+      "module": "sets",
+      "num": 1,
+      "title": "Worked example: building A × B on a grid",
+      "objective": "Build a Cartesian product A × B cell by cell on a grid and count the ordered pairs with the product rule |A × B| = |A| · |B|.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": [
+        "(S, red)",
+        "(S, blue)",
+        "(M, red)",
+        "(M, blue)",
+        "(L, red)",
+        "(L, blue)"
+      ],
+      "variants": [
+        {
+          "label": "Variant: a one-element set",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": [
+            "(one-size, red)",
+            "(one-size, blue)",
+            "(one-size, black)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-venn-shading",
+      "module": "sets",
+      "num": 1,
+      "title": "Worked example: shading (A ∪ B) ∩ C′ on a Venn diagram",
+      "objective": "Compute a compound set expression one sub-expression at a time, tracking each partial result as a shading on a Venn diagram.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": [
+        1,
+        3,
+        4,
+        6,
+        7
+      ],
+      "variants": [
+        {
+          "label": "Variant: (A ∩ B) ∪ C′",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": [
+            1,
+            3,
+            4,
+            5,
+            6,
+            7,
+            9,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-demorgan-membership",
+      "module": "sets",
+      "num": 1,
+      "title": "Worked example: De Morgan’s law by a membership table",
+      "objective": "Prove a De Morgan law for concrete sets by building a membership table and showing that the two sides agree in every row.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": [
+        5,
+        6
+      ],
+      "variants": [
+        {
+          "label": "Variant: the other De Morgan law",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": [
+            1,
+            2,
+            4,
+            5,
+            6
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-truth-table",
+      "module": "logic",
+      "num": 2,
+      "title": "Worked example: a truth table, column by column",
+      "objective": "Build a truth table column by column, from the smallest sub-formulas outward, and classify the formula as a tautology, a contradiction, or a contingency.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": "tautology",
+      "variants": [
+        {
+          "label": "Variant: reversed conclusion",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": "contingency"
+        }
+      ]
+    },
+    {
+      "id": "ex-negated-conditional",
+      "module": "logic",
+      "num": 2,
+      "title": "Worked example: rewriting a negated conditional",
+      "objective": "Rewrite a negated formula by applying named equivalence laws one step at a time, then prove the rewrite by comparing truth-table columns.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "p ∧ ¬q",
+      "variants": [
+        {
+          "label": "Variant: negated disjunction",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": "¬p ∧ q"
+        }
+      ]
+    },
+    {
+      "id": "ex-argument-validity",
+      "module": "logic",
+      "num": 2,
+      "title": "Worked example: is this argument valid?",
+      "objective": "Test an argument for validity by searching its truth table for a counterexample: a row where every premise is true and the conclusion is false.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "invalid",
+      "variants": [
+        {
+          "label": "Variant: a valid argument",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "valid"
+        }
+      ]
+    },
+    {
+      "id": "ex-quantifier-negation",
+      "module": "logic",
+      "num": 2,
+      "title": "Worked example: quantifiers and negation on a small domain",
+      "objective": "Evaluate a quantified statement element by element over a finite domain, then form its negation by flipping the quantifier and check the negation on the same table.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "statement false, negation true",
+      "variants": [
+        {
+          "label": "Variant: an existential statement",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "statement true, negation false"
+        }
+      ]
+    },
+    {
+      "id": "ex-induction-sum",
+      "module": "proofs",
+      "num": 3,
+      "title": "Worked example: the sum formula by induction",
+      "objective": "Prove a closed-form sum formula by mathematical induction, checking the base case and then the inductive step.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "n(n+1)/2",
+      "variants": [
+        {
+          "label": "Variant: sum of odd numbers",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "n^2"
+        }
+      ]
+    },
+    {
+      "id": "ex-sqrt2-contradiction",
+      "module": "proofs",
+      "num": 3,
+      "title": "Worked example: the square root of 2 is irrational",
+      "objective": "Prove a number is irrational by contradiction, using lowest terms and a parity argument to force a shared factor.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "irrational",
+      "variants": [
+        {
+          "label": "Variant: sqrt(3) is irrational",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "irrational"
+        }
+      ]
+    },
+    {
+      "id": "ex-direct-proof-odd-sum",
+      "module": "proofs",
+      "num": 3,
+      "title": "Worked example: a direct proof, inference by inference",
+      "objective": "Prove a parity claim by direct proof, justifying each inference from the hypothesis to the conclusion.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "m + n is even",
+      "variants": [
+        {
+          "label": "Variant: even + even",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "m + n is even"
+        }
+      ]
+    },
+    {
+      "id": "ex-contrapositive-square-even",
+      "module": "proofs",
+      "num": 3,
+      "title": "Worked example: a proof by contrapositive",
+      "objective": "Prove a statement by forming its contrapositive (negate both parts, then swap them) and proving that instead.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "n is even",
+      "variants": [
+        {
+          "label": "Variant: odd square, odd root",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "n is odd"
+        }
+      ]
+    },
+    {
+      "id": "ex-strong-induction-prime-factorization",
+      "module": "proofs",
+      "num": 3,
+      "title": "Worked example: strong induction and prime factorization",
+      "objective": "Prove a claim by strong induction, using several earlier cases at once where ordinary induction offers only one.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "product of primes",
+      "variants": [
+        {
+          "label": "Variant: postage stamps",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "payable with 4-cent and 5-cent stamps"
+        }
+      ]
+    },
+    {
+      "id": "ex-warshall",
+      "module": "relations",
+      "num": 4,
+      "title": "Worked example: transitive closure by Warshall’s algorithm",
+      "objective": "Compute the transitive closure of a relation with Warshall’s algorithm, allowing one intermediate vertex at a time.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": [
+        [
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "variants": [
+        {
+          "label": "Variant: a chain relation",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": [
+            [
+              0,
+              1,
+              1,
+              1
+            ],
+            [
+              0,
+              0,
+              0,
+              1
+            ],
+            [
+              0,
+              1,
+              0,
+              1
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-equivalence-classes",
+      "module": "relations",
+      "num": 4,
+      "title": "Worked example: equivalence classes mod 3",
+      "objective": "Show that a congruence relation is an equivalence relation and partition its set into the equivalence classes.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": [
+        [
+          0,
+          3,
+          6
+        ],
+        [
+          1,
+          4,
+          7
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "variants": [
+        {
+          "label": "Variant: classes mod 4",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": [
+            [
+              0,
+              4,
+              8
+            ],
+            [
+              1,
+              5,
+              9
+            ],
+            [
+              2,
+              6,
+              10
+            ],
+            [
+              3,
+              7,
+              11
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-property-audit",
+      "module": "relations",
+      "num": 4,
+      "title": "Worked example: a property audit of one relation",
+      "objective": "Audit one concrete relation for reflexivity, symmetry, antisymmetry and transitivity, reading each check in its matrix and its digraph at the same time.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "reflexive, antisymmetric — neither an equivalence relation nor a partial order",
+      "variants": [
+        {
+          "label": "Variant: same-parity relation",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "reflexive, symmetric, transitive — an equivalence relation"
+        }
+      ]
+    },
+    {
+      "id": "ex-hasse-divisibility",
+      "module": "relations",
+      "num": 4,
+      "title": "Worked example: from a partial order to its Hasse diagram",
+      "objective": "Build a Hasse diagram from a partial order by deleting reflexive loops and transitive edges, then placing the elements on levels.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "1 → 2, 1 → 3, 2 → 4, 2 → 6, 3 → 6, 4 → 12, 6 → 12",
+      "variants": [
+        {
+          "label": "Variant: subsets of {a, b}",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "∅ → {a}, ∅ → {b}, {a} → {a,b}, {b} → {a,b}"
+        }
+      ]
+    },
+    {
+      "id": "ex-binary-search",
+      "module": "algorithms",
+      "num": 5,
+      "title": "Worked example: binary search for 31",
+      "objective": "Trace binary search probe by probe on a sorted list, tracking lo, hi and mid until the target is found, and report the index together with the probe count.",
+      "steps": 5,
+      "checkpoints": 1,
+      "answer": 5,
+      "variants": [
+        {
+          "label": "Variant: target missing",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": -1
+        }
+      ]
+    },
+    {
+      "id": "ex-insertion-sort",
+      "module": "algorithms",
+      "num": 5,
+      "title": "Worked example: insertion sort, pass by pass",
+      "objective": "Sort a list with insertion sort one pass at a time, growing a sorted prefix from the left and tracking the comparisons and shifts each inserted key costs.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "variants": [
+        {
+          "label": "Variant: already sorted",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": [
+            2,
+            5,
+            9,
+            14,
+            20,
+            27
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-loop-count",
+      "module": "algorithms",
+      "num": 5,
+      "title": "Worked example: counting a nested loop exactly",
+      "objective": "Count the exact number of inner-line executions of a triangular nested loop row by row, accumulate the running total, and check it against the closed form n(n + 1)/2.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": 15,
+      "variants": [
+        {
+          "label": "Variant: inner loop runs to n",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": 25
+        }
+      ]
+    },
+    {
+      "id": "ex-growth-race",
+      "module": "algorithms",
+      "num": 5,
+      "title": "Worked example: a growth race at doubling inputs",
+      "objective": "Compare the growth families n, n log n and n squared by computing exact operation counts at doubling inputs, tracking each doubling factor, and naming the fastest-growing family.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "n²",
+      "variants": [
+        {
+          "label": "Variant: 2ⁿ enters the race",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "2ⁿ"
+        }
+      ]
+    },
+    {
+      "id": "ex-euclid-gcd",
+      "module": "numbers",
+      "num": 6,
+      "title": "Worked example: Euclid’s algorithm for gcd(252, 198)",
+      "objective": "Use Euclid’s algorithm to find the gcd of two integers by repeated division, and justify the answer by dividing both original numbers by the result.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": 18,
+      "variants": [
+        {
+          "label": "Variant: first number smaller",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": 42
+        }
+      ]
+    },
+    {
+      "id": "ex-mod-inverse",
+      "module": "numbers",
+      "num": 6,
+      "title": "Worked example: the inverse of 7 modulo 26",
+      "objective": "Find a modular inverse by running Euclid’s algorithm forward and back-substituting to a Bézout combination, and recognize the gcd test that decides whether an inverse exists at all.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": 15,
+      "variants": [
+        {
+          "label": "Variant: no inverse exists",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "no inverse"
+        }
+      ]
+    },
+    {
+      "id": "ex-fast-power",
+      "module": "numbers",
+      "num": 6,
+      "title": "Worked example: 5^11 mod 13 by repeated squaring",
+      "objective": "Compute a modular power by repeated squaring: expand the exponent in binary, square the base step by step while reducing mod m, and multiply in only the powers selected by the 1-bits.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": 8,
+      "variants": [
+        {
+          "label": "Variant: exponent is a power of two",
+          "steps": 9,
+          "checkpoints": 1,
+          "answer": 4
+        }
+      ]
+    },
+    {
+      "id": "ex-sieve-primes",
+      "module": "numbers",
+      "num": 6,
+      "title": "Worked example: the sieve up to 30",
+      "objective": "Find all primes up to a stated bound with the sieve of Eratosthenes, crossing out multiples prime by prime starting at each prime squared, and check the surviving list by independent trial division.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": [
+        2,
+        3,
+        5,
+        7,
+        11,
+        13,
+        17,
+        19,
+        23,
+        29
+      ],
+      "variants": [
+        {
+          "label": "Variant: sieve up to 50",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": [
+            2,
+            3,
+            5,
+            7,
+            11,
+            13,
+            17,
+            19,
+            23,
+            29,
+            31,
+            37,
+            41,
+            43,
+            47
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-choose-collapse",
+      "module": "counting",
+      "num": 7,
+      "title": "Worked example: ordered picks collapse into committees",
+      "objective": "Learn why combinations come from permutations by dividing out the r! orders of each group, watching every committee get overcounted the same number of times.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": 4,
+      "variants": [
+        {
+          "label": "Variant: choose 2 of 5",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": 10
+        }
+      ]
+    },
+    {
+      "id": "ex-pascal-build",
+      "module": "counting",
+      "num": 7,
+      "title": "Worked example: building Pascal’s triangle to find C(5, 2)",
+      "objective": "Learn to build Pascal’s triangle row by row using only the addition rule for neighboring entries, then read a binomial coefficient straight from the finished row.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": 10,
+      "variants": [
+        {
+          "label": "Variant: C(6, 3)",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": 20
+        }
+      ]
+    },
+    {
+      "id": "ex-choice-tree",
+      "module": "counting",
+      "num": 7,
+      "title": "Worked example: a choice tree for the product and sum rules",
+      "objective": "Build a multi-stage choice as a tree level by level to apply the product rule, then add a disjoint alternatives group with the sum rule.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": 8,
+      "variants": [
+        {
+          "label": "Variant: a stage with one option",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": 7
+        }
+      ]
+    },
+    {
+      "id": "ex-inclusion-exclusion",
+      "module": "counting",
+      "num": 7,
+      "title": "Worked example: inclusion-exclusion on a Venn diagram",
+      "objective": "Count the union of two overlapping sets with inclusion-exclusion, tracking each region of the Venn diagram so the overlap is neither missed nor counted twice.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": 26,
+      "variants": [
+        {
+          "label": "Variant: disjoint clubs",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": 24
+        }
+      ]
+    },
+    {
+      "id": "ex-pigeonhole",
+      "module": "counting",
+      "num": 7,
+      "title": "Worked example: pigeonhole — how many socks guarantee a pair?",
+      "objective": "Use the pigeonhole principle by building the worst case placement by placement, so the guarantee is the first draw that has nowhere safe to go.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": 4,
+      "variants": [
+        {
+          "label": "Variant: guarantee three of a color",
+          "steps": 9,
+          "checkpoints": 1,
+          "answer": 7
+        }
+      ]
+    },
+    {
+      "id": "ex-hanoi-moves",
+      "module": "recurrences",
+      "num": 8,
+      "title": "Worked example: Tower of Hanoi in 7 moves",
+      "objective": "Learn how the recursive Tower of Hanoi strategy builds an optimal move sequence one subproblem at a time, and why n disks always take exactly 2^n − 1 moves.",
+      "steps": 9,
+      "checkpoints": 1,
+      "answer": 7,
+      "variants": [
+        {
+          "label": "Variant: 4 disks",
+          "steps": 17,
+          "checkpoints": 1,
+          "answer": 15
+        }
+      ]
+    },
+    {
+      "id": "ex-recurrence-iteration",
+      "module": "recurrences",
+      "num": 8,
+      "title": "Worked example: iterating a recurrence to a closed form",
+      "objective": "Learn to solve a first-order recurrence by iterating it, spotting the pattern in a shifted column of terms, and proving the guessed closed form by induction.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "2^n − 1",
+      "variants": [
+        {
+          "label": "Variant: 3a(n-1) + 1",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "(3^n − 1)/2"
+        }
+      ]
+    },
+    {
+      "id": "ex-recursion-tree",
+      "module": "recurrences",
+      "num": 8,
+      "title": "Worked example: a recursion tree with level costs",
+      "objective": "Expand a recursion tree level by level, compute the work per level and the leaf total, and add the level totals to solve a divide-and-conquer recurrence.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": 32,
+      "variants": [
+        {
+          "label": "Variant: branching factor 3",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": 65
+        }
+      ]
+    },
+    {
+      "id": "ex-characteristic-roots",
+      "module": "recurrences",
+      "num": 8,
+      "title": "Worked example: characteristic roots with initial conditions",
+      "objective": "Solve a two-term linear recurrence by forming and factoring its characteristic equation, applying the initial conditions to fix the constants, and checking the closed form against iterated terms.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": "5·2^n + 2·3^n",
+      "variants": [
+        {
+          "label": "Variant: a repeated root",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": "(1 + n)·2^n"
+        }
+      ]
+    },
+    {
+      "id": "ex-euler-audit",
+      "module": "graphs",
+      "num": 9,
+      "title": "Worked example: Euler audit and building a circuit",
+      "objective": "Audit the degree parity of every vertex to decide whether an Euler trail exists, then trace a circuit edge by edge, marking each edge used exactly once.",
+      "steps": 13,
+      "checkpoints": 1,
+      "answer": {
+        "verdict": "circuit",
+        "circuit": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "C",
+          "A"
+        ],
+        "odd": []
+      },
+      "variants": [
+        {
+          "label": "Variant: four odd vertices",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": {
+            "verdict": "none",
+            "odd": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-rep-degrees-path",
+      "module": "graphs",
+      "num": 9,
+      "title": "Worked example: adjacency list, degrees and a path",
+      "objective": "Build the adjacency list of a small graph from its picture, read every degree off the list, check the handshake sum, and use the list to settle a path question.",
+      "steps": 9,
+      "checkpoints": 1,
+      "answer": {
+        "adj": {
+          "A": [
+            "B",
+            "C"
+          ],
+          "B": [
+            "A",
+            "C",
+            "D"
+          ],
+          "C": [
+            "A",
+            "B",
+            "D"
+          ],
+          "D": [
+            "B",
+            "C",
+            "E"
+          ],
+          "E": [
+            "D"
+          ]
+        },
+        "deg": {
+          "A": 2,
+          "B": 3,
+          "C": 3,
+          "D": 3,
+          "E": 1
+        },
+        "edges": 6,
+        "path": [
+          "A",
+          "B",
+          "D",
+          "E"
+        ]
+      },
+      "variants": [
+        {
+          "label": "Variant: an isolated vertex",
+          "steps": 9,
+          "checkpoints": 1,
+          "answer": {
+            "adj": {
+              "A": [
+                "B",
+                "C"
+              ],
+              "B": [
+                "A",
+                "D"
+              ],
+              "C": [
+                "A",
+                "D"
+              ],
+              "D": [
+                "B",
+                "C"
+              ],
+              "E": []
+            },
+            "deg": {
+              "A": 2,
+              "B": 2,
+              "C": 2,
+              "D": 2,
+              "E": 0
+            },
+            "edges": 4,
+            "path": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-dfs-stack",
+      "module": "graphs",
+      "num": 9,
+      "title": "Worked example: depth-first search with a stack",
+      "objective": "Run depth-first search with an explicit stack, showing every push and pop, the discovery order, the dead-end backtracks, and what happens to a stale stack entry.",
+      "steps": 9,
+      "checkpoints": 1,
+      "answer": {
+        "order": [
+          "A",
+          "B",
+          "D",
+          "E",
+          "F",
+          "C"
+        ]
+      },
+      "variants": [
+        {
+          "label": "Variant: a second component",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": {
+            "order": [
+              "A",
+              "B",
+              "D",
+              "C"
+            ],
+            "unvisited": [
+              "E",
+              "F"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-graph-coloring",
+      "module": "graphs",
+      "num": 9,
+      "title": "Worked example: coloring a graph, checking conflicts",
+      "objective": "Color a graph greedily in a stated vertex order, ruling colors out from neighbor conflicts at each step, and prove the number of colors used cannot be reduced.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": {
+        "colors": {
+          "A": 1,
+          "B": 2,
+          "C": 3,
+          "D": 1,
+          "E": 2
+        },
+        "used": 3
+      },
+      "variants": [
+        {
+          "label": "Variant: K4 needs a fourth color",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": {
+            "colors": {
+              "A": 1,
+              "B": 2,
+              "C": 3,
+              "D": 4
+            },
+            "used": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-bfs-order",
+      "module": "graphs",
+      "num": 9,
+      "title": "Worked example: breadth-first search order and layers",
+      "objective": "Run breadth-first search from a source vertex and read off the visit order and the layer (the fewest edges from the source) of every vertex it reaches.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": {
+        "order": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F"
+        ],
+        "dist": {
+          "A": 0,
+          "B": 1,
+          "C": 1,
+          "D": 2,
+          "E": 2,
+          "F": 3
+        }
+      },
+      "variants": [
+        {
+          "label": "Variant: disconnected graph",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": {
+            "order": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E"
+            ],
+            "dist": {
+              "A": 0,
+              "B": 1,
+              "C": 1,
+              "D": 2,
+              "E": 2
+            },
+            "unreached": [
+              "F"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-dijkstra",
+      "module": "graphs",
+      "num": 9,
+      "title": "Worked example: Dijkstra shortest distances from A",
+      "objective": "Run Dijkstra's algorithm one settled vertex at a time, relaxing edges after each settle, to find the shortest distance from the source to every reachable vertex.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": {
+        "A": 0,
+        "B": 3,
+        "C": 2,
+        "D": 8,
+        "E": 10
+      },
+      "variants": [
+        {
+          "label": "Variant: unreachable vertex",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": {
+            "A": 0,
+            "B": 3,
+            "C": 2,
+            "D": 8,
+            "E": 10,
+            "F": "unreachable"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-bst-insert",
+      "module": "trees",
+      "num": 10,
+      "title": "Worked example: building a binary search tree by insertion",
+      "objective": "Build a binary search tree by inserting keys one at a time, following the smaller-left, larger-right rule at every node, and read the result with an inorder traversal.",
+      "steps": 9,
+      "checkpoints": 1,
+      "answer": [
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80
+      ],
+      "variants": [
+        {
+          "label": "Variant: sorted keys (degenerate)",
+          "steps": 8,
+          "checkpoints": 1,
+          "answer": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ex-huffman",
+      "module": "trees",
+      "num": 10,
+      "title": "Worked example: building a Huffman code",
+      "objective": "Build a Huffman code by repeatedly merging the two lightest trees, then read each codeword off its root-to-leaf path and compute the expected code length.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": {
+        "lengths": {
+          "A": 1,
+          "B": 3,
+          "C": 3,
+          "D": 3,
+          "E": 4,
+          "F": 4
+        },
+        "wpl": 224
+      },
+      "variants": [
+        {
+          "label": "Variant: equal frequencies",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": {
+            "lengths": {
+              "A": 2,
+              "B": 2,
+              "C": 2,
+              "D": 2
+            },
+            "wpl": 80
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-bst-search",
+      "module": "trees",
+      "num": 10,
+      "title": "Worked example: searching a binary search tree",
+      "objective": "Search a binary search tree by following one root-to-leaf comparison path, once for a key that is present and once for a key whose absence is proved by an empty link.",
+      "steps": 5,
+      "checkpoints": 1,
+      "answer": {
+        "target": 40,
+        "found": true,
+        "path": [
+          50,
+          30,
+          40
+        ],
+        "comparisons": 3
+      },
+      "variants": [
+        {
+          "label": "Variant: target missing",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": {
+            "target": 65,
+            "found": false,
+            "path": [
+              50,
+              70,
+              60
+            ],
+            "comparisons": 3,
+            "insertAs": "right child of 60"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-tree-traversals",
+      "module": "trees",
+      "num": 10,
+      "title": "Worked example: three traversals of one tree",
+      "objective": "List one binary tree in preorder, inorder and postorder by applying each visiting rule recursively, and see how the same three rules act on a skewed tree.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": {
+        "preorder": [
+          "A",
+          "B",
+          "D",
+          "E",
+          "G",
+          "C",
+          "F",
+          "H"
+        ],
+        "inorder": [
+          "D",
+          "B",
+          "G",
+          "E",
+          "A",
+          "C",
+          "H",
+          "F"
+        ],
+        "postorder": [
+          "D",
+          "G",
+          "E",
+          "B",
+          "H",
+          "F",
+          "C",
+          "A"
+        ]
+      },
+      "variants": [
+        {
+          "label": "Variant: a skewed chain",
+          "steps": 8,
+          "checkpoints": 1,
+          "answer": {
+            "preorder": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E",
+              "F",
+              "G",
+              "H"
+            ],
+            "inorder": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E",
+              "F",
+              "G",
+              "H"
+            ],
+            "postorder": [
+              "H",
+              "G",
+              "F",
+              "E",
+              "D",
+              "C",
+              "B",
+              "A"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-mst-kruskal",
+      "module": "trees",
+      "num": 10,
+      "title": "Worked example: a minimum spanning tree by Kruskal",
+      "objective": "Run Kruskal’s algorithm on a stated weighted graph, accepting or rejecting each link by the cycle test, until the accepted links form a minimum spanning tree.",
+      "steps": 13,
+      "checkpoints": 1,
+      "answer": {
+        "edges": [
+          "E–F",
+          "D–E",
+          "A–D",
+          "A–B",
+          "C–E",
+          "D–G",
+          "E–H"
+        ],
+        "total": 38
+      },
+      "variants": [
+        {
+          "label": "Variant: six stations, a tempting triangle",
+          "steps": 9,
+          "checkpoints": 1,
+          "answer": {
+            "edges": [
+              "A–B",
+              "B–C",
+              "C–D",
+              "D–E",
+              "E–F"
+            ],
+            "total": 19
+          }
+        }
+      ]
+    },
+    {
+      "id": "ex-maxflow",
+      "module": "networks",
+      "num": 11,
+      "title": "Worked example: maximum flow by augmenting paths",
+      "objective": "Find a maximum flow by repeatedly pushing the bottleneck amount along an augmenting path, then certify the result with a cut of equal capacity.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": 17,
+      "variants": [
+        {
+          "label": "Variant: the trap — a backward step",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": 2
+        }
+      ]
+    },
+    {
+      "id": "ex-mincut",
+      "module": "networks",
+      "num": 11,
+      "title": "Worked example: a minimum cut from the residual network",
+      "objective": "Read a minimum cut off the final residual network: mark the vertices reachable from s, then add the capacities of the edges leaving that set.",
+      "steps": 5,
+      "checkpoints": 1,
+      "answer": 17,
+      "variants": [
+        {
+          "label": "Variant: the cheap cut sits near s",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": 12
+        }
+      ]
+    },
+    {
+      "id": "ex-flow-audit",
+      "module": "networks",
+      "num": 11,
+      "title": "Worked example: auditing a flow, vertex by vertex",
+      "objective": "Verify a stated flow assignment by auditing both flow rules directly: capacity on every edge, then inflow against outflow at each intermediate vertex, summed from the edge list.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": 10,
+      "variants": [
+        {
+          "label": "Variant: one vertex does not balance",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": "invalid at c"
+        }
+      ]
+    },
+    {
+      "id": "ex-reverse-reroute",
+      "module": "networks",
+      "num": 11,
+      "title": "Worked example: the augmenting path that has to cancel flow",
+      "objective": "Run Ford–Fulkerson with depth-first path choices on a network where greedy choices block the optimum, and explain the backward residual step — why canceling flow is legal and what the rerouting buys.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": 8,
+      "variants": [
+        {
+          "label": "Variant: a wider last link, no cancellation needed",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": 8
+        }
+      ]
+    },
+    {
+      "id": "ex-kmap",
+      "module": "boolean",
+      "num": 12,
+      "title": "Worked example: minimizing with a Karnaugh map",
+      "objective": "Use a Karnaugh map to merge neighboring 1s into the largest possible groups and read off a minimal sum of products.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "c′ + ab′",
+      "variants": [
+        {
+          "label": "Variant: one group of 4",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": "c"
+        }
+      ]
+    },
+    {
+      "id": "ex-adder-eval",
+      "module": "boolean",
+      "num": 12,
+      "title": "Worked example: evaluating a ripple-carry adder",
+      "objective": "Evaluate a ripple-carry adder one column at a time from the least significant bit, tracking every carry, until the full sum including the final carry-out is known.",
+      "steps": 7,
+      "checkpoints": 1,
+      "answer": "10001",
+      "variants": [
+        {
+          "label": "Variant: a carry in every column",
+          "steps": 7,
+          "checkpoints": 1,
+          "answer": "10000"
+        }
+      ]
+    },
+    {
+      "id": "ex-truth-table-sop",
+      "module": "boolean",
+      "num": 12,
+      "title": "Worked example: from a truth table to a sum of minterms",
+      "objective": "Turn a truth table into the canonical sum of minterms by writing one full product term for each row where the function is 1.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": "x′yz′ + x′yz + xy′z + xyz",
+      "variants": [
+        {
+          "label": "Variant: a single 1-row",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": "xyz′"
+        }
+      ]
+    },
+    {
+      "id": "ex-simplify-laws",
+      "module": "boolean",
+      "num": 12,
+      "title": "Worked example: simplifying an expression law by law",
+      "objective": "Simplify a Boolean expression by applying one named algebra law at a time until no law can shrink it further, then confirm the equivalence on every truth-table row.",
+      "steps": 9,
+      "checkpoints": 1,
+      "answer": "x + z",
+      "variants": [
+        {
+          "label": "Variant: idempotent first",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": "xy + z′"
+        }
+      ]
+    },
+    {
+      "id": "ex-dice-sample-space",
+      "module": "probability",
+      "num": 13,
+      "title": "Worked example: two dice, building the sample space",
+      "objective": "Construct the 36-pair sample space for two dice as a grid, mark an event on it, and compute the probability as a reduced fraction of the two counts.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "1/6",
+      "variants": [
+        {
+          "label": "Variant: the boundary sum 12",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "1/36"
+        }
+      ]
+    },
+    {
+      "id": "ex-conditional-independence",
+      "module": "probability",
+      "num": 13,
+      "title": "Worked example: conditional probability and an independence test",
+      "objective": "Compute a conditional probability by restricting the sample space to the given event, then test independence by comparing the exact fractions P(A and B) and P(A) times P(B).",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "1/5, dependent",
+      "variants": [
+        {
+          "label": "Variant: a pair that is independent",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "1/2, independent"
+        }
+      ]
+    },
+    {
+      "id": "ex-expected-value-game",
+      "module": "probability",
+      "num": 13,
+      "title": "Worked example: expected value, term by term",
+      "objective": "Build an expected value one term at a time from a payout table, keep a running total, and interpret the result as a fair price and a long-run average.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "1/6",
+      "variants": [
+        {
+          "label": "Variant: the top prize drops to $3",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "-1/6"
+        }
+      ]
+    },
+    {
+      "id": "ex-bayes-dots",
+      "module": "probability",
+      "num": 13,
+      "title": "Worked example: Bayes with 1,000 dots",
+      "objective": "Use natural frequencies — counts out of 1,000 people — to find the probability that a positive test result is a true case, keeping the base rate in sight the whole way.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "19/68",
+      "variants": [
+        {
+          "label": "Variant: a much commoner condition",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "19/28"
+        }
+      ]
+    },
+    {
+      "id": "ex-binomial-tree",
+      "module": "probability",
+      "num": 13,
+      "title": "Worked example: exactly 2 heads in 4 flips, by tree",
+      "objective": "Build the full outcome tree for repeated coin flips, collect the leaves with the target head count, and turn the leaf count into a probability.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "3/8",
+      "variants": [
+        {
+          "label": "Variant: 3 flips instead of 4",
+          "steps": 5,
+          "checkpoints": 1,
+          "answer": "3/8"
+        }
+      ]
+    },
+    {
+      "id": "ex-duplicate-signups",
+      "module": "design",
+      "num": 14,
+      "title": "Worked example: designing the duplicate sign-up check",
+      "objective": "Run one real design problem through the whole loop — model, specification, cost analysis, then verification — and let the counting, not taste, choose the data structure.",
+      "steps": 6,
+      "checkpoints": 1,
+      "answer": "hash set",
+      "variants": [
+        {
+          "label": "Variant: the 32-bit hash shortcut",
+          "steps": 6,
+          "checkpoints": 1,
+          "answer": "full addresses"
+        }
+      ]
+    },
+    {
+      "id": "ex-course-schedule",
+      "module": "design",
+      "num": 14,
+      "title": "Worked example: designing a prerequisite-proof course schedule",
+      "objective": "Design a course schedule by modeling prerequisites as a directed acyclic graph, computing earliest semesters from the longest chain, verifying the plan mechanically against every prerequisite pair, and folding in a changed requirement.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": 5,
+      "variants": [
+        {
+          "label": "Variant: CS2 also requires M2",
+          "steps": 8,
+          "checkpoints": 1,
+          "answer": 6
+        }
+      ]
+    },
+    {
+      "id": "ex-access-rule",
+      "module": "design",
+      "num": 14,
+      "title": "Worked example: designing an access rule and checking its form",
+      "objective": "Design a grant/deny rule as a Boolean formula, count its granting truth-table rows, verify a proposed form of the rule by exhaustive row-by-row comparison, and fold in an added condition.",
+      "steps": 8,
+      "checkpoints": 1,
+      "answer": 3,
+      "variants": [
+        {
+          "label": "Variant: the promo-code shortcut",
+          "steps": 8,
+          "checkpoints": 1,
+          "answer": 1
+        }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import vm from 'node:vm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -86,8 +87,9 @@ if (/<!--(HEAD|BODY)-->/.test(full)) throw new Error('a template marker survived
 const minBytes = mods.length === modFiles.length ? 1200 * 1024 : 120 * 1024; // the full course is about 1.6 MB; a welcome-only build about 160 KB
 if (full.length < minBytes) throw new Error(`output is suspiciously small (${full.length} bytes for ${mods.length} module files)`);
 /* Worked examples build their pictures at run time and embed no images, so the page must stay
-   lean: a hard ceiling catches a change that starts inlining assets or runaway generated data. */
-const maxBytes = 2.2 * 1024 * 1024;
+   lean: a hard ceiling catches a change that starts inlining assets or runaway generated data.
+   The ceiling is 1.5x the original 1,676,736-byte page (the Codex size rule, SPEC2 section 3). */
+const maxBytes = 2515104;
 const outBytes = Buffer.byteLength(full, 'utf8');
 if (mods.length === modFiles.length && outBytes > maxBytes) throw new Error(`output is too large (${outBytes} bytes, ceiling ${maxBytes}); build states and pictures at run time instead of embedding them`);
 writeFileSync(out, full);
@@ -97,6 +99,38 @@ console.log(`wrote ${out} (${(full.length / 1024).toFixed(0)} KB, ${mods.length}
 if (!opt['no-index'] && out === resolve(join(root, 'discrete-math-interactive.html'))) {
   const stub = `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Discrete Mathematics &amp; Probability</title><meta http-equiv="refresh" content="0; url=discrete-math-interactive.html"><link rel="canonical" href="discrete-math-interactive.html"></head>\n<body><p>Opening the course… <a href="discrete-math-interactive.html">Continue</a></p></body></html>\n`;
   writeFileSync(join(root, 'index.html'), stub);
+}
+
+/* Coverage manifest (SPEC2 section 2): a machine-readable list of every worked example — id,
+   module, objective, step and checkpoint counts, variants — regenerated on every full build by
+   loading the modules in the same bare sandbox the unit tests use. tests/examples.test.mjs
+   re-derives the same data from source and fails if this file drifts from it. */
+if (mods.length === modFiles.length) {
+  const found = [];
+  const sandbox = { DM: { module: (m) => found.push(m), hlPy: (x) => x, renderMath: () => {}, modules: [], util: {}, kinds: {} }, console };
+  sandbox.globalThis = sandbox;
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(util, sandbox, { filename: 'util.js' });
+  for (const [f, js] of libs) vm.runInContext(js, sandbox, { filename: f });
+  for (const f of modFiles) vm.runInContext(readFileSync(join(here, 'modules', f), 'utf8'), sandbox, { filename: f });
+  const strip = (s) => String(s ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  const entries = [];
+  for (const m of [...found].sort((a, b) => a.num - b.num)) {
+    for (const sl of m.slides) {
+      if (sl.kind !== 'example') continue;
+      entries.push({
+        id: sl.id, module: m.id, num: m.num, title: strip(sl.title), objective: strip(sl.objective),
+        steps: sl.steps.length, checkpoints: sl.steps.filter((st) => st.checkpoint).length, answer: sl.answer,
+        variants: (Array.isArray(sl.variants) ? sl.variants : []).map((v) => ({
+          label: v.label, steps: v.steps.length, checkpoints: v.steps.filter((st) => st.checkpoint).length, answer: v.answer,
+        })),
+      });
+    }
+  }
+  const manifest = { baseline: 1676736, maxBytes, total: entries.length, examples: entries };
+  writeFileSync(join(root, 'examples-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+  console.log(`wrote examples-manifest.json (${entries.length} worked examples)`);
 }
 
 if (opt.artifact) {

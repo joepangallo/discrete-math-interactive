@@ -299,28 +299,335 @@
   const INVARIANT_CODE = ['total, k = 0, 0', 'while k < n:', '    k += 1', '    total += k', '# invariant: total == 1 + 2 + ... + k'].map(DM.hlPy).join('\n');
   const RECURSION_CODE = ['def sum_to(n):', '    return 0 if n == 0 else sum_to(n - 1) + n'].map(DM.hlPy).join('\n');
 
-  // ---- worked example: the sum formula by induction, as proof lines plus the domino strip ----
-  const EX_IND_ROWS = [
-    { tag: 'The claim', html: String.raw`\(P(n):\ 1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every integer \(n \ge 1\). Induction needs two things: a <b>base case</b> and an <b>inductive step</b>.` },
-    { tag: 'Base case', html: String.raw`\(n = 1\): the left side is \(1\), and the right side is \(\dfrac{1 \cdot 2}{2} = 1\). The two sides agree, so \(P(1)\) is true.` },
-    { tag: 'Inductive hypothesis', html: String.raw`Assume \(P(k)\) is true for one fixed \(k \ge 1\): \(\;1 + 2 + \cdots + k = \dfrac{k(k+1)}{2}\).` },
-    { tag: 'The goal', html: String.raw`Show \(P(k+1)\): \(\;1 + 2 + \cdots + k + (k+1) = \dfrac{(k+1)(k+2)}{2}\).` },
-    { tag: 'Algebra', html: String.raw`\((1 + \cdots + k) + (k+1) = \dfrac{k(k+1)}{2} + (k+1)\) <span class="muted">[by the inductive hypothesis]</span>` },
-    { tag: '', html: String.raw`\(= \)<span class="hl">\((k+1)\)</span>\(\left(\dfrac{k}{2} + 1\right)\) <span class="muted">[factor out \(k+1\)]</span>` },
-    { tag: '', html: String.raw`\(= \dfrac{(k+1)(k+2)}{2}\) — exactly the goal, so \(P(k) \to P(k+1)\).` },
-    { tag: 'Conclusion', html: String.raw`By induction, \(P(n)\) is true for every positive integer \(n\). ∎` },
-  ];
-  const EX_IND_TOTAL = 6; // dominoes in the strip
+  // ---- worked examples: induction proofs, built by one shared generator ----
+  // Each preset is described by a spec: the claim's tex rows plus plain-text pieces the captions
+  // are assembled from. indStepsFor(spec) zips the specs into the shared step shape (proof lines
+  // revealed so far + dominoes fallen), so the variant's steps are computed from its own spec by
+  // exactly the code that builds the primary's.
+  function indRowsFor(spec) {
+    return [
+      { tag: 'The claim', html: String.raw`\(P(n):\ ${spec.claimTex}\) for every integer \(n \ge 1\). Induction needs two things: a <b>base case</b> and an <b>inductive step</b>.` },
+      { tag: 'Base case', html: spec.baseHtml },
+      { tag: 'Inductive hypothesis', html: String.raw`Assume \(P(k)\) is true for one fixed \(k \ge 1\): \(\;${spec.hypTex}\).` },
+      { tag: 'The goal', html: String.raw`Show \(P(k+1)\): \(\;${spec.goalTex}\).` },
+      { tag: 'Algebra', html: spec.algebraHtml[0] },
+      { tag: '', html: spec.algebraHtml[1] },
+      { tag: '', html: spec.algebraHtml[2] },
+      { tag: 'Conclusion', html: String.raw`By induction, \(P(n)\) is true for every positive integer \(n\). ∎` },
+    ];
+  }
+  function indStepsFor(spec) {
+    const lines = [1, 2, 3, 4, 7, 8], fallen = [0, 1, 2, 2, 3, 6];
+    return spec.captions.map((caption, i) => {
+      const st = { lines: lines[i], fallen: fallen[i], caption };
+      if (i === spec.checkpointAt) st.checkpoint = spec.checkpoint;
+      if (i === spec.captions.length - 1) st.answer = true;
+      return st;
+    });
+  }
+  function indDataFor(spec) {
+    return { rows: indRowsFor(spec), total: 6, answerBanner: spec.answerBanner };
+  }
+  const EX_IND_SPEC = {
+    claimTex: String.raw`1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}`,
+    baseHtml: String.raw`\(n = 1\): the left side is \(1\), and the right side is \(\dfrac{1 \cdot 2}{2} = 1\). The two sides agree, so \(P(1)\) is true.`,
+    hypTex: String.raw`1 + 2 + \cdots + k = \dfrac{k(k+1)}{2}`,
+    goalTex: String.raw`1 + 2 + \cdots + k + (k+1) = \dfrac{(k+1)(k+2)}{2}`,
+    algebraHtml: [
+      String.raw`\((1 + \cdots + k) + (k+1) = \dfrac{k(k+1)}{2} + (k+1)\) <span class="muted">[by the inductive hypothesis]</span>`,
+      String.raw`\(= \)<span class="hl">\((k+1)\)</span>\(\left(\dfrac{k}{2} + 1\right)\) <span class="muted">[factor out \(k+1\)]</span>`,
+      String.raw`\(= \dfrac{(k+1)(k+2)}{2}\) — exactly the goal, so \(P(k) \to P(k+1)\).`,
+    ],
+    captions: [
+      'State the claim as P(n) and name the two things induction needs: a base case and an inductive step. In the domino picture from the induction lab, the base case tips the first domino, and the inductive step is why each falling domino knocks over the next one.',
+      'The base case checks n = 1 directly: the left side is 1 and the right side is 1 · 2 / 2 = 1, so the two sides agree and P(1) is true. In the picture, the first domino has fallen.',
+      'Next, the inductive hypothesis: assume P(k) is true for one fixed k ≥ 1, that is, 1 + ⋯ + k = k(k+1)/2. We do not prove this line; we assume it for a single k — domino k is falling — and use it to push the next domino over.',
+      'Before doing any algebra, write out the goal for k + 1: 1 + ⋯ + k + (k+1) = (k+1)(k+2)/2. Writing the target first matters because it gives every manipulation that follows a destination to aim at.',
+      'The algebra is the heart of the step: group the sum as (1 + ⋯ + k) + (k+1), replace the bracket with k(k+1)/2 by the inductive hypothesis, then factor out (k+1), highlighted in the middle line, to land exactly on the goal. Domino k has knocked over domino k + 1.',
+      'Answer: by induction, 1 + 2 + ⋯ + n = n(n+1)/2 for every positive integer n, and every domino is down. Spot check at n = 5: 1 + 2 + 3 + 4 + 5 = 15 and 5 · 6 / 2 = 15, so the formula agrees with a direct count.',
+    ],
+    checkpointAt: 3,
+    checkpoint: 'Predict: after the bracket is replaced by k(k+1)/2, which factor will appear in both terms and factor out?',
+    answerBanner: String.raw`Proved: \(1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every positive integer \(n\) · check at \(n = 5\): \(1+2+3+4+5 = 15\) and \(\dfrac{5 \cdot 6}{2} = 15\) ✓`,
+  };
+  const EX_IND_ODD_SPEC = {
+    claimTex: String.raw`1 + 3 + 5 + \cdots + (2n-1) = n^2`,
+    baseHtml: String.raw`\(n = 1\): the left side is the first odd number, \(1\), and the right side is \(1^2 = 1\). The two sides agree, so \(P(1)\) is true.`,
+    hypTex: String.raw`1 + 3 + \cdots + (2k-1) = k^2`,
+    goalTex: String.raw`1 + 3 + \cdots + (2k-1) + (2k+1) = (k+1)^2`,
+    algebraHtml: [
+      String.raw`\((1 + 3 + \cdots + (2k-1)) + (2k+1) = k^2 + (2k+1)\) <span class="muted">[by the inductive hypothesis]</span>`,
+      String.raw`\(= \)<span class="hl">\(k^2 + 2k + 1\)</span> <span class="muted">[add the terms: the new odd number contributes exactly \(2k + 1\)]</span>`,
+      String.raw`\(= (k+1)^2\) — exactly the goal, because \((k+1)^2\) expands to \(k^2 + 2k + 1\), so \(P(k) \to P(k+1)\).`,
+    ],
+    captions: [
+      'State the new claim as P(n): the sum of the first n odd numbers, 1 + 3 + 5 + ⋯ + (2n − 1), should equal n squared. The same two ingredients are needed as before: a base case to start the chain and an inductive step to extend it.',
+      'The base case checks n = 1 directly: the sum of the first one odd number is 1, and the right side is 1 squared, which is also 1, so P(1) is true and the first domino has fallen.',
+      'Next, the inductive hypothesis: assume P(k) is true for one fixed k ≥ 1, that is, 1 + 3 + ⋯ + (2k − 1) = k squared. We assume this line for a single k — domino k is falling — and use it to push the next domino over.',
+      'Before doing any algebra, write out the goal for k + 1: the sum gains the next odd number, 2(k + 1) − 1 = 2k + 1, and the target value is (k + 1) squared. Writing the target first gives the algebra a destination to aim at.',
+      'The algebra is the heart of the step: group the sum as (1 + 3 + ⋯ + (2k − 1)) + (2k + 1), replace the bracket with k squared by the inductive hypothesis, and the total becomes k squared + 2k + 1, which is exactly (k + 1) squared expanded. Domino k has knocked over domino k + 1.',
+      'Answer: by induction, 1 + 3 + ⋯ + (2n − 1) = n squared for every positive integer n, and every domino is down. Spot check at n = 4: 1 + 3 + 5 + 7 = 16 and 4 squared = 16, so the formula agrees with a direct count.',
+    ],
+    checkpointAt: 3,
+    checkpoint: 'Predict: adding the next odd number 2k + 1 to k squared — which perfect square does the total land on?',
+    answerBanner: String.raw`Proved: \(1 + 3 + 5 + \cdots + (2n-1) = n^2\) for every positive integer \(n\) · check at \(n = 4\): \(1+3+5+7 = 16\) and \(4^2 = 16\) ✓`,
+  };
+  const EX_IND_DATA = indDataFor(EX_IND_SPEC);
+  const EX_IND_ODD_DATA = indDataFor(EX_IND_ODD_SPEC);
 
-  // ---- worked example: sqrt(2) is irrational, as stacked deduction lines ----
-  const EX_SQRT_ROWS = [
-    { tag: 'The assumption', html: String.raw`Suppose, for contradiction, that \(\sqrt2 = \dfrac{a}{b}\) for integers \(a, b\) with \(b \ne 0\), in <b>lowest terms</b>: \(a\) and \(b\) share no common factor bigger than \(1\).` },
-    { tag: 'Square', html: String.raw`Squaring both sides and clearing the fraction: \(\;a^2 = 2b^2\). So \(a^2\) is <b>even</b>, because it is \(2\) times the integer \(b^2\).` },
-    { tag: 'Parity', html: String.raw`An odd number squared is odd: \((2m+1)^2 = 4m^2 + 4m + 1 = 2(2m^2 + 2m) + 1\). Since \(a^2\) is even, \(a\) itself is <b>even</b>.` },
-    { tag: 'Substitute', html: String.raw`Write \(a = 2c\). Then \((2c)^2 = 2b^2\), so \(4c^2 = 2b^2\), and dividing by \(2\): \(\;b^2 = 2c^2\). Now \(b^2\) is even too.` },
-    { tag: 'Contradiction', warn: true, html: String.raw`By the same parity argument, \(b\) is <b>even</b> too. So \(a\) and \(b\) share the factor \(2\), which contradicts lowest terms.` },
-    { tag: 'Conclusion', html: String.raw`The assumption was false, so no such fraction exists: \(\sqrt2\) is <b>irrational</b>. ∎` },
-  ];
+  // ---- worked examples: irrationality by contradiction, built by one shared generator ----
+  // Both presets run the same argument shape — assume a lowest-terms fraction, square, use a
+  // divisibility lemma to push the prime d from a onto b, and contradict lowest terms. The spec
+  // carries the prime d and the lemma's proof line, so sqrtStepsFor builds both presets' steps.
+  function sqrtRowsFor(spec) {
+    const d = spec.prime;
+    return [
+      { tag: 'The assumption', html: String.raw`Suppose, for contradiction, that \(\sqrt${d} = \dfrac{a}{b}\) for integers \(a, b\) with \(b \ne 0\), in <b>lowest terms</b>: \(a\) and \(b\) share no common factor bigger than \(1\).` },
+      { tag: 'Square', html: String.raw`Squaring both sides and clearing the fraction: \(\;a^2 = ${d}b^2\). So \(a^2\) is a <b>multiple of ${d}</b>, because it is ${d} times the integer \(b^2\).` },
+      { tag: spec.lemmaTag, html: spec.lemmaHtml },
+      { tag: 'Substitute', html: spec.substHtml },
+      { tag: 'Contradiction', warn: true, html: String.raw`By the same argument, ${d} divides \(b\) too. So \(a\) and \(b\) share the factor ${d}, which contradicts lowest terms.` },
+      { tag: 'Conclusion', html: String.raw`The assumption was false, so no such fraction exists: \(\sqrt${d}\) is <b>irrational</b>. ∎` },
+    ];
+  }
+  function sqrtStepsFor(spec) {
+    return spec.captions.map((caption, i) => {
+      const st = { lines: i + 1, caption };
+      if (i === spec.checkpointAt) st.checkpoint = spec.checkpoint;
+      if (i === spec.captions.length - 1) st.answer = true;
+      return st;
+    });
+  }
+  function sqrtDataFor(spec) {
+    return {
+      rows: sqrtRowsFor(spec), clashAt: 5, answerBanner: spec.answerBanner,
+      clashHtml: spec.clashA,
+      clashHtml2: spec.clashB,
+      clashTail: `→ shared factor ${spec.prime}, contradicting lowest terms`,
+    };
+  }
+  const EX_SQRT2_SPEC = {
+    prime: 2,
+    lemmaTag: 'Parity',
+    lemmaHtml: String.raw`An odd number squared is odd: \((2m+1)^2 = 4m^2 + 4m + 1 = 2(2m^2 + 2m) + 1\). Since \(a^2\) is even, \(a\) itself is <b>even</b>.`,
+    substHtml: String.raw`Write \(a = 2c\). Then \((2c)^2 = 2b^2\), so \(4c^2 = 2b^2\), and dividing by \(2\): \(\;b^2 = 2c^2\). Now \(b^2\) is even too.`,
+    captions: [
+      'For contradiction, suppose sqrt(2) = a/b for integers a and b, with the fraction in lowest terms, so a and b share no common factor bigger than 1. Naming the assumption precisely matters, because the contradiction at the end is aimed exactly at the words "lowest terms".',
+      'Square both sides and clear the fraction: a squared equals 2 times b squared. That one equation is the engine of the proof, because it says a squared is even — it is 2 times the integer b squared.',
+      'So a itself is even. The reason is parity: the square of an odd number is odd, since (2m + 1) squared expands to 4m squared plus 4m plus 1, so an even square cannot come from an odd number.',
+      'Since a is even, write a = 2c and substitute: (2c) squared = 2 b squared gives 4 c squared = 2 b squared, and dividing by 2 gives b squared = 2 c squared. The same evenness has now moved from a over to b.',
+      'By the same parity argument, b is even too. But then a and b share the factor 2, which directly contradicts the lowest-terms assumption the proof started with — that clash is the point of the whole argument.',
+      'Answer: sqrt(2) is irrational — the assumption collapses. The logic is proof by contradiction: a lowest-terms fraction forced both a and b to be even forever, an infinite descent that no lowest-terms fraction can survive, and every step used only lowest terms and basic parity.',
+    ],
+    clashA: String.raw`\(a\) is <b>even</b>`,
+    clashB: String.raw`\(b\) is <b>even</b>`,
+    checkpointAt: 1,
+    checkpoint: 'Predict: a squared is even — does that force a itself to be even, or could an odd a have an even square?',
+    answerBanner: String.raw`Answer: \(\sqrt2\) is irrational — the check: \(a^2 = 2b^2\) forced \(a\) and \(b\) both even, contradicting lowest terms, so no such fraction exists ✓`,
+  };
+  const EX_SQRT3_SPEC = {
+    prime: 3,
+    lemmaTag: 'Divisibility',
+    lemmaHtml: String.raw`Split \(a\) into cases by its remainder on division by \(3\). If the remainder is \(1\) or \(2\), then \(a^2\) leaves remainder \(1\) (since \(1^2 = 1\) and \(2^2 = 4 = 3 + 1\)), so \(3\) does <b>not</b> divide \(a^2\). But \(3\) does divide \(a^2\) here, so the remainder must be \(0\): \(3\) <b>divides</b> \(a\).`,
+    substHtml: String.raw`Write \(a = 3c\). Then \((3c)^2 = 3b^2\), so \(9c^2 = 3b^2\), and dividing by \(3\): \(\;b^2 = 3c^2\). Now \(3\) divides \(b^2\) too.`,
+    captions: [
+      'For contradiction, suppose sqrt(3) = a/b for integers a and b, with the fraction in lowest terms, so a and b share no common factor bigger than 1. The argument follows the sqrt(2) proof line for line, with the prime 3 in the role that 2 played before.',
+      'Square both sides and clear the fraction: a squared equals 3 times b squared. That one equation is the engine of the proof, because it says 3 divides a squared — it is 3 times the integer b squared.',
+      'So 3 divides a itself. The reason is a proof by cases on the remainder of a mod 3: remainders 1 and 2 both square to remainder 1, never 0, so a square divisible by 3 can only come from a number divisible by 3.',
+      'Since 3 divides a, write a = 3c and substitute: (3c) squared = 3 b squared gives 9 c squared = 3 b squared, and dividing by 3 gives b squared = 3 c squared. The same divisibility has now moved from a over to b.',
+      'By the same cases argument, 3 divides b too. But then a and b share the factor 3, which directly contradicts the lowest-terms assumption the proof started with — that clash is the point of the whole argument.',
+      'Answer: sqrt(3) is irrational — the assumption collapses. The logic is proof by contradiction: a lowest-terms fraction forced both a and b to be multiples of 3 forever, an infinite descent that no lowest-terms fraction can survive, and every step used only lowest terms and remainders mod 3.',
+    ],
+    clashA: String.raw`\(a\) is a <b>multiple of 3</b>`,
+    clashB: String.raw`\(b\) is a <b>multiple of 3</b>`,
+    checkpointAt: 1,
+    checkpoint: 'Predict: 3 divides a squared — does that force 3 to divide a itself, or could a number dodge the factor 3 while its square cannot?',
+    answerBanner: String.raw`Answer: \(\sqrt3\) is irrational — the check: \(a^2 = 3b^2\) forced \(3\) to divide both \(a\) and \(b\), contradicting lowest terms, so no such fraction exists ✓`,
+  };
+  const EX_SQRT_DATA = sqrtDataFor(EX_SQRT2_SPEC);
+  const EX_SQRT3_DATA = sqrtDataFor(EX_SQRT3_SPEC);
+
+  // ---- worked examples B: direct, contrapositive and strong-induction proofs ----
+  // All three share one zipper: a spec carries proof rows (tag + html) and captions, and pStepsFor
+  // reveals one row per step. The direct and contrapositive specs are built by generators from
+  // their parity case, so each variant's rows, algebra and spot checks are computed from its own
+  // case rather than copied from the primary's.
+  function pStepsFor(spec) {
+    return spec.caps.map((caption, i) => {
+      const st = { lines: i + 1, caption };
+      if (i === spec.cp) st.checkpoint = spec.cq;
+      if (i === spec.caps.length - 1) st.answer = true;
+      return st;
+    });
+  }
+  const pDataFor = (spec) => ({ rows: spec.rows, banner: spec.banner });
+  function rowDraw(fallback) {
+    return (stage, ctx, step, k, preset) => {
+      const D = (preset && preset.data) || fallback;
+      const { h } = ctx;
+      const rows = D.rows.slice(0, step.lines).map((r, i) => h('div',
+        { style: { display: 'flex', gap: '0.6rem', width: '100%', padding: '0.28rem 0.55rem', border: '1px solid var(--rule)', borderRadius: 'var(--radius)', background: i === step.lines - 1 ? 'var(--accent-2)' : 'var(--sheet)', fontSize: '0.84rem', lineHeight: 1.4, textAlign: 'left' } },
+        h('span.tiny.mono.muted', { style: { flex: '0 0 7.6rem', paddingTop: '0.15rem' } }, r[0].toUpperCase()),
+        h('span', { style: { flex: '1 1 auto', minWidth: 0 }, html: r[1] })));
+      stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%', maxWidth: '46rem', alignItems: 'center' } },
+        h('div.stack', { style: { gap: '0.25rem', width: '100%' } }, rows),
+        step.answer ? h('div.ex-answer', { html: D.banner }) : null));
+    };
+  }
+
+  // (c) Direct proof: two integers of the same stated parity add to an even integer.
+  function dirSpec(odd) {
+    const w = odd ? 'odd' : 'even';
+    const fm = odd ? '2a + 1' : '2a', fn = odd ? '2b + 1' : '2b';
+    const raw = odd ? '2a + 2b + 2' : '2a + 2b', inner = odd ? 'a + b + 1' : 'a + b';
+    const [sm, sn] = odd ? [5, 7] : [6, 10];
+    return {
+      rows: [
+        ['The claim', String.raw`For integers \(m\) and \(n\): if both are ${w}, then \(m + n\) is even. A <b>direct proof</b> assumes the hypothesis and reasons forward to the conclusion, justifying each inference.`],
+        ['Assume', String.raw`Let \(m\) and \(n\) be ${w} integers. <span class="muted">[Given: the hypothesis of the claim]</span>`],
+        ['Definition', String.raw`\(m = ${fm}\) and \(n = ${fn}\) for some integers \(a\) and \(b\). <span class="muted">[Unpack the definition of ${w}]</span>`],
+        ['Algebra', String.raw`\(m + n = (${fm}) + (${fn}) = ${raw}\). <span class="muted">[Substitute, then collect like terms]</span>`],
+        ['Factor', String.raw`\(m + n = 2(${inner})\). <span class="muted">[Factor out the common factor \(2\)]</span>`],
+        ['Conclusion', String.raw`\(${inner}\) is an integer, since sums of integers are integers, so \(m + n\) is \(2\) times an integer: \(m + n\) is <b>even</b>. ∎ <span class="muted">[Pack the definition of even back up]</span>`],
+      ],
+      caps: [
+        `A direct proof starts from the hypothesis and moves forward, one justified inference at a time, until it reaches the conclusion. The claim here is that two ${w} integers always add to an even integer, and nothing about the conclusion may be assumed along the way.`,
+        `Assume the hypothesis: m and n are both ${w} integers. A direct proof is allowed to use exactly this and nothing more, so every later line must be earned from this assumption, from a definition, or from algebra.`,
+        `Unpack the definition of ${w}: write m = ${fm} and n = ${fn} for some integers a and b. This inference gives the proof something to compute with, because it turns a word, ${w}, into an equation.`,
+        `Add the two forms and collect like terms: m + n = ${raw}. The right side still shows the structure of the two ${w} inputs, and the total is now one factoring step away from the shape that the definition of even asks for.`,
+        `Factor out the common factor 2 to get m + n = 2(${inner}). This is the key inference of the proof, because it rewrites the sum in exactly the form two times something, which is what the word even means.`,
+        `Answer: ${inner} is an integer by closure of the integers under addition, so m + n is two times an integer and is even, which completes the direct proof. Spot check: ${sm} + ${sn} = ${sm + sn}, and ${sm + sn} is two times ${(sm + sn) / 2}, so it is even.`,
+      ],
+      cp: 2,
+      cq: odd
+        ? 'Predict: adding (2a + 1) and (2b + 1), what do the two constant terms 1 + 1 contribute to the sum?'
+        : 'Predict: adding 2a and 2b, will the sum have any constant term, or will every term carry a factor of 2?',
+      banner: String.raw`Proved directly: if \(m\) and \(n\) are ${w}, then \(m + n\) is even · check: ${sm} + ${sn} = ${sm + sn} = 2 \cdot ${(sm + sn) / 2} ✓`,
+    };
+  }
+  function dirVerify(odd) {
+    return () => {
+      for (let a = -30; a <= 30; a++) for (let b = -30; b <= 30; b++) {
+        const m = odd ? 2 * a + 1 : 2 * a, n = odd ? 2 * b + 1 : 2 * b;
+        if ((m + n) % 2 !== 0) return false;
+        if (m + n !== 2 * (odd ? a + b + 1 : a + b)) return false;
+      }
+      return true;
+    };
+  }
+  const EX_DIR_SPEC = dirSpec(true), EX_DIR_EVEN_SPEC = dirSpec(false);
+  const EX_DIR_DATA = pDataFor(EX_DIR_SPEC), EX_DIR_EVEN_DATA = pDataFor(EX_DIR_EVEN_SPEC);
+
+  // (d) Contrapositive: the parity of n squared forces the parity of n, proved via the flipped claim.
+  function contraSpec(evenCase) {
+    const hypW = evenCase ? 'even' : 'odd', negW = evenCase ? 'odd' : 'even';
+    const form = evenCase ? '2k + 1' : '2k';
+    const sqTex = evenCase ? String.raw`(2k + 1)^2 = 4k^2 + 4k + 1` : String.raw`(2k)^2 = 4k^2`;
+    const resTex = evenCase ? String.raw`2(2k^2 + 2k) + 1` : String.raw`2(2k^2)`;
+    const spotN = evenCase ? 5 : 6, spotSq = spotN * spotN;
+    return {
+      rows: [
+        ['The claim', String.raw`For every integer \(n\): if \(n^2\) is ${hypW}, then \(n\) is ${hypW}. Call the hypothesis \(p\) and the conclusion \(q\), so the claim is \(p \to q\). Proving \(p\) directly is awkward, because a square gives little to work with.`],
+        ['Negate both', String.raw`Negate each part: \(\neg q\) says \(n\) is <b>not</b> ${hypW}, that is, \(n\) is ${negW}; and \(\neg p\) says \(n^2\) is <b>not</b> ${hypW}, that is, \(n^2\) is ${negW}. Negating flips even to odd and odd to even.`],
+        ['Swap', String.raw`Swap the negated parts to form the <b>contrapositive</b> \(\neg q \to \neg p\): if \(n\) is ${negW}, then \(n^2\) is ${negW}. A conditional and its contrapositive are equivalent, so proving this one proves the claim.`],
+        ['Assume', String.raw`Suppose \(n\) is ${negW}, so \(n = ${form}\) for some integer \(k\). <span class="muted">[The definition of ${negW}, applied to the new hypothesis]</span>`],
+        ['Algebra', String.raw`\(n^2 = ${sqTex} = ${resTex}\). <span class="muted">[Square, then group the result into the shape that defines ${negW}; the grouped coefficient is an integer by closure]</span>`],
+        ['Equivalence', String.raw`So \(n^2\) is ${negW}: the contrapositive \(\neg q \to \neg p\) holds. Because \(p \to q \equiv \neg q \to \neg p\), the original claim holds too: if \(n^2\) is ${hypW}, then \(n\) is ${hypW}. ∎`],
+      ],
+      caps: [
+        `State the claim as p implies q, with p the statement that n squared is ${hypW} and q the statement that n is ${hypW}. A direct attack stalls here, because knowing a square is ${hypW} hands us no equation for n itself to compute with.`,
+        `Forming a contrapositive takes two separate moves, and this step does the first one: negate both parts. The negation of the conclusion says n is ${negW}, and the negation of the hypothesis says n squared is ${negW}.`,
+        `The second move is to swap the negated parts, giving the contrapositive: if n is ${negW}, then n squared is ${negW}. This new claim is friendlier, because its hypothesis is about n itself, and a conditional is equivalent to its contrapositive.`,
+        `Now prove the contrapositive directly: suppose n is ${negW} and write n = ${form} for some integer k, using the definition of ${negW}. Just as in a direct proof, unpacking the definition turns a word into an equation we can compute with.`,
+        `Square both sides: n squared works out to the grouped form shown in this row, which has exactly the shape that defines ${negW}, since the grouped coefficient is an integer. So the square of a ${negW} integer is ${negW}, and the contrapositive is proved.`,
+        `Answer: because a conditional and its contrapositive are equivalent, proving the contrapositive proves the original claim: whenever n squared is ${hypW}, n itself is ${hypW}. Spot check the contrapositive at n = ${spotN}: n is ${negW} and n squared is ${spotSq}, which is ${negW} too.`,
+      ],
+      cp: 1,
+      cq: `Predict: after both parts are negated, the contrapositive starts by assuming which one — that n is ${negW}, or that n squared is ${negW}?`,
+      banner: String.raw`Proved by contrapositive: if \(n^2\) is ${hypW} then \(n\) is ${hypW} · check: \(n = ${spotN}\) is ${negW} and \(n^2 = ${spotSq}\) is ${negW} ✓`,
+    };
+  }
+  function contraVerify(evenCase) {
+    return () => {
+      for (let n = -60; n <= 60; n++) {
+        const sqE = (n * n) % 2 === 0, nE = n % 2 === 0;
+        const orig = evenCase ? (!sqE || nE) : (sqE || !nE);
+        const contra = evenCase ? (nE || !sqE) : (!nE || sqE);
+        if (!orig || !contra) return false;
+      }
+      for (let k = -60; k <= 60; k++) {
+        if (evenCase ? (2 * k + 1) ** 2 !== 2 * (2 * k * k + 2 * k) + 1 : (2 * k) ** 2 !== 2 * (2 * k * k)) return false;
+      }
+      return true;
+    };
+  }
+  const EX_CON_SPEC = contraSpec(true), EX_CON_ODD_SPEC = contraSpec(false);
+  const EX_CON_DATA = pDataFor(EX_CON_SPEC), EX_CON_ODD_DATA = pDataFor(EX_CON_ODD_SPEC);
+
+  // (e) Strong induction: prime factorization (primary) and postage stamps (variant).
+  const EX_STR_PRIME_SPEC = {
+    rows: [
+      ['The claim', String.raw`\(P(n)\): every integer \(n \ge 2\) is a <b>product of primes</b>, where a prime itself counts as a product of one prime. Euclid's proof that there are infinitely many primes uses this claim, so it is worth proving carefully.`],
+      ['Base case', String.raw`\(P(2)\): \(2\) is prime, so it is already a product of primes with a single factor. The chain starts here.`],
+      ['Strong hypothesis', String.raw`Fix \(k \ge 2\) and assume \(P(2), P(3), \ldots, P(k)\) are <b>all</b> true at once: every integer from \(2\) through \(k\) is a product of primes. Ordinary induction would assume only the single case \(P(k)\).`],
+      ['Split k + 1', String.raw`Consider \(k + 1\). If it is prime, \(P(k+1)\) is immediate. Otherwise \(k + 1 = ab\) with \(2 \le a, b \le k\). Example: \(36 = 4 \cdot 9\), and neither factor is \(k = 35\): the factors are earlier cases, but not the single predecessor.`],
+      ['Apply it', String.raw`By the strong hypothesis, \(a\) is a product of primes and \(b\) is a product of primes: say \(a = p_1 \cdots p_r\) and \(b = q_1 \cdots q_s\). Neither application was to \(k\) itself, which is exactly the gap ordinary induction cannot cross.`],
+      ['Conclusion', String.raw`Multiply the two products: \(k + 1 = ab = p_1 \cdots p_r \, q_1 \cdots q_s\), a product of primes. So \(P(k+1)\) holds, and by strong induction \(P(n)\) holds for every \(n \ge 2\). ∎`],
+    ],
+    caps: [
+      'State the claim P(n): every integer n from 2 on is a product of primes, counting a prime as a product with one factor. This is the canonical strong-induction statement, because the step will split a number into pieces that ordinary induction cannot reach.',
+      'The base case is P(2): 2 is prime, so it is a product of primes with a single factor. Every induction needs its chain anchored somewhere, and here the anchor is the smallest integer the claim covers.',
+      'The strong hypothesis assumes P(2) through P(k) all at once, for one fixed k: every integer from 2 through k is already known to be a product of primes. Holding all of those cases at once, not just P(k), is what makes this induction strong.',
+      'Consider k + 1. If it is prime we are done at once; if it is composite it splits as k + 1 = ab with both factors between 2 and k. The example 36 = 4 times 9 shows the point: the factors are earlier cases scattered below k, and neither one is the predecessor k itself.',
+      'Apply the strong hypothesis to each factor separately: a is a product of primes and b is a product of primes. Ordinary induction could not do this step, because its only assumption, P(k), says nothing at all about a or about b.',
+      'Answer: multiplying the two prime products gives a prime product for k + 1, so P(k + 1) holds and strong induction proves the claim for every n from 2 on. Spot check: 60 = 2 times 2 times 3 times 5, and those factors multiply back to 60.',
+    ],
+    cp: 2,
+    cq: 'Predict: if k + 1 splits as a times b, will a and b be the predecessor k itself, or smaller cases scattered somewhere below k?',
+    banner: String.raw`Proved by strong induction: every integer \(n \ge 2\) is a product of primes · check: \(60 = 2 \cdot 2 \cdot 3 \cdot 5\) and \(2 \cdot 2 \cdot 3 \cdot 5 = 60\) ✓`,
+  };
+  const EX_STR_POST_SPEC = {
+    rows: [
+      ['The claim', String.raw`\(P(n)\): every amount of \(n \ge 12\) cents can be paid exactly with \(4\)¢ and \(5\)¢ stamps. Amounts below \(12\) are not claimed: \(11\)¢ cannot be paid at all.`],
+      ['Base cases', String.raw`Four base cases, paid by hand: \(12 = 4 + 4 + 4\), \(13 = 4 + 4 + 5\), \(14 = 4 + 5 + 5\) and \(15 = 5 + 5 + 5\). Four are needed because the step below reaches back \(4\) cents.`],
+      ['Strong hypothesis', String.raw`Fix \(k \ge 15\) and assume \(P(12), P(13), \ldots, P(k)\) are <b>all</b> true at once: every amount from \(12\) through \(k\) cents can already be paid. Ordinary induction would assume only the single case \(P(k)\).`],
+      ['Reach back', String.raw`To pay \(k + 1 \ge 16\) cents, first pay \(k + 1 - 4\) cents and then add one \(4\)¢ stamp. Note \(k + 1 - 4 = k - 3\), which is still at least \(12\), but it is not \(k\): the step needs an earlier case, not the predecessor.`],
+      ['Apply it', String.raw`By the strong hypothesis, \(k - 3\) cents can be paid, since \(12 \le k - 3 \le k\). Add one \(4\)¢ stamp to that payment and the total is \(k - 3 + 4 = k + 1\) cents, paid exactly.`],
+      ['Conclusion', String.raw`So \(P(k+1)\) holds, and by strong induction every amount of \(12\) cents or more can be paid. Example chain: \(23 \to 19 \to 15\), a base case, so \(23 = 4 + 4 + 5 + 5 + 5\). ∎`],
+    ],
+    caps: [
+      'State the claim P(n): every amount of n cents, from 12 cents on, can be paid exactly using only 4-cent and 5-cent stamps. The threshold matters, because 11 cents cannot be paid at all, so the claim would be false if it started any lower.',
+      'Four base cases are checked by hand: 12, 13, 14 and 15 cents, each written out as an explicit mix of stamps. Four bases are needed because the inductive step will reach back 4 cents, so every amount within 4 of the start must be anchored directly.',
+      'The strong hypothesis assumes P(12) through P(k) all at once, for one fixed k of at least 15: every amount from 12 through k cents can already be paid. Holding all of those cases, not just P(k), is what makes this induction strong.',
+      'To pay k + 1 cents, peel off one 4-cent stamp and pay the remaining k + 1 minus 4, which is k minus 3 cents. That amount is still at least 12, so it is inside the assumed range, but it is not the predecessor k that ordinary induction would offer.',
+      'Apply the strong hypothesis to k minus 3 cents: it can be paid, and adding one 4-cent stamp to that payment pays k + 1 cents exactly. The strong hypothesis is doing real work here, because the case used sits three steps below the predecessor.',
+      'Answer: the step carries every amount past the four base cases, so strong induction proves that every amount of 12 cents or more can be paid. Spot check: 23 cents reduces 23 to 19 to 15, a base case, giving 23 = 4 + 4 + 5 + 5 + 5.',
+    ],
+    cp: 2,
+    cq: 'Predict: the step pays k + 1 cents by reaching back to which amount — k itself, or k + 1 with one 4-cent stamp removed?',
+    banner: String.raw`Proved by strong induction: every amount \(\ge 12\)¢ can be paid with \(4\)¢ and \(5\)¢ stamps · check: \(23 = 4 + 4 + 5 + 5 + 5 = 23\) ✓`,
+  };
+  function primeVerify() {
+    return () => {
+      for (let n = 2; n <= 150; n++) {
+        let x = n, prod = 1;
+        while (x > 1) { const f = smallestFactor(x); if (!isPrime(f)) return false; prod *= f; x /= f; }
+        if (prod !== n) return false;
+      }
+      return true;
+    };
+  }
+  function postVerify() {
+    return () => {
+      for (let n = 12; n <= 240; n++) {
+        let ok = false;
+        for (let a = 0; 4 * a <= n && !ok; a++) if ((n - 4 * a) % 5 === 0) ok = true;
+        if (!ok) return false;
+      }
+      return true;
+    };
+  }
+  const EX_STR_DATA = pDataFor(EX_STR_PRIME_SPEC), EX_STR_POST_DATA = pDataFor(EX_STR_POST_SPEC);
 
   DM.module({
     id: 'proofs',
@@ -1056,15 +1363,10 @@
         title: 'Worked example: the sum formula by induction',
         kind: 'example',
         id: 'ex-induction-sum',
+        objective: 'Prove a closed-form sum formula by mathematical induction, checking the base case and then the inductive step.',
         problem: String.raw`<p>Prove by mathematical induction that \(1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every positive integer \(n\).</p>`,
-        steps: [
-          { lines: 1, fallen: 0, caption: 'State the claim as P(n) and name the two things induction needs: a base case and an inductive step. In the domino picture from the induction lab, the base case tips the first domino, and the inductive step is why each falling domino knocks over the next one.' },
-          { lines: 2, fallen: 1, caption: 'The base case checks n = 1 directly: the left side is 1 and the right side is 1 · 2 / 2 = 1, so the two sides agree and P(1) is true. In the picture, the first domino has fallen.' },
-          { lines: 3, fallen: 2, caption: 'Next, the inductive hypothesis: assume P(k) is true for one fixed k ≥ 1, that is, 1 + ⋯ + k = k(k+1)/2. We do not prove this line; we assume it for a single k — domino k is falling — and use it to push the next domino over.' },
-          { lines: 4, fallen: 2, caption: 'Before doing any algebra, write out the goal for k + 1: 1 + ⋯ + k + (k+1) = (k+1)(k+2)/2. Writing the target first matters because it gives every manipulation that follows a destination to aim at.' },
-          { lines: 7, fallen: 3, caption: 'The algebra is the heart of the step: group the sum as (1 + ⋯ + k) + (k+1), replace the bracket with k(k+1)/2 by the inductive hypothesis, then factor out (k+1), highlighted in the middle line, to land exactly on the goal. Domino k has knocked over domino k + 1.' },
-          { lines: 8, fallen: 6, answer: true, caption: 'Answer: by induction, 1 + 2 + ⋯ + n = n(n+1)/2 for every positive integer n, and every domino is down. Spot check at n = 5: 1 + 2 + 3 + 4 + 5 = 15 and 5 · 6 / 2 = 15, so the formula agrees with a direct count.' },
-        ],
+        data: EX_IND_DATA,
+        steps: indStepsFor(EX_IND_SPEC),
         answer: 'n(n+1)/2',
         verify(M) {
           for (let n = 1; n <= 60; n++) {
@@ -1075,23 +1377,42 @@
           for (let k = 1; k <= 60; k++) if ((k * (k + 1)) / 2 + (k + 1) !== ((k + 1) * (k + 2)) / 2) return false;
           return true;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: sum of odd numbers',
+            problem: String.raw`<p>Prove by mathematical induction that \(1 + 3 + 5 + \cdots + (2n-1) = n^2\) for every positive integer \(n\): the sum of the first \(n\) odd numbers is a perfect square.</p>`,
+            data: EX_IND_ODD_DATA,
+            steps: indStepsFor(EX_IND_ODD_SPEC),
+            answer: 'n^2',
+            verify(M) {
+              for (let n = 1; n <= 60; n++) {
+                let s = 0;
+                for (let i = 1; i <= n; i++) s += 2 * i - 1;
+                if (s !== n * n) return false;
+              }
+              for (let k = 1; k <= 60; k++) if (k * k + (2 * k + 1) !== (k + 1) * (k + 1)) return false;
+              return true;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const D = (preset && preset.data) || EX_IND_DATA;
           const { h, s } = ctx;
           const doms = [];
           doms.push(s('line', { x1: 8, y1: 48, x2: 352, y2: 48, stroke: 'var(--ink-3)', 'stroke-width': 2 }));
-          for (let i = 0; i < EX_IND_TOTAL; i++) {
+          for (let i = 0; i < D.total; i++) {
             const down = i < step.fallen;
             doms.push(s('rect', { class: 'domino' + (down ? ' down' : ''), x: 26 + i * 54, y: 6, width: 15, height: 42, rx: 2, fill: down ? 'var(--accent)' : 'var(--sheet)', stroke: 'var(--accent)', 'stroke-width': 2 }));
           }
-          const strip = s('svg', { viewBox: '0 0 360 56', class: 'pf-dom', role: 'img', 'aria-label': `${step.fallen} of ${EX_IND_TOTAL} dominoes fallen`, style: { width: '100%', maxWidth: '30rem', height: '3.1rem', flex: 'none' } }, doms);
-          const rows = EX_IND_ROWS.slice(0, step.lines).map((r, i) => h('div',
+          const strip = s('svg', { viewBox: '0 0 360 56', class: 'pf-dom', role: 'img', 'aria-label': `${step.fallen} of ${D.total} dominoes fallen`, style: { width: '100%', maxWidth: '30rem', height: '3.1rem', flex: 'none' } }, doms);
+          const rows = D.rows.slice(0, step.lines).map((r, i) => h('div',
             { style: { display: 'flex', gap: '0.6rem', width: '100%', padding: '0.28rem 0.55rem', border: '1px solid var(--rule)', borderRadius: 'var(--radius)', background: i === step.lines - 1 ? 'var(--accent-2)' : 'var(--sheet)', fontSize: '0.84rem', lineHeight: 1.4, textAlign: 'left' } },
             h('span.tiny.mono.muted', { style: { flex: '0 0 7.6rem', paddingTop: '0.15rem' } }, r.tag.toUpperCase()),
             h('span', { style: { flex: '1 1 auto', minWidth: 0 }, html: r.html })));
           stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%', maxWidth: '46rem', alignItems: 'center' } },
             strip,
             h('div.stack', { style: { gap: '0.25rem', width: '100%' } }, rows),
-            step.answer ? h('div.ex-answer', { html: String.raw`Proved: \(1 + 2 + \cdots + n = \dfrac{n(n+1)}{2}\) for every positive integer \(n\) · check at \(n = 5\): \(1+2+3+4+5 = 15\) and \(\dfrac{5 \cdot 6}{2} = 15\) ✓` }) : null));
+            step.answer ? h('div.ex-answer', { html: D.answerBanner }) : null));
         },
       },
       /* ---------------------------------------------------------------- worked example */
@@ -1099,15 +1420,10 @@
         title: 'Worked example: the square root of 2 is irrational',
         kind: 'example',
         id: 'ex-sqrt2-contradiction',
+        objective: 'Prove a number is irrational by contradiction, using lowest terms and a parity argument to force a shared factor.',
         problem: String.raw`<p>Prove that \(\sqrt2\) is irrational: there are no integers \(a\) and \(b\) with \(b \ne 0\) and \(\sqrt2 = a/b\).</p>`,
-        steps: [
-          { lines: 1, caption: 'For contradiction, suppose sqrt(2) = a/b for integers a and b, with the fraction in lowest terms, so a and b share no common factor bigger than 1. Naming the assumption precisely matters, because the contradiction at the end is aimed exactly at the words "lowest terms".' },
-          { lines: 2, caption: 'Square both sides and clear the fraction: a squared equals 2 times b squared. That one equation is the engine of the proof, because it says a squared is even — it is 2 times the integer b squared.' },
-          { lines: 3, caption: 'So a itself is even. The reason is parity: the square of an odd number is odd, since (2m + 1) squared expands to 4m squared plus 4m plus 1, so an even square cannot come from an odd number.' },
-          { lines: 4, caption: 'Since a is even, write a = 2c and substitute: (2c) squared = 2 b squared gives 4 c squared = 2 b squared, and dividing by 2 gives b squared = 2 c squared. The same evenness has now moved from a over to b.' },
-          { lines: 5, caption: 'By the same parity argument, b is even too. But then a and b share the factor 2, which directly contradicts the lowest-terms assumption the proof started with — that clash is the point of the whole argument.' },
-          { lines: 6, answer: true, caption: 'Answer: sqrt(2) is irrational — the assumption collapses. The logic is proof by contradiction: a lowest-terms fraction forced both a and b to be even forever, an infinite descent that no lowest-terms fraction can survive, and every step used only lowest terms and basic parity.' },
-        ],
+        data: EX_SQRT_DATA,
+        steps: sqrtStepsFor(EX_SQRT2_SPEC),
         answer: 'irrational',
         verify(M) {
           let noSolution = true;
@@ -1119,21 +1435,111 @@
           }
           return noSolution && parity;
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: sqrt(3) is irrational',
+            problem: String.raw`<p>Prove that \(\sqrt3\) is irrational: there are no integers \(a\) and \(b\) with \(b \ne 0\) and \(\sqrt3 = a/b\). Use the same contradiction method, with a cases argument on remainders mod \(3\) in place of parity.</p>`,
+            data: EX_SQRT3_DATA,
+            steps: sqrtStepsFor(EX_SQRT3_SPEC),
+            answer: 'irrational',
+            verify(M) {
+              let noSolution = true;
+              for (let b = 1; b <= 300 && noSolution; b++) for (let a = 1; a <= 520; a++) if (a * a === 3 * b * b) { noSolution = false; break; }
+              let cases = true;
+              for (let m = 0; m <= 300; m++) {
+                const r = ((m % 3) + 3) % 3;
+                if (r !== 0 && (m * m) % 3 !== 1) cases = false;
+                if (r === 0 && (m * m) % 3 !== 0) cases = false;
+              }
+              return noSolution && cases;
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const D = (preset && preset.data) || EX_SQRT_DATA;
           const { h } = ctx;
-          const rows = EX_SQRT_ROWS.slice(0, step.lines).map((r, i) => h('div',
+          const rows = D.rows.slice(0, step.lines).map((r, i) => h('div',
             { style: { display: 'flex', gap: '0.6rem', width: '100%', padding: '0.28rem 0.55rem', border: '1px solid ' + (r.warn && i === step.lines - 1 ? 'var(--false)' : 'var(--rule)'), borderRadius: 'var(--radius)', background: i === step.lines - 1 ? 'var(--accent-2)' : 'var(--sheet)', fontSize: '0.84rem', lineHeight: 1.4, textAlign: 'left' } },
             h('span.tiny.mono.muted', { style: { flex: '0 0 7.6rem', paddingTop: '0.15rem' } }, r.tag.toUpperCase()),
             h('span', { style: { flex: '1 1 auto', minWidth: 0 }, html: r.html })));
-          const clash = step.lines >= 5 ? h('div', { style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', width: '100%', background: 'var(--false-bg)', border: '1px solid var(--false)', borderRadius: 'var(--radius)', padding: '0.35rem 0.6rem', fontSize: '0.86rem' } },
-            h('span', { html: String.raw`\(a\) is <b>even</b>` }),
-            h('span', { html: String.raw`\(b\) is <b>even</b>` }),
-            h('b', '→ shared factor 2, contradicting lowest terms')) : null;
+          const clash = step.lines >= D.clashAt ? h('div', { style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', width: '100%', background: 'var(--false-bg)', border: '1px solid var(--false)', borderRadius: 'var(--radius)', padding: '0.35rem 0.6rem', fontSize: '0.86rem' } },
+            h('span', { html: D.clashHtml }),
+            h('span', { html: D.clashHtml2 }),
+            h('b', D.clashTail)) : null;
           stage.append(h('div.stack', { style: { gap: '0.4rem', width: '100%', maxWidth: '46rem', alignItems: 'center' } },
             h('div.stack', { style: { gap: '0.25rem', width: '100%' } }, rows),
             clash,
-            step.answer ? h('div.ex-answer', { html: String.raw`Answer: \(\sqrt2\) is irrational — the check: \(a^2 = 2b^2\) forced \(a\) and \(b\) both even, contradicting lowest terms, so no such fraction exists ✓` }) : null));
+            step.answer ? h('div.ex-answer', { html: D.answerBanner }) : null));
         },
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: a direct proof, inference by inference',
+        kind: 'example',
+        id: 'ex-direct-proof-odd-sum',
+        objective: 'Prove a parity claim by direct proof, justifying each inference from the hypothesis to the conclusion.',
+        problem: String.raw`<p>Prove by <b>direct proof</b>: if \(m\) and \(n\) are odd integers, then \(m + n\) is even. Justify every inference.</p>`,
+        data: EX_DIR_DATA,
+        steps: pStepsFor(EX_DIR_SPEC),
+        answer: 'm + n is even',
+        verify: dirVerify(true),
+        variants: [
+          {
+            label: 'Variant: even + even',
+            problem: String.raw`<p>Prove by <b>direct proof</b>: if \(m\) and \(n\) are even integers, then \(m + n\) is even. Justify every inference, using the same method as the primary proof.</p>`,
+            data: EX_DIR_EVEN_DATA,
+            steps: pStepsFor(EX_DIR_EVEN_SPEC),
+            answer: 'm + n is even',
+            verify: dirVerify(false),
+          },
+        ],
+        draw: rowDraw(EX_DIR_DATA),
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: a proof by contrapositive',
+        kind: 'example',
+        id: 'ex-contrapositive-square-even',
+        objective: 'Prove a statement by forming its contrapositive (negate both parts, then swap them) and proving that instead.',
+        problem: String.raw`<p>Prove by <b>contrapositive</b>: for every integer \(n\), if \(n^2\) is even, then \(n\) is even. Show the contrapositive being formed, then prove it.</p>`,
+        data: EX_CON_DATA,
+        steps: pStepsFor(EX_CON_SPEC),
+        answer: 'n is even',
+        verify: contraVerify(true),
+        variants: [
+          {
+            label: 'Variant: odd square, odd root',
+            problem: String.raw`<p>Prove by <b>contrapositive</b>: for every integer \(n\), if \(n^2\) is odd, then \(n\) is odd. Show the contrapositive being formed, then prove it with the same method.</p>`,
+            data: EX_CON_ODD_DATA,
+            steps: pStepsFor(EX_CON_ODD_SPEC),
+            answer: 'n is odd',
+            verify: contraVerify(false),
+          },
+        ],
+        draw: rowDraw(EX_CON_DATA),
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: strong induction and prime factorization',
+        kind: 'example',
+        id: 'ex-strong-induction-prime-factorization',
+        objective: 'Prove a claim by strong induction, using several earlier cases at once where ordinary induction offers only one.',
+        problem: String.raw`<p>Prove by <b>strong induction</b>: every integer \(n \ge 2\) is a product of primes. Show why the single predecessor case that ordinary induction offers is not enough.</p>`,
+        data: EX_STR_DATA,
+        steps: pStepsFor(EX_STR_PRIME_SPEC),
+        answer: 'product of primes',
+        verify: primeVerify(),
+        variants: [
+          {
+            label: 'Variant: postage stamps',
+            problem: String.raw`<p>Prove by <b>strong induction</b>: every amount of \(12\) cents or more can be paid exactly with \(4\)¢ and \(5\)¢ stamps. The step reaches back \(4\) cents, so check the base cases it needs.</p>`,
+            data: EX_STR_POST_DATA,
+            steps: pStepsFor(EX_STR_POST_SPEC),
+            answer: 'payable with 4-cent and 5-cent stamps',
+            verify: postVerify(),
+          },
+        ],
+        draw: rowDraw(EX_STR_DATA),
       },
       /* ---------------------------------------------------------------- 14 */
       {

@@ -209,29 +209,374 @@
   const plainNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? 'undefined' : x > 0 ? '∞' : '−∞');
   const texNum = (x) => (Number.isFinite(x) ? num(x) : Number.isNaN(x) ? '\\text{undefined}' : x > 0 ? '\\infty' : '-\\infty');
 
-  // ---- worked example: Warshall's algorithm on R = {(1, 2), (2, 3), (3, 1), (3, 4)}, precomputed once ----
-  const EX_WAR_EDGES = [[0, 1], [1, 2], [2, 0], [2, 3]]; // the pairs of R, written 0-based
-  const EX_WAR_MATS = []; // EX_WAR_MATS[p] is the matrix after pass p (pass 0 is the starting matrix)
-  const EX_WAR_NEW = []; // EX_WAR_NEW[p] lists the pairs that pass p turned on
-  {
-    let cur = range(4).map((i) => range(4).map((j) => (EX_WAR_EDGES.some(([a, b]) => a === i && b === j) ? 1 : 0)));
-    EX_WAR_MATS.push(cur);
-    EX_WAR_NEW.push([]);
-    for (let k = 0; k < 4; k++) {
+  // ---- worked examples: Warshall's algorithm, run by one shared generator ----
+  // warshallRun computes every pass matrix and the pairs each pass turns on; warStepsFor then
+  // narrates those computed passes, so a variant on a different relation gets its steps from the
+  // same code as the primary instead of from hand-swapped numbers.
+  function warshallRun(n, edges) {
+    let cur = range(n).map((i) => range(n).map((j) => (edges.some(([a, b]) => a === i && b === j) ? 1 : 0)));
+    const mats = [cur], news = [[]];
+    for (let k = 0; k < n; k++) {
       const next = cur.map((r) => r.slice());
       const addedPairs = [];
-      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if (!next[i][j] && cur[i][k] && cur[k][j]) { next[i][j] = 1; addedPairs.push([i, j]); }
-      EX_WAR_MATS.push(next);
-      EX_WAR_NEW.push(addedPairs);
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (!next[i][j] && cur[i][k] && cur[k][j]) { next[i][j] = 1; addedPairs.push([i, j]); }
+      mats.push(next);
+      news.push(addedPairs);
       cur = next;
     }
+    return { mats, news, closure: cur };
   }
-  const EX_WAR_ANSWER = EX_WAR_MATS[4];
-  const EX_WAR_PAIR = ([i, j]) => `(${i + 1}, ${j + 1})`;
+  const warPair = ([i, j]) => `(${i + 1}, ${j + 1})`;
+  const andList = (xs) => (xs.length <= 1 ? String(xs[0] ?? '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
+  function warPassCaption(D, p) {
+    const k = p, prev = D.mats[p - 1], added = D.news[p];
+    const targets = range(D.n).filter((j) => prev[k - 1][j]).map((j) => j + 1);
+    const reachers = range(D.n).filter((i) => prev[i][k - 1]).map((i) => i + 1);
+    if (!added.length) {
+      if (!targets.length) return `Pass k = ${k} changes no matrix value, and the picture shows why: row ${k} is all 0s, because no pair leaves vertex ${k}. No path can arrive at ${k} and then continue onward, so allowing paths through ${k} adds no new pairs.`;
+      if (!reachers.length) return `Pass k = ${k} changes no matrix value, and the picture shows why: column ${k} is all 0s in the current matrix, so no path arrives at vertex ${k} in the first place. A pass can only extend paths that reach its vertex, so this pass adds no new pairs.`;
+      return `Pass k = ${k} changes no matrix value: vertex ${k} is reached by ${andList(reachers)} and points to ${andList(targets)}, but every combination of an incoming pair and an outgoing pair through ${k} is already switched on, so nothing new appears.`;
+    }
+    const reachText = reachers.length === 1 ? `Only vertex ${reachers[0]} reaches ${k}` : reachers.length === 2 ? `Vertices ${reachers[0]} and ${reachers[1]} both reach ${k}` : `Vertices ${andList(reachers)} all reach ${k}`;
+    const paths = added.map(([i, j]) => `${i + 1} → ${k} → ${j + 1}`);
+    return `Pass k = ${k} lets paths step through vertex ${k}, which points to ${andList(targets)}. ${reachText}, so ${added.length === 1 ? 'exactly one new pair appears' : 'new pairs appear'}: ${andList(added.map(warPair))}, recording the two-step path${added.length === 1 ? '' : 's'} ${andList(paths)} as direct pair${added.length === 1 ? '' : 's'} of the closure.`;
+  }
+  function warAnswerCaption(D) {
+    const full = [], empty = [], parts = [];
+    range(D.n).forEach((i) => {
+      const reach = range(D.n).filter((j) => D.closure[i][j]).map((j) => j + 1);
+      if (reach.length === D.n) full.push(i + 1);
+      else if (!reach.length) empty.push(i + 1);
+      else parts.push(`source ${i + 1} reaches ${andList(reach)}`);
+    });
+    if (full.length) parts.unshift(`rows of all 1s for source${full.length === 1 ? '' : 's'} ${andList(full)}`);
+    if (empty.length) parts.push(`an all-0 row for source${empty.length === 1 ? '' : 's'} ${andList(empty)}`);
+    return `Answer: the transitive closure has ${parts.join('; ')}. Check: ${D.captionCheck}`;
+  }
+  function warStepsFor(D) {
+    const steps = [{ pass: 0, k: 0, caption: 'Start with the adjacency matrix of R: a 1 in row i, column j means the pair (i, j) is present. The rule for every pass is the same: when paths may pass through vertex k, cell (i, j) turns on whenever both (i, k) and (k, j) are already on.' }];
+    for (let p = 1; p <= D.n; p++) steps.push({ pass: p, k: p, caption: warPassCaption(D, p) });
+    steps.push({ pass: D.n, k: 0, answer: true, caption: warAnswerCaption(D) });
+    steps[D.checkpointAt].checkpoint = D.checkpoint;
+    return steps;
+  }
+  function warDataFor(spec) {
+    const run = warshallRun(spec.n, spec.edges);
+    return { n: spec.n, edges: spec.edges, mats: run.mats, news: run.news, closure: run.closure, checkpointAt: spec.checkpointAt, checkpoint: spec.checkpoint, captionCheck: spec.captionCheck, bannerCheck: spec.bannerCheck };
+  }
+  function warVerify(edges, n, answer) {
+    // Independent check: a plain depth-first search over the original pairs, with no Warshall passes.
+    const adj = range(n).map((i) => edges.filter(([a]) => a === i).map(([, b]) => b));
+    const reach = range(n).map((src) => {
+      const seen = new Set();
+      const stack = adj[src].slice();
+      while (stack.length) {
+        const v = stack.pop();
+        if (seen.has(v)) continue;
+        seen.add(v);
+        for (const w of adj[v]) if (!seen.has(w)) stack.push(w);
+      }
+      return range(n).map((j) => (seen.has(j) ? 1 : 0));
+    });
+    return JSON.stringify(reach) === JSON.stringify(answer);
+  }
+  const EX_WAR_DATA = warDataFor({
+    n: 4, edges: [[0, 1], [1, 2], [2, 0], [2, 3]],
+    checkpointAt: 2,
+    checkpoint: 'Predict: vertex 3 now points to four vertices and three sources reach it — will pass k = 3 add more pairs than passes 1 and 2 combined?',
+    captionCheck: 'from 1 the path 1 → 2 → 3 → 4 reaches every vertex, the same holds starting from 2 or 3, and 4 has no outgoing pair, so it reaches nothing.',
+    bannerCheck: '1 → 2 → 3 → 4 reaches every vertex from 1, and vertex 4 reaches nothing.',
+  });
+  const EX_WAR_CHAIN_DATA = warDataFor({
+    n: 4, edges: [[0, 2], [2, 1], [1, 3]],
+    checkpointAt: 1,
+    checkpoint: 'Predict: pass k = 2 is the first pass whose vertex has both an incoming pair and an outgoing pair — how many new pairs will it add?',
+    captionCheck: 'the chain 1 → 3 → 2 → 4 visits every vertex in order, so each source reaches exactly the vertices downstream of it, and 4 has no outgoing pair, so it reaches nothing.',
+    bannerCheck: '1 → 3 → 2 → 4 reaches 3, 2 and 4 from 1, and vertex 4 reaches nothing.',
+  });
 
-  // ---- worked example: the equivalence relation "3 divides a - b" on {0, 1, ..., 7} ----
-  const EX_EQ_SET = [0, 1, 2, 3, 4, 5, 6, 7];
-  const EX_EQ_CLASSES = [[0, 3, 6], [1, 4, 7], [2, 5]];
+  // ---- worked examples: equivalence classes for "m divides a - b", built by one shared generator ----
+  function eqClassesFor(set, mod) {
+    const classes = [], byRem = new Map();
+    for (const a of set) {
+      const r = ((a % mod) + mod) % mod;
+      if (!byRem.has(r)) { byRem.set(r, []); classes.push(byRem.get(r)); }
+      byRem.get(r).push(a);
+    }
+    return classes;
+  }
+  const EQ_NUMWORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
+  function eqStepsFor(D) {
+    const mod = D.mod, N = D.set.length, [x, y] = D.pair, d = y - x, [ta, tb, tc] = D.triple;
+    const captions = [
+      `Setup: a ~ b means a and b leave the same remainder when divided by ${mod}, because ${mod} divides a − b exactly when the two remainders match. Each element below is labeled with its remainder mod ${mod}, and the work ahead is to test three properties: reflexive, symmetric and transitive.`,
+      `Reflexive: for every element a, the difference a − a is 0, and ${mod} divides 0 because 0 = ${mod} · 0. So every element is related to itself, which is why each chip now carries its own loop and a check mark for the first property.`,
+      `Symmetric: if ${mod} divides a − b, then it also divides b − a, because b − a is just −(a − b) and flipping the sign keeps divisibility. The highlighted pair checks this with numbers: ${y} − ${x} = ${d} and ${x} − ${y} = −${d}, and ${mod} divides both differences.`,
+      `Transitive: if a − b = ${mod}m and b − c = ${mod}n, then adding the two equations gives a − c = ${mod}(m + n), which is a multiple of ${mod} again. The highlighted triple checks this: ${ta} − ${tb} = ${ta - tb} and ${tb} − ${tc} = ${tb - tc}, so ${ta} − ${tc} = ${ta - tc}, and ${mod} divides ${ta - tc}.`,
+      `With all three properties confirmed, group the elements by their remainder mod ${mod}, putting elements that share a remainder into one box. Elements in the same box differ by a multiple of ${mod}, so they are related to each other, and the set splits into exactly ${EQ_NUMWORDS[D.classes.length]} boxes.`,
+      `Answer: ~ is an equivalence relation, with classes ${andList(D.classes.map((c) => '{' + c.join(', ') + '}'))}. Check: the classes are disjoint, their union is all ${N} elements of the set, and their sizes add up as ${D.classes.map((c) => c.length).join(' + ')} = ${N}, so nothing is missing and nothing is counted twice.`,
+    ];
+    const phases = ['setup', 'reflexive', 'symmetric', 'transitive', 'classes', 'answer'];
+    return phases.map((phase, i) => {
+      const st = { phase, caption: captions[i] };
+      if (phase === 'transitive') st.checkpoint = D.checkpoint;
+      if (phase === 'answer') st.answer = true;
+      return st;
+    });
+  }
+  function eqDataFor(spec) {
+    const classes = eqClassesFor(spec.set, spec.mod);
+    return {
+      set: spec.set, mod: spec.mod, classes, pair: spec.pair, triple: spec.triple,
+      checkpoint: `Predict: with all three properties confirmed, grouping the elements by their remainder mod ${spec.mod} — how many separate classes will the set split into?`,
+    };
+  }
+  function eqVerify(M, D) {
+    // Independent check: regroup the set from scratch with the engine's mod, then confirm that for
+    // every pair, "mod divides a - b" agrees with "same stated class".
+    const regrouped = eqClassesFor(D.set, D.mod);
+    if (JSON.stringify(regrouped) !== JSON.stringify(D.classes)) return false;
+    for (const a of D.set) for (const b of D.set) {
+      const rel = M.mod(a - b, D.mod) === 0;
+      const same = D.classes.some((c) => c.includes(a) && c.includes(b));
+      if (rel !== same) return false;
+    }
+    return true;
+  }
+  const EX_EQ_DATA = eqDataFor({ set: range(8), mod: 3, pair: [1, 4], triple: [7, 4, 1] });
+  const EX_EQ4_DATA = eqDataFor({ set: range(12), mod: 4, pair: [1, 5], triple: [9, 5, 1] });
+
+  // ---- worked examples B: a property audit (matrix + digraph in sync) and a Hasse construction ----
+  // audDataFor runs the module's own relProps witness search on the matrix built from the pairs, so
+  // every verdict, witness and highlight in the steps is computed from the relation itself.
+  const PROP_ORDER = ['refl', 'sym', 'anti', 'trans'];
+  const PROP_NAME = { refl: 'reflexive', sym: 'symmetric', anti: 'antisymmetric', trans: 'transitive' };
+  function audDataFor(spec) {
+    const n = spec.labels.length;
+    const mat = range(n).map((i) => range(n).map((j) => (spec.pairs.some(([a, b]) => a === i && b === j) ? 1 : 0)));
+    const w = relProps(mat);
+    const verdict = { refl: !w.refl, sym: !w.sym, anti: !w.anti, trans: !w.trans };
+    const firstOff = () => { for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (i !== j && mat[i][j]) return [i, j]; return null; };
+    let transEx = null;
+    for (let pass = 0; pass < 2 && !transEx; pass++)
+      for (let i = 0; i < n && !transEx; i++) for (let j = 0; j < n && !transEx; j++) for (let k = 0; k < n && !transEx; k++)
+        if (mat[i][j] && mat[j][k] && mat[i][k] && (pass === 1 || (j !== i && j !== k))) transEx = { have: [[i, j], [j, k]], miss: [i, k] };
+    const off = firstOff();
+    const checks = {
+      refl: { hl: range(n).map((i) => [i, i]).filter(([i, j]) => mat[i][j]), miss: w.refl ? w.refl.miss : [] },
+      sym: w.sym ? { hl: w.sym.have, miss: w.sym.miss } : { hl: off ? [off, [off[1], off[0]]] : [], miss: [] },
+      anti: w.anti ? { hl: w.anti.have, miss: [] } : { hl: off ? [off] : [], miss: off ? [[off[1], off[0]]] : [] },
+      trans: w.trans ? { hl: w.trans.have, miss: w.trans.miss } : { hl: transEx ? [...transEx.have, transEx.miss] : [], miss: [] },
+    };
+    const held = PROP_ORDER.filter((k) => verdict[k]).map((k) => PROP_NAME[k]);
+    const cls = verdict.refl && verdict.sym && verdict.trans ? 'an equivalence relation'
+      : verdict.refl && verdict.anti && verdict.trans ? 'a partial order' : 'neither an equivalence relation nor a partial order';
+    const P = ([i, j]) => `(${spec.labels[i]}, ${spec.labels[j]})`;
+    const tw = w.trans || transEx;
+    return {
+      labels: spec.labels, pairs: spec.pairs, mat, verdict, checks, cls,
+      answerText: `${held.join(', ')} — ${cls}`,
+      cq: `Predict: the digraph has the two-step path ${P(tw.have[0])} then ${P(tw.have[1])} — will the shortcut pair ${P(tw.miss)} be present, making the relation transitive?`,
+      bannerCheck: spec.bannerCheck,
+    };
+  }
+  function audStepsFor(D) {
+    const P = ([i, j]) => `(${D.labels[i]}, ${D.labels[j]})`;
+    const v = D.verdict, w = relProps(D.mat);
+    const off = D.checks.anti.hl[0];
+    const tw = w.trans || { have: D.checks.trans.hl.slice(0, 2), miss: D.checks.trans.hl[2] };
+    const caps = [
+      `Setup: the relation R on {${D.labels.join(', ')}} is drawn two ways at once, as a matrix and as a digraph, and the audit tests the four properties one by one. Every check below highlights the same pairs in both pictures, so the matrix pattern and the digraph feature cannot drift apart.`,
+      v.refl
+        ? `Reflexive holds: the matrix diagonal is all 1s and every vertex of the digraph carries a loop, because ${D.labels.map((x) => `(${x}, ${x})`).join(', ')} are all in R. A single missing diagonal cell would have failed this check on its own.`
+        : `Reflexive fails: the pair ${P(w.refl.miss[0])} is missing, so one diagonal cell of the matrix is 0 and one vertex of the digraph has no loop. One missing loop is enough to fail the property.`,
+      v.sym
+        ? `Symmetric holds: every arrow has a return arrow, and the matrix equals its own transpose. The highlighted check is ${P(D.checks.sym.hl[0])} together with its mirror pair ${P(D.checks.sym.hl[1])}, which sit in mirror cells across the diagonal and are both present.`
+        : `Symmetric fails: ${P(w.sym.have[0])} is in R, highlighted in the matrix and the digraph, but its mirror pair ${P(w.sym.miss[0])} is missing, shown dashed. The matrix is not equal to its transpose, because those two mirror cells disagree.`,
+      v.anti
+        ? `Antisymmetric holds: no two different elements point at each other. The highlighted pair ${P(off)} is present while its reverse ${P([off[1], off[0]])} is absent, which is exactly the one-way pattern this property allows between different elements.`
+        : `Antisymmetric fails: ${P(w.anti.have[0])} and ${P(w.anti.have[1])} are both in R, highlighted in both pictures, yet the two elements are different. Two-way arrows between different elements are precisely what this property forbids.`,
+      v.trans
+        ? `Transitive holds: every two-step path has its shortcut. The highlighted path ${P(tw.have[0])} then ${P(tw.have[1])} forces the shortcut ${P(tw.miss)}, and that pair is present, as it is for every other two-step path in the digraph.`
+        : `Transitive fails: the digraph has the two-step path ${P(tw.have[0])} then ${P(tw.have[1])}, highlighted in both pictures, but the shortcut pair ${P(tw.miss[0])} is missing, shown dashed. One two-step path without its shortcut is enough to fail the property.`,
+      `Answer: R is ${D.answerText}. The verdicts in the matrix and the digraph agree check by check: ${D.bannerCheck}`,
+    ];
+    const phases = ['setup', 'refl', 'sym', 'anti', 'trans', 'answer'];
+    return phases.map((phase, i) => {
+      const chk = D.checks[phase] || { hl: [], miss: [] };
+      const st = { phase, hl: chk.hl, miss: chk.miss, caption: caps[i] };
+      if (i === 3) st.checkpoint = D.cq;
+      if (i === phases.length - 1) st.answer = true;
+      return st;
+    });
+  }
+  function audVerify(D) {
+    return () => {
+      const S = new Set(D.pairs.map(([i, j]) => i + ',' + j)), has = (i, j) => S.has(i + ',' + j), n = D.labels.length;
+      const v = { refl: true, sym: true, anti: true, trans: true };
+      for (let i = 0; i < n; i++) if (!has(i, i)) v.refl = false;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        if (has(i, j) && !has(j, i)) v.sym = false;
+        if (i !== j && has(i, j) && has(j, i)) v.anti = false;
+        for (let k = 0; k < n; k++) if (has(i, j) && has(j, k) && !has(i, k)) v.trans = false;
+      }
+      return JSON.stringify(v) === JSON.stringify(D.verdict);
+    };
+  }
+  function audDraw(fallback) {
+    return (stage, ctx, step, k, preset) => {
+      const D = (preset && preset.data) || fallback;
+      const { h } = ctx;
+      const hl = new Set((step.hl || []).map(([i, j]) => i + ',' + j));
+      const miss = new Set((step.miss || []).map(([i, j]) => i + ',' + j));
+      const failed = step.phase in D.verdict ? !D.verdict[step.phase] : false;
+      const cell = (i, j) => {
+        const key = i + ',' + j, attrs = {};
+        if (hl.has(key)) attrs.style = { background: 'var(--mark)', fontWeight: 700 };
+        if (miss.has(key)) attrs.style = { background: 'var(--false-bg)', color: 'var(--false)', fontWeight: 700 };
+        else if (!D.mat[i][j]) attrs.style = { ...(attrs.style || {}), color: 'var(--ink-3)' };
+        return h('td', attrs, miss.has(key) ? '?' : String(D.mat[i][j]));
+      };
+      const table = h('table.tt',
+        h('thead', h('tr', h('th', 'R'), ...range(D.labels.length).map((j) => h('th', D.labels[j])))),
+        h('tbody', ...range(D.labels.length).map((i) => h('tr', h('th', D.labels[i]), ...range(D.labels.length).map((j) => cell(i, j))))));
+      const svg = digraph(ctx.s, {
+        n: D.labels.length, prefix: 'exaud', size: 230, labels: D.labels, label: 'Digraph of the relation being audited',
+        edge: (i, j) => {
+          const key = i + ',' + j;
+          if (miss.has(key)) return { kind: 'bad', dashed: true };
+          if (D.mat[i][j]) return { kind: hl.has(key) ? (failed ? 'bad' : 'good') : 'base' };
+          return null;
+        },
+      });
+      svg.style.width = '13rem';
+      const phaseIdx = ['setup', 'refl', 'sym', 'anti', 'trans', 'answer'].indexOf(step.phase);
+      const pills = PROP_ORDER.map((key, idx) => {
+        const known = phaseIdx >= idx + 1;
+        return h('span', { style: { border: '1px solid var(--rule)', borderRadius: '1rem', padding: '0.15rem 0.6rem', fontWeight: known ? 700 : 400, background: known ? (D.verdict[key] ? 'var(--true-bg)' : 'var(--false-bg)') : 'var(--paper)' } },
+          `${known ? (D.verdict[key] ? '✓' : '✗') : '?'} ${PROP_NAME[key]}`);
+      });
+      stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.5rem' } },
+        h('div.row', { style: { gap: '1.4rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' } }, table, svg),
+        h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' } }, pills),
+        step.answer ? h('div.ex-answer', `Answer: R is ${D.answerText} — check: ${D.bannerCheck}`) : null));
+    };
+  }
+  const EX_AUD_DATA = audDataFor({
+    labels: ['1', '2', '3'],
+    pairs: [[0, 0], [1, 1], [2, 2], [0, 1], [1, 2]],
+    bannerCheck: 'the diagonal is all 1s and there are no two-way arrows, but (1, 2) lacks its reverse and the path 1 → 2 → 3 lacks the shortcut (1, 3).',
+  });
+  const EX_AUD_EQ_DATA = audDataFor({
+    labels: ['1', '2', '3'],
+    pairs: [[0, 0], [1, 1], [2, 2], [0, 2], [2, 0]],
+    bannerCheck: 'the diagonal is all 1s, (1, 3) and (3, 1) mirror each other, and every two-step path has its shortcut; the two-way pair (1, 3), (3, 1) is what breaks antisymmetry.',
+  });
+
+  // (d) Partial order to Hasse diagram: hasseDataFor computes the full relation, the pairs deleted
+  // at each reduction step, the cover relations and the levels, all from the relation matrix.
+  function hasseDataFor(spec) {
+    const n = spec.labels.length, rel = spec.rel;
+    const loops = [], strict = [], covers = [], transRem = [];
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (rel[i][j]) (i === j ? loops : strict).push([i, j]);
+    for (const [i, j] of strict) {
+      const via = range(n).some((k) => k !== i && k !== j && rel[i][k] && rel[k][j]);
+      (via ? transRem : covers).push([i, j]);
+    }
+    const level = new Array(n).fill(0);
+    for (let pass = 0; pass < n; pass++) for (let i = 0; i < n; i++) for (let j = 0; j < n; j++)
+      if (i !== j && rel[i][j]) level[j] = Math.max(level[j], level[i] + 1);
+    const P = ([i, j]) => `${spec.labels[i]} → ${spec.labels[j]}`;
+    const total = loops.length + strict.length;
+    return {
+      labels: spec.labels, rel, loops, strict, covers, transRem, level, total,
+      loopsText: loops.map(P).join(', '), transText: transRem.map(P).join(', '),
+      coversText: covers.map(P).join(', '),
+      levelText: range(Math.max(...level) + 1).map((L) => `level ${L}: ${spec.labels.filter((_, i) => level[i] === L).join(', ')}`).join('; '),
+      answerText: covers.map(P).join(', '),
+    };
+  }
+  function hasseStepsFor(D) {
+    const caps = [
+      `Start from the full relation: ${D.total} pairs in all, counting the ${D.loops.length} loops where each element is related to itself. A Hasse diagram draws this same order with far less ink, by deleting exactly the pairs that the remaining pairs already imply.`,
+      `First deletion: remove the ${D.loops.length} reflexive loops (${D.loopsText}), because in a Hasse diagram every element is understood to be related to itself. That leaves ${D.strict.length} pairs between different elements, and no information is lost.`,
+      `Second deletion: remove the ${D.transRem.length} transitive edges (${D.transText}), because each one is already implied by a two-step path through a middle element. What remains is ${D.covers.length} cover relations: pairs with nothing strictly between them.`,
+      `Now assign levels: each element sits on the level of the longest chain of cover steps below it, giving ${D.levelText}. Levels are what let the finished diagram drop its arrowheads, because every cover edge runs from one level straight up to the next.`,
+      `Draw the Hasse diagram: one line per cover relation (${D.coversText}), smaller elements lower, no loops, no transitive edges and no arrowheads. Reading upward along any path in the picture recovers the original order, which is the whole point of the reduction.`,
+      `Answer: the Hasse diagram has ${D.covers.length} cover edges (${D.coversText}). Check: following upward paths from any element reaches exactly the elements it was related to, and adding the understood loops back reproduces all ${D.total} pairs of the original relation.`,
+    ];
+    const notes = [
+      `Full relation: ${D.total} pairs, including the ${D.loops.length} loops.`,
+      `Removed loops: ${D.loopsText}. ${D.strict.length} strict pairs remain.`,
+      `Removed transitive edges: ${D.transText}. ${D.covers.length} cover edges remain.`,
+      `Levels: ${D.levelText}.`,
+      'Hasse diagram: cover edges only, smaller elements lower, no loops, no arrowheads.',
+      `Reachability in this diagram, plus the understood loops, reproduces all ${D.total} original pairs.`,
+    ];
+    const modes = ['full', 'strict', 'covers', 'covers', 'covers', 'covers'];
+    return caps.map((caption, i) => {
+      const st = { phase: i, edgeMode: modes[i], showLevels: i >= 3, note: notes[i], caption };
+      if (i === 1) st.checkpoint = `Predict: after the loops, deleting every edge that a two-step path already implies will leave how many cover edges — most of the ${D.strict.length} strict pairs, or only a few?`;
+      if (i === caps.length - 1) st.answer = true;
+      return st;
+    });
+  }
+  function hasseVerify(D) {
+    return () => {
+      const n = D.labels.length;
+      const adj = range(n).map((i) => D.covers.filter(([a]) => a === i).map(([, b]) => b));
+      for (let i = 0; i < n; i++) {
+        const seen = new Set([i]), stack = [i];
+        while (stack.length) { const v = stack.pop(); for (const w of adj[v]) if (!seen.has(w)) { seen.add(w); stack.push(w); } }
+        for (let j = 0; j < n; j++) if (D.rel[i][j] !== seen.has(j)) return false;
+      }
+      for (const [i, j] of D.covers) {
+        if (range(n).some((k) => k !== i && k !== j && D.rel[i][k] && D.rel[k][j])) return false;
+        if (D.level[j] <= D.level[i]) return false;
+      }
+      return D.covers.length + D.transRem.length === D.strict.length;
+    };
+  }
+  function hasseDraw(fallback) {
+    return (stage, ctx, step, k, preset) => {
+      const D = (preset && preset.data) || fallback;
+      const { h, s } = ctx;
+      const W = 340, H = 264, r = 21, top = Math.max(...D.level);
+      const pos = [];
+      range(top + 1).forEach((L) => {
+        const ids = range(D.labels.length).filter((i) => D.level[i] === L);
+        ids.forEach((i, k2) => { pos[i] = [(W * (k2 + 1)) / (ids.length + 1), H - 30 - L * ((H - 62) / Math.max(1, top))]; });
+      });
+      const edges = step.edgeMode === 'full' ? D.strict : step.edgeMode === 'strict' ? D.strict : D.covers;
+      const parts = [];
+      if (step.showLevels) range(top + 1).forEach((L) => {
+        const y = H - 30 - L * ((H - 62) / Math.max(1, top));
+        parts.push(s('text', { x: 6, y: y + 4, fill: 'var(--ink-3)', 'font-size': 11, text: `L${L}` }));
+      });
+      edges.forEach(([i, j]) => parts.push(s('line', { x1: pos[i][0], y1: pos[i][1], x2: pos[j][0], y2: pos[j][1], stroke: step.edgeMode === 'covers' ? 'var(--accent)' : 'var(--ink-3)', 'stroke-width': step.edgeMode === 'covers' ? 2.4 : 1.5 })));
+      if (step.edgeMode === 'full') D.loops.forEach(([i]) => parts.push(s('circle', { cx: pos[i][0], cy: pos[i][1] - r - 7, r: 7, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 1.5 })));
+      D.labels.forEach((lbl, i) => {
+        parts.push(s('circle', { cx: pos[i][0], cy: pos[i][1], r, fill: 'var(--sheet)', stroke: 'var(--ink-2)', 'stroke-width': 1.6 }));
+        parts.push(s('text', { x: pos[i][0], y: pos[i][1] + 4, 'text-anchor': 'middle', fill: 'var(--ink)', 'font-size': lbl.length > 2 ? 11.5 : 14, 'font-weight': 600, text: lbl }));
+      });
+      const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Staged Hasse diagram construction' }, parts);
+      svg.style.width = '21rem';
+      stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem' } },
+        svg,
+        h('p.small', { style: { textAlign: 'center' } }, step.note),
+        step.answer ? h('div.ex-answer', `Answer: ${D.covers.length} cover edges — ${D.coversText} — check: upward reachability plus the understood loops reproduces all ${D.total} pairs of the original order ✓`) : null));
+    };
+  }
+  const DIVS = [1, 2, 3, 4, 6, 12];
+  const EX_HASSE_DATA = hasseDataFor({
+    labels: DIVS.map(String),
+    rel: DIVS.map((a) => DIVS.map((b) => b % a === 0)),
+  });
+  const SUBS = [0, 1, 2, 3];
+  const EX_HASSE_SUB_DATA = hasseDataFor({
+    labels: ['∅', '{a}', '{b}', '{a,b}'],
+    rel: SUBS.map((a) => SUBS.map((b) => (a & ~b) === 0)),
+  });
 
   DM.module({
     id: 'relations',
@@ -1095,36 +1440,31 @@
         title: 'Worked example: transitive closure by Warshall\u2019s algorithm',
         kind: 'example',
         id: 'ex-warshall',
+        objective: 'Compute the transitive closure of a relation with Warshall\u2019s algorithm, allowing one intermediate vertex at a time.',
         problem: String.raw`<p>Let \(R\) be the relation on \(\{1, 2, 3, 4\}\) with pairs \((1, 2), (2, 3), (3, 1)\) and \((3, 4)\). Use Warshall's algorithm — allowing paths through one intermediate vertex at a time — to find the transitive closure of \(R\).</p>`,
-        steps: [
-          { pass: 0, k: 0, caption: 'Start with the adjacency matrix of R: a 1 in row i, column j means the pair (i, j) is present. The rule for every pass is the same: when paths may pass through vertex k, cell (i, j) turns on whenever both (i, k) and (k, j) are already on.' },
-          { pass: 1, k: 1, caption: 'Pass k = 1 lets paths step through vertex 1. Only row 3 reaches 1, and from 1 the path continues to 2, so exactly one new pair appears: (3, 2), which records the two-step path 3 → 1 → 2 as a direct pair.' },
-          { pass: 2, k: 2, caption: 'Pass k = 2 lets paths step through vertex 2, which points to 3. Rows 1 and 3 both reach 2, so (1, 3) and (3, 3) turn on: the paths 1 → 2 → 3 and 3 → 2 → 3 become direct pairs of the closure.' },
-          { pass: 3, k: 3, caption: 'Pass k = 3 is the big one, because vertex 3 now points to 1, 2, 3 and 4. Every row that reaches 3 gains all of those targets, adding (1, 1), (1, 4), (2, 1), (2, 2) and (2, 4) in a single pass.' },
-          { pass: 4, k: 4, caption: 'Pass k = 4 changes no matrix value, and the picture shows why: column 4 has 1s, so paths can arrive at 4, but row 4 is all 0s. No path can leave 4 and continue onward, so this pass adds no new pairs.' },
-          { pass: 4, k: 0, answer: true, caption: 'Answer: the closure has rows of all 1s for sources 1, 2 and 3, and an all-0 row for source 4. Check: from 1 the path 1 → 2 → 3 → 4 reaches every vertex, the same holds starting from 2 or 3, and 4 has no outgoing pair, so it reaches nothing.' },
-        ],
-        answer: EX_WAR_ANSWER,
+        data: EX_WAR_DATA,
+        steps: warStepsFor(EX_WAR_DATA),
+        answer: EX_WAR_DATA.closure,
         verify(M) {
-          // Independent check: a plain depth-first search over the original pairs, with no Warshall passes.
-          const adj = [[1], [2], [0, 3], []];
-          const reach = [0, 1, 2, 3].map((src) => {
-            const seen = new Set();
-            const stack = adj[src].slice();
-            while (stack.length) {
-              const v = stack.pop();
-              if (seen.has(v)) continue;
-              seen.add(v);
-              for (const w of adj[v]) if (!seen.has(w)) stack.push(w);
-            }
-            return [0, 1, 2, 3].map((j) => (seen.has(j) ? 1 : 0));
-          });
-          return JSON.stringify(reach) === JSON.stringify(EX_WAR_ANSWER);
+          return warVerify(EX_WAR_DATA.edges, EX_WAR_DATA.n, EX_WAR_DATA.closure);
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: a chain relation',
+            problem: String.raw`<p>Let \(R\) be the relation on \(\{1, 2, 3, 4\}\) with pairs \((1, 3), (3, 2)\) and \((2, 4)\) — a single chain \(1 \to 3 \to 2 \to 4\). Use Warshall's algorithm — allowing paths through one intermediate vertex at a time — to find the transitive closure of \(R\).</p>`,
+            data: EX_WAR_CHAIN_DATA,
+            steps: warStepsFor(EX_WAR_CHAIN_DATA),
+            answer: EX_WAR_CHAIN_DATA.closure,
+            verify(M) {
+              return warVerify(EX_WAR_CHAIN_DATA.edges, EX_WAR_CHAIN_DATA.n, EX_WAR_CHAIN_DATA.closure);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const D = (preset && preset.data) || EX_WAR_DATA;
           const { h } = ctx;
-          const mat = EX_WAR_MATS[step.pass];
-          const added = step.pass ? EX_WAR_NEW[step.pass] : [];
+          const mat = D.mats[step.pass];
+          const added = step.pass ? D.news[step.pass] : [];
           const isNew = (i, j) => added.some(([a, b]) => a === i && b === j);
           const cell = (i, j) => {
             const attrs = {};
@@ -1134,17 +1474,23 @@
             return h('td', attrs, isNew(i, j) ? h('b', '1') : String(mat[i][j]));
           };
           const table = h('table.tt',
-            h('thead', h('tr', h('th', 'R'), ...range(4).map((j) => h('th', step.k === j + 1 ? { class: 'cur' } : null, String(j + 1))))),
-            h('tbody', ...range(4).map((i) => h('tr', h('th', step.k === i + 1 ? { class: 'cur' } : null, String(i + 1)), ...range(4).map((j) => cell(i, j))))));
+            h('thead', h('tr', h('th', 'R'), ...range(D.n).map((j) => h('th', step.k === j + 1 ? { class: 'cur' } : null, String(j + 1))))),
+            h('tbody', ...range(D.n).map((i) => h('tr', h('th', step.k === i + 1 ? { class: 'cur' } : null, String(i + 1)), ...range(D.n).map((j) => cell(i, j))))));
           const svg = digraph(ctx.s, {
-            n: 4, prefix: 'exwar', size: 230, labels: ['1', '2', '3', '4'], label: 'Digraph of the relation after this pass',
+            n: D.n, prefix: 'exwar', size: 230, labels: range(D.n).map((i) => String(i + 1)), label: 'Digraph of the relation after this pass',
             edge: (i, j) => (mat[i][j] ? { kind: step.answer ? 'acc' : isNew(i, j) ? 'good' : 'base' } : null),
           });
           svg.style.width = '13rem';
+          const prev = step.pass && step.k ? D.mats[step.pass - 1] : null;
+          const emptyReason = !prev ? '' : !range(D.n).some((j) => prev[step.k - 1][j])
+            ? `nothing leaves vertex ${step.k}, so no path can continue through it.`
+            : !range(D.n).some((i) => prev[i][step.k - 1])
+              ? `nothing reaches vertex ${step.k}, so no path can pass through it.`
+              : `every path through vertex ${step.k} was already recorded.`;
           const status = step.answer ? null
-            : step.pass === 0 ? 'No intermediate vertex is allowed yet: only the 4 given pairs are on.'
-            : added.length ? `Pass k = ${step.k}: the new pairs ${added.map(EX_WAR_PAIR).join(', ')} turn on, drawn heavier in the digraph.`
-            : `Pass k = ${step.k}: no new pairs — nothing leaves vertex 4, so no path can continue through it.`;
+            : step.pass === 0 ? `No intermediate vertex is allowed yet: only the ${D.edges.length} given pairs are on.`
+            : added.length ? `Pass k = ${step.k}: the new pairs ${added.map(warPair).join(', ')} turn on, drawn heavier in the digraph.`
+            : `Pass k = ${step.k}: no new pairs — ${emptyReason}`;
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.45rem' } },
             h('div.row', { style: { gap: '1.4rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' } },
               h('div.stack', { style: { alignItems: 'center', gap: '0.3rem' } },
@@ -1152,69 +1498,115 @@
                 h('p.tiny.muted', { style: { maxWidth: '16rem', textAlign: 'center' } }, 'Row i, column j is 1 when i reaches j by a path whose middle vertices are all allowed so far. A bold 1 on a tinted cell was added by this pass; the tinted row and column belong to the active vertex k.')),
               svg),
             status ? h('p.small', { style: { textAlign: 'center' } }, status) : null,
-            step.answer ? h('div.ex-answer', 'Answer: transitive closure = [[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [0, 0, 0, 0]] — check: 1 → 2 → 3 → 4 reaches every vertex from 1, and vertex 4 reaches nothing.') : null));
+            step.answer ? h('div.ex-answer', `Answer: transitive closure = [${D.closure.map((r) => '[' + r.join(', ') + ']').join(', ')}] — check: ${D.bannerCheck}`) : null));
         },
       },
       {
         title: 'Worked example: equivalence classes mod 3',
         kind: 'example',
         id: 'ex-equivalence-classes',
+        objective: 'Show that a congruence relation is an equivalence relation and partition its set into the equivalence classes.',
         problem: String.raw`<p>On the set \(\{0, 1, 2, 3, 4, 5, 6, 7\}\), define \(a \sim b\) to mean that \(3\) divides \(a - b\). Show that \(\sim\) is an equivalence relation, and find all of its equivalence classes.</p>`,
-        steps: [
-          { phase: 'setup', caption: 'Setup: a ~ b means a and b leave the same remainder when divided by 3, because 3 divides a − b exactly when the two remainders match. Each element below is labeled with its remainder mod 3, and the work ahead is to test three properties: reflexive, symmetric and transitive.' },
-          { phase: 'reflexive', caption: 'Reflexive: for every element a, the difference a − a is 0, and 3 divides 0 because 0 = 3 · 0. So every element is related to itself, which is why each chip now carries its own loop and a check mark for the first property.' },
-          { phase: 'symmetric', caption: 'Symmetric: if 3 divides a − b, then it also divides b − a, because b − a is just −(a − b) and flipping the sign keeps divisibility. The highlighted pair checks this with numbers: 4 − 1 = 3 and 1 − 4 = −3, and 3 divides both differences.' },
-          { phase: 'transitive', caption: 'Transitive: if a − b = 3m and b − c = 3n, then adding the two equations gives a − c = 3(m + n), which is a multiple of 3 again. The highlighted triple checks this: 7 − 4 = 3 and 4 − 1 = 3, so 7 − 1 = 6, and 3 divides 6.' },
-          { phase: 'classes', caption: 'With all three properties confirmed, group the elements by their remainder mod 3, putting elements that share a remainder into one box. Elements in the same box differ by a multiple of 3, so they are related to each other, and the set splits into exactly three boxes.' },
-          { phase: 'answer', answer: true, caption: 'Answer: ~ is an equivalence relation, with classes {0, 3, 6}, {1, 4, 7} and {2, 5}. Check: the classes are disjoint, their union is all 8 elements of the set, and their sizes add up as 3 + 3 + 2 = 8, so nothing is missing and nothing is counted twice.' },
-        ],
-        answer: EX_EQ_CLASSES,
+        data: EX_EQ_DATA,
+        steps: eqStepsFor(EX_EQ_DATA),
+        answer: EX_EQ_DATA.classes,
         verify(M) {
-          // Independent check: the stated classes cover 0..7 exactly once, and for all 64 pairs,
-          // "3 divides a - b" (tested with the engine's mod) agrees with "same class".
-          const flat = EX_EQ_CLASSES.flat().slice().sort((x, y) => x - y);
-          if (JSON.stringify(flat) !== JSON.stringify(EX_EQ_SET)) return false;
-          for (let a = 0; a < 8; a++) for (let b = 0; b < 8; b++) {
-            const rel = M.mod(a - b, 3) === 0;
-            const same = EX_EQ_CLASSES.some((c) => c.includes(a) && c.includes(b));
-            if (rel !== same) return false;
-          }
-          return true;
+          return eqVerify(M, EX_EQ_DATA);
         },
-        draw(stage, ctx, step) {
+        variants: [
+          {
+            label: 'Variant: classes mod 4',
+            problem: String.raw`<p>On the set \(\{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11\}\), define \(a \sim b\) to mean that \(4\) divides \(a - b\). Show that \(\sim\) is an equivalence relation, and find all of its equivalence classes.</p>`,
+            data: EX_EQ4_DATA,
+            steps: eqStepsFor(EX_EQ4_DATA),
+            answer: EX_EQ4_DATA.classes,
+            verify(M) {
+              return eqVerify(M, EX_EQ4_DATA);
+            },
+          },
+        ],
+        draw(stage, ctx, step, k, preset) {
+          const D = (preset && preset.data) || EX_EQ_DATA;
           const { h } = ctx;
           const phase = step.phase;
           const checked = { setup: 0, reflexive: 1, symmetric: 2, transitive: 3, classes: 3, answer: 3 }[phase];
-          const highlighted = phase === 'symmetric' ? [1, 4] : phase === 'transitive' ? [7, 4, 1] : [];
+          const highlighted = phase === 'symmetric' ? D.pair : phase === 'transitive' ? D.triple : [];
           const chip = (a) => {
             const hl = highlighted.includes(a);
-            return h('div', { style: { border: `2px solid ${hl ? 'var(--false)' : CLASS_COLORS[a % 3]}`, borderRadius: '0.4rem', padding: '0.3rem 0.55rem', textAlign: 'center', background: hl ? 'var(--mark)' : 'var(--sheet)', minWidth: '3.4rem' } },
+            return h('div', { style: { border: `2px solid ${hl ? 'var(--false)' : CLASS_COLORS[a % D.mod]}`, borderRadius: '0.4rem', padding: '0.3rem 0.55rem', textAlign: 'center', background: hl ? 'var(--mark)' : 'var(--sheet)', minWidth: '3.4rem' } },
               h('div', { style: { fontWeight: 700, fontSize: '1.05rem' } }, phase === 'reflexive' ? `${a} ✓` : String(a)),
-              h('div.tiny.muted', `mod 3 = ${a % 3}`),
+              h('div.tiny.muted', `mod ${D.mod} = ${a % D.mod}`),
               phase === 'reflexive' ? h('div.tiny', `${a} ~ ${a}`) : null);
           };
-          const classBox = (cls) => h('div', { style: { border: `2px solid ${CLASS_COLORS[cls[0] % 3]}`, borderRadius: '0.5rem', padding: '0.45rem 0.8rem', textAlign: 'center', background: 'var(--sheet)' } },
-            h('div.small.muted', `[${cls[0]}] · remainder ${cls[0] % 3}`),
+          const classBox = (cls) => h('div', { style: { border: `2px solid ${CLASS_COLORS[cls[0] % D.mod]}`, borderRadius: '0.5rem', padding: '0.45rem 0.8rem', textAlign: 'center', background: 'var(--sheet)' } },
+            h('div.small.muted', `[${cls[0]}] · remainder ${cls[0] % D.mod}`),
             h('div', { style: { fontWeight: 700, fontSize: '1.15rem' } }, `{${cls.join(', ')}}`));
           const grouped = phase === 'classes' || phase === 'answer';
           const main = grouped
-            ? h('div.row', { style: { gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' } }, ...EX_EQ_CLASSES.map(classBox))
-            : h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '34rem' } }, ...EX_EQ_SET.map(chip));
+            ? h('div.row', { style: { gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' } }, ...D.classes.map(classBox))
+            : h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '34rem' } }, ...D.set.map(chip));
           const prop = (name, i) => h('span', { style: { border: '1px solid var(--rule)', borderRadius: '1rem', padding: '0.15rem 0.6rem', fontWeight: i < checked ? 700 : 400, background: i < checked ? 'var(--true-bg)' : 'var(--paper)' } }, `${i < checked ? '✓' : '?'} ${name}`);
+          const [px, py] = D.pair, [ta, tb, tc] = D.triple;
           const info = {
             setup: 'Three properties to test: reflexive, symmetric and transitive. Passing all three is what makes ~ an equivalence relation.',
-            reflexive: 'For every a: a − a = 0 = 3 · 0, so 3 divides 0 and a ~ a. The first property holds for all 8 elements at once.',
-            symmetric: 'Highlighted check: 1 ~ 4 because 4 − 1 = 3. Reversed, 1 − 4 = −3, which is −(4 − 1), and 3 divides −3 as well, so 4 ~ 1.',
-            transitive: 'Highlighted check: 7 ~ 4 and 4 ~ 1, since 7 − 4 = 3 and 4 − 1 = 3. Adding the differences gives 7 − 1 = 6 = 3 + 3, so 7 ~ 1.',
-            classes: 'One box per remainder: remainder 0, remainder 1 and remainder 2. Every element of the set lands in exactly one box.',
+            reflexive: `For every a: a − a = 0 = ${D.mod} · 0, so ${D.mod} divides 0 and a ~ a. The first property holds for all ${D.set.length} elements at once.`,
+            symmetric: `Highlighted check: ${px} ~ ${py} because ${py} − ${px} = ${py - px}. Reversed, ${px} − ${py} = −${py - px}, which is −(${py} − ${px}), and ${D.mod} divides −${py - px} as well, so ${py} ~ ${px}.`,
+            transitive: `Highlighted check: ${ta} ~ ${tb} and ${tb} ~ ${tc}, since ${ta} − ${tb} = ${ta - tb} and ${tb} − ${tc} = ${tb - tc}. Adding the differences gives ${ta} − ${tc} = ${ta - tc} = ${ta - tb} + ${tb - tc}, so ${ta} ~ ${tc}.`,
+            classes: `One box per remainder: ${andList(D.classes.map((c) => 'remainder ' + (c[0] % D.mod)))}. Every element of the set lands in exactly one box.`,
             answer: '',
           }[phase];
           stage.append(h('div.stack', { style: { alignItems: 'center', gap: '0.55rem', maxWidth: '58rem' } },
             main,
             h('div.row', { style: { gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' } }, prop('Reflexive', 0), prop('Symmetric', 1), prop('Transitive', 2)),
             info ? h('p.small', { style: { textAlign: 'center' } }, info) : null,
-            step.answer ? h('div.ex-answer', 'Answer: ~ is an equivalence relation with classes {0, 3, 6}, {1, 4, 7}, {2, 5} — check: the classes are disjoint, their union is all 8 elements, and 3 + 3 + 2 = 8.') : null));
+            step.answer ? h('div.ex-answer', `Answer: ~ is an equivalence relation with classes ${D.classes.map((c) => '{' + c.join(', ') + '}').join(', ')} — check: the classes are disjoint, their union is all ${D.set.length} elements, and ${D.classes.map((c) => c.length).join(' + ')} = ${D.set.length}.`) : null));
         },
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: a property audit of one relation',
+        kind: 'example',
+        id: 'ex-property-audit',
+        objective: 'Audit one concrete relation for reflexivity, symmetry, antisymmetry and transitivity, reading each check in its matrix and its digraph at the same time.',
+        problem: String.raw`<p>Let \(R\) be the relation on \(\{1, 2, 3\}\) with pairs \((1, 1), (2, 2), (3, 3), (1, 2)\) and \((2, 3)\). Audit \(R\): decide whether it is reflexive, symmetric, antisymmetric and transitive, naming the witnessing pairs.</p>`,
+        data: EX_AUD_DATA,
+        steps: audStepsFor(EX_AUD_DATA),
+        answer: EX_AUD_DATA.answerText,
+        verify: audVerify(EX_AUD_DATA),
+        variants: [
+          {
+            label: 'Variant: same-parity relation',
+            problem: String.raw`<p>Let \(R\) be the relation on \(\{1, 2, 3\}\) with pairs \((1, 1), (2, 2), (3, 3), (1, 3)\) and \((3, 1)\): two elements are related when they have the same parity, plus every element is related to itself. Audit \(R\) with the same four checks.</p>`,
+            data: EX_AUD_EQ_DATA,
+            steps: audStepsFor(EX_AUD_EQ_DATA),
+            answer: EX_AUD_EQ_DATA.answerText,
+            verify: audVerify(EX_AUD_EQ_DATA),
+          },
+        ],
+        draw: audDraw(EX_AUD_DATA),
+      },
+      /* ---------------------------------------------------------------- worked example */
+      {
+        title: 'Worked example: from a partial order to its Hasse diagram',
+        kind: 'example',
+        id: 'ex-hasse-divisibility',
+        objective: 'Build a Hasse diagram from a partial order by deleting reflexive loops and transitive edges, then placing the elements on levels.',
+        problem: String.raw`<p>Take the partial order "divides" on \(\{1, 2, 3, 4, 6, 12\}\). Starting from the full relation, delete the reflexive loops and the transitive edges step by step, then draw the Hasse diagram level by level.</p>`,
+        data: EX_HASSE_DATA,
+        steps: hasseStepsFor(EX_HASSE_DATA),
+        answer: EX_HASSE_DATA.answerText,
+        verify: hasseVerify(EX_HASSE_DATA),
+        variants: [
+          {
+            label: 'Variant: subsets of {a, b}',
+            problem: String.raw`<p>Take the partial order "is a subset of" on the power set of \(\{a, b\}\): \(\varnothing, \{a\}, \{b\}, \{a, b\}\). Starting from the full relation, delete the loops and transitive edges with the same reduction, then draw the Hasse diagram level by level.</p>`,
+            data: EX_HASSE_SUB_DATA,
+            steps: hasseStepsFor(EX_HASSE_SUB_DATA),
+            answer: EX_HASSE_SUB_DATA.answerText,
+            verify: hasseVerify(EX_HASSE_SUB_DATA),
+          },
+        ],
+        draw: hasseDraw(EX_HASSE_DATA),
       },
       /* ---------------------------------------------------------------- 14 */
       {
