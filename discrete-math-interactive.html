@@ -3882,7 +3882,7 @@ DM.module({
       {
         title: 'Lab: ordered pairs and the Cartesian product',
         kind: 'lab',
-        html: String.raw`<div class="def">An <span class="term">ordered pair</span> \((a, b)\) remembers order, so \((1, 2) \neq (2, 1)\). The <span class="term">Cartesian product</span> is \(A \times B = \{(a, b) \mid a \in A,\ b \in B\}\), and \(|A \times B| = |A| \cdot |B|\).<div class="eg">\(\{1, 2\} \times \{x, y\} = \{(1, x), (1, y), (2, x), (2, y)\}\), which is \(2 \cdot 2 = 4\) pairs.</div></div>`,
+        html: String.raw`<div class="def">An <span class="term">ordered pair</span> \((a, b)\) remembers order, so \((1, 2) \neq (2, 1)\). The <span class="term">Cartesian product</span> is \(A \times B = \{(a, b) \mid a \in A,\ b \in B\}\), and \(|A \times B| = |A| \cdot |B|\).<div class="eg">\(\{1, 2\} \times \{x, y\} = \{(1, x), (1, y), (2, x), (2, y)\}\), so \(2 \cdot 2 = 4\) pairs.</div></div>`,
         render(body, ctx) {
           const { h } = ctx;
           let A = ['S', 'M', 'L'];
@@ -3906,9 +3906,9 @@ DM.module({
             grid.replaceChildren(table);
             side.replaceChildren(
               h('div.big-math', { html: String.raw`\(|${nx} \times ${ny}| = ${X.length} \cdot ${Y.length} = ${X.length * Y.length}\)` }),
-              h('p.small', { html: `Each row picks one element of ${nx}; each column picks one of ${ny}. Every cell is one ordered pair, so the grid has rows × columns cells. This is the <b>product rule</b> of counting (Module 7).` }),
-              h('p.small.muted', { html: flip ? 'Compare with A × B: same number of pairs, but each pair is reversed, so the two sets are different (unless A = B or one of them is empty).' : 'Press the button to swap the order and see that A × B ≠ B × A.' }),
-              h('div.ai', { html: 'A grid search for hyperparameters tries every pair in <i>learning rates</i> × <i>batch sizes</i>. With 5 rates and 4 sizes that is 20 training runs, and each extra parameter multiplies the cost again.' }));
+              h('p.small', { html: `Rows pick from ${nx} and columns from ${ny}, so the grid holds rows × columns ordered pairs: the <b>product rule</b> (Module 7).` }),
+              h('p.small.muted', { html: flip ? 'Same number of pairs as A × B, but every pair is reversed, so the sets differ (unless A = B or one is empty).' : 'Press the button to swap the order and see that A × B ≠ B × A.' }),
+              h('div.ai', { html: 'Model tuning by grid search tries every pair in <i>learning rates</i> × <i>batch sizes</i>: 5 × 4 = 20 training runs. Each extra parameter multiplies the cost.' }));
             ctx.tex(side);
           }
           draw();
