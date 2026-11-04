@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homework 2 — Discrete Mathematics (Numbers · Counting · Recurrences · Graphs)</title>
+<style>
+:root{
+  --bg:#0b1020; --panel:#131a2e; --panel2:#182238; --ink:#eef1ff; --muted:#a7b0cc;
+  --line:#2a3557; --accent:#ff9f0a; --accent2:#64d2ff; --good:#30d158; --bad:#ff453a;
+  --warn:#ffd60a; --code-bg:#0a0e1a; --radius:16px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#0b1020,#0d1330 40%,#0b1020);color:var(--ink);line-height:1.55}
+a{color:var(--accent2)}
+header.hero{padding:34px 20px 10px;max-width:1020px;margin:0 auto}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:.78rem}
+h1{font-size:2rem;margin:.3rem 0 .4rem;line-height:1.15}
+.sub{color:var(--muted);max-width:760px}
+main{max-width:1020px;margin:0 auto;padding:10px 20px 70px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:18px 0;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.card h2{margin:.1rem 0 .5rem;font-size:1.3rem}
+.card h3{margin:.2rem 0 .4rem;font-size:1.08rem}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.18rem .55rem;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-right:.4rem;vertical-align:middle}
+.tag.mod{color:#0b1020;background:var(--accent2);border-color:transparent}
+.tag.bonus{color:#0b1020;background:var(--warn);border-color:transparent}
+.tag.write{color:#0b1020;background:var(--good);border-color:transparent}
+.pts{float:right;color:var(--accent);font-weight:700;white-space:nowrap}
+pre.code{background:var(--code-bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto;font-size:.92rem;line-height:1.5}
+pre.code code,code.inline{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+code.inline{background:var(--code-bg);padding:.08rem .35rem;border-radius:6px;border:1px solid var(--line);font-size:.88em}
+.tok-k{color:#ff7eb6}.tok-s{color:#a5d6a7}.tok-n{color:#82aaff}.tok-c{color:#697098;font-style:italic}
+.sticky{position:sticky;top:0;z-index:50;background:rgba(11,16,32,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.sticky-in{max-width:1020px;margin:0 auto;padding:10px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.progresswrap{flex:1;min-width:180px}
+.progressbar{height:10px;background:var(--panel2);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+.progressbar>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s}
+.scorebox{font-weight:700}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:.55rem 1rem}
+button:hover{border-color:var(--accent2)}
+button.primary{background:var(--accent);color:#14100a;border-color:transparent;font-weight:700}
+button.primary:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{background:transparent}
+button.small{padding:.3rem .7rem;font-size:.9rem}
+.choices{display:grid;gap:10px;margin:12px 0}
+.choice{text-align:left;width:100%;padding:.7rem .9rem;display:flex;gap:.6rem;align-items:flex-start}
+.choice.sel{border-color:var(--accent);background:#1d2a4a}
+.choice.correct{border-color:var(--good);background:rgba(48,209,88,.12)}
+.choice.wrong{border-color:var(--bad);background:rgba(255,69,58,.10)}
+.choice:disabled{cursor:default;opacity:1}
+.feedback{border-radius:12px;padding:12px 14px;margin:12px 0;display:none}
+.feedback.show{display:block}
+.feedback.good{border:1px solid var(--good);background:rgba(48,209,88,.10)}
+.feedback.bad{border:1px solid var(--bad);background:rgba(255,69,58,.08)}
+.feedback.info{border:1px solid var(--accent2);background:rgba(100,210,255,.08)}
+.hintbox{display:none;border-left:4px solid var(--warn);background:rgba(255,214,10,.07);padding:10px 14px;margin:10px 0;border-radius:0 10px 10px 0}
+.hintbox.show{display:block}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+input[type=text],textarea,select{font:inherit;background:var(--code-bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:.55rem .7rem}
+textarea.codein{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92rem;min-height:96px}
+input.typed{width:110px}
+input.namein{width:min(420px,100%);font-size:1.05rem;padding:.7rem .9rem}
+select{max-width:100%}
+.parsons-bank,.parsons-zone{display:grid;gap:8px;margin:10px 0}
+.parsons-line{text-align:left;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9rem;width:100%}
+.parsons-line.inzone{border-color:var(--accent2)}
+.parsons-line.distractor-used{border-color:var(--bad)}
+.zone-label{color:var(--muted);font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.debugline{display:block;width:100%;text-align:left;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9rem;margin:4px 0;background:var(--code-bg)}
+.debugline.sel{border-color:var(--accent)}
+.debugline.correct{border-color:var(--good)}
+.debugline.wrong{border-color:var(--bad)}
+.phone{width:270px;max-width:88vw;margin:14px auto;background:#000;border:3px solid #39466e;border-radius:38px;padding:16px 14px 22px;min-height:340px;box-shadow:0 14px 40px rgba(0,0,0,.45)}
+.phone .notch{width:110px;height:20px;background:#39466e;border-radius:0 0 12px 12px;margin:-16px auto 12px}
+.phone .screen{display:grid;gap:12px;align-content:start;justify-items:center;text-align:center}
+.pill-demo{font-weight:700;color:#111}
+.state-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.93rem}
+.state-table th,.state-table td{border:1px solid var(--line);padding:.45rem .6rem;text-align:left}
+.state-table th{background:var(--panel2)}
+.timeline{display:grid;gap:8px;margin:12px 0}
+.tl-row{display:flex;align-items:center;gap:10px}
+.tl-label{width:120px;color:var(--muted);font-size:.88rem}
+.tl-track{flex:1;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;height:26px;position:relative;overflow:hidden}
+.tl-fill{position:absolute;top:0;bottom:0;border-radius:6px}
+.checklist{list-style:none;padding:0;margin:10px 0;display:grid;gap:8px}
+.checklist li{padding:.55rem .8rem;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.checklist li.ok{border-color:var(--good)}
+.checklist li.no{border-color:var(--bad)}
+.mini{font-size:.88rem;color:var(--muted)}
+.scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+.scorecell{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+.scorecell b{font-size:1.25rem;display:block}
+#summaryList{display:grid;gap:8px}
+footer{max-width:1020px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:.9rem}
+@media print{
+  body{background:#fff;color:#000}
+  .sticky,.no-print{display:none!important}
+  .card{border:1px solid #bbb;box-shadow:none;background:#fff;break-inside:avoid}
+  pre.code{background:#f4f4f4;border-color:#bbb}
+  .feedback{display:none}
+  #printSummary{display:block!important}
+}
+#printSummary{display:none}
+</style>
+</head>
+<body>
+<div class="sticky no-print"><div class="sticky-in">
+  <div class="scorebox">Homework 2</div>
+  <div class="progresswrap"><div class="progressbar"><div id="progressFill"></div></div><div class="mini" id="progressText">0 of 0 points</div></div>
+  <div class="scorebox" id="scoreBox">Score: 0 / 100</div>
+  <button class="small" onclick="scrollToId('finish')">Finish &amp; results ↓</button>
+</div></div>
+
+<header class="hero">
+  <div class="kicker">Discrete Mathematics &amp; Probability · Homework 2</div>
+  <h1>Compute it. Count it. Traverse it.</h1>
+  <p class="sub">This homework covers the next four modules of the course in the
+  <a href="https://github.com/joepangallo/discrete-math-interactive" target="_blank" rel="noopener">joepangallo/discrete-math-interactive</a> repo
+  (live course: <a href="https://joepangallo.github.io/discrete-math-interactive/" target="_blank" rel="noopener">joepangallo.github.io/discrete-math-interactive</a>):
+  <strong>Module 06</strong> Integers &amp; Number Theory, <strong>Module 07</strong> Counting &amp; the Binomial Theorem,
+  <strong>Module 08</strong> Recurrence Relations, and <strong>Module 09</strong> Graphs — <strong>25 points each, 100 total</strong>,
+  plus two bonus items (+2 each) that can never hurt your grade. As before, there is <strong>no proof-writing</strong> anywhere in this assignment:
+  you compute, count, construct, and judge. <strong>Do this homework before the midterm</strong> — the midterm re-tests exactly these concepts.</p>
+  <div class="card">
+    <h3>How this works — read this first (2 minutes)</h3>
+    <ul>
+      <li><strong>Time:</strong> about 75–90 minutes. <strong>Total:</strong> 100 points (25 per module), plus two <em>bonus</em> items (+2 each) that can never hurt your grade.</li>
+      <li><strong>Learn while you work:</strong> commit to a prediction or a construction <em>before</em> anything is revealed. Your first attempt is kept in your results, so you can see what your instincts got right.</li>
+      <li><strong>Feedback explains why</strong>, not just right/wrong, and names the exact lesson to revisit.</li>
+      <li><strong>Second tries:</strong> on questions with 4+ choices and on typed / constructed answers, a correct second try earns half credit. Multi-part items earn credit per correct part. Items built from yes/no cells (truth tables, property audits) are graded as one constructed whole.</li>
+      <li><strong>Hints are free</strong> — using them is recorded (so your instructor can see where the class got stuck) but never lowers your score.</li>
+      <li><strong>Conventions, stated once:</strong> typed answers are exact numbers (commas optional). a(0) is the starting term of a recurrence. "Distance" in a graph means the number of edges on a shortest path. An Euler <em>path</em> may start and end at different vertices; an Euler <em>circuit</em> returns to its start.</li>
+      <li><strong>Your work saves automatically</strong> in this browser. At the end, use <em>Download results</em> or <em>Print</em> to turn it in, exactly as your instructor directs.</li>
+    </ul>
+    <label for="studentName"><strong>Your name:</strong></label><br>
+    <input class="namein" type="text" id="studentName" placeholder="First and last name" autocomplete="name">
+    <span class="mini" id="saveNote">Progress saves automatically on this device.</span>
+  </div>
+</header>
+<main id="app"></main>
+
+<section class="card" id="finish">
+  <h2>Finish &amp; results</h2>
+  <p>When every section shows as complete, review what you missed below — each miss names the module and lesson to revisit in the course. Then turn this in the way your instructor directed.</p>
+  <div class="scoregrid" id="sectionScores"></div>
+  <div class="scorebox" id="finalScore" style="font-size:1.2rem"></div>
+  <h3>Review what you missed</h3>
+  <div id="summaryList"><p class="mini">Nothing missed yet — or nothing attempted yet. Items you attempt will be summarized here.</p></div>
+  <div class="row no-print">
+    <button class="primary" onclick="downloadResults()">Download results (.txt)</button>
+    <button onclick="window.print()">Print / save as PDF</button>
+    <button onclick="copyBackup()">Copy backup code</button>
+    <button onclick="restoreBackup()">Restore from backup code</button>
+    <button class="ghost" onclick="resetAll()">Reset everything</button>
+  </div>
+  <p class="mini no-print">Honesty note: this page grades in your browser and its answers live in the page source, like every take-home practice file. Your downloaded result includes your attempts, hints used, and a timestamp — that's the record to turn in.</p>
+  <div id="printSummary"></div>
+</section>
+<footer>Built from the Discrete Mathematics &amp; Probability interactive course (Modules 6–9) · Homework 2 · Compute → Count → Traverse</footer>
+
+<script>
+"use strict";
+/* ============ tiny helpers ============ */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function hl(code){ // very small Swift highlighter for display snippets
+  let e=esc(code);
+  e=e.replace(/(\/\/[^\n]*)/g,'<span class="tok-c">$1</span>');
+  e=e.replace(/(&quot;[^&]*?&quot;|"(?:[^"\\]|\\.)*")/g,'<span class="tok-s">$1</span>');
+  e=e.replace(/\b(import|struct|class|enum|protocol|func|var|let|return|if|else|guard|switch|case|default|for|while|repeat|in|break|continue|try|catch|do|throws|async|await|some|any|mutating|static|private|true|false|nil|self|super|init|extension|where|inout|defer|typealias)\b/g,'<span class="tok-k">$1</span>');
+  e=e.replace(/\b(\d+(?:\.\d+)?)\b/g,'<span class="tok-n">$1</span>');
+  return e;
+}
+const norm=s=>String(s).toLowerCase().replace(/\s+/g," ").trim();
+const normCode=s=>String(s).replace(/\/\/[^\n]*/g,"").replace(/\s+/g," ").trim();
+function scrollToId(id){document.getElementById(id)?.scrollIntoView({behavior:"smooth"});}
+
+/* ============ state ============ */
+const LS_KEY="dm-hw2-v1";
+let state={name:"",items:{},finishedAt:null};
+try{const raw=localStorage.getItem(LS_KEY); if(raw) state=JSON.parse(raw);}catch(e){}
+function save(){ try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){} renderProgress(); }
+function itemState(id){ if(!state.items[id]) state.items[id]={attempts:0,hint1:false,hint2:false,awarded:0,done:false,answers:[]}; return state.items[id]; }
+
+/* ============ scoring core ============
+   grade(id, fraction, detail): fraction = share of the item answered correctly (0..1).
+   Attempt factor: 1st graded try x1; 2nd try x0.5 when def.secondTryCredit (or the item is
+   multi-part / typed / written / built), otherwise x0 and the item locks after one try.
+   def.attemptFactors overrides this (capstone builder: [1, .5, .25], max 3 checks).
+   Hints are FREE (never reduce the score); hint use is logged for the instructor.
+   Partial credit: multi-part items keep the best fraction earned across tries. */
+function maxAttempts(def){ return def.attemptFactors? def.attemptFactors.length : (def.secondTryCredit?2:1); }
+function attemptFactor(def,attempt){
+  if(def.attemptFactors) return def.attemptFactors[Math.min(attempt-1,def.attemptFactors.length-1)];
+  if(attempt===1) return 1;
+  return def.secondTryCredit? 0.5 : 0;
+}
+function grade(id,fraction,detail){
+  const def=ITEMS[id]; const st=itemState(id);
+  if(st.done) return st.awarded;
+  fraction=Math.max(0,Math.min(1,fraction));
+  st.attempts++;
+  st.answers.push(detail||("fraction="+fraction));
+  if(st.attempts===1) st.firstAnswer=detail||("fraction="+fraction);
+  const f=attemptFactor(def,st.attempts);
+  const earned=Math.round(def.points*fraction*f*100)/100;
+  if(earned>st.awarded) st.awarded=earned;
+  st.bestFraction=Math.max(st.bestFraction||0,fraction);
+  if(fraction>=1 || st.attempts>=maxAttempts(def)) st.done=true;
+  save(); renderItemFeedback(id,fraction,st.awarded); renderSummary();
+  return st.awarded;
+}
+function useHint(id,n){
+  const st=itemState(id); if(n===1)st.hint1=true; if(n===2)st.hint2=true; save();
+  const box=$("#hint"+n+"-"+id); if(box) box.classList.add("show");
+  const b=$("#hintbtn"+n+"-"+id); if(b) b.disabled=true;
+}
+function triesLeft(id){ const def=ITEMS[id]; const st=itemState(id); if(st.done)return 0; return def.secondTryCredit? Math.max(0,2-st.attempts): Math.max(0,1-st.attempts); }
+
+/* ============ ITEMS registry (renderers fill this) ============ */
+const ITEMS={}; const SECTIONS=[];
+function registerSection(sec){ SECTIONS.push(sec); }
+function registerItem(def){ ITEMS[def.id]=def; }
+
+/* feedback renderer: every item has #fb-<id> */
+function renderItemFeedback(id,fraction,awarded){
+  const def=ITEMS[id]; const st=itemState(id); const fb=$("#fb-"+id); if(!fb)return;
+  const full=fraction>=1, label=def.bonus?`Bonus earned: +${awarded} pts`:`Score so far on this item: ${awarded} / ${def.points} pts`;
+  fb.className="feedback show "+(full?"good":(st.done?"bad":"info"));
+  if(full){
+    fb.innerHTML=`<strong>✓ Correct — ${label}.</strong><br>${def.explain}`;
+  } else if(st.done){
+    fb.innerHTML=`<strong>${st.bestFraction>0?"◐ Partially there":"✗ Not quite"} — ${label}.</strong><br>${def.explain}<br><span class="mini">Revisit: ${esc(def.revisit)}</span>`;
+  } else {
+    fb.innerHTML=`<strong>◐ Not fully there yet (${Math.round((st.bestFraction||0)*100)}% of this item so far).</strong> You have another try — a fully correct second try earns half credit on this item. Re-read carefully${st.hint1?"":" — Hint 1 is free"}.`;
+  }
+  if(st.done){ $$("[data-lock='"+id+"']").forEach(el=>{el.disabled=true;}); const c=$("#check-"+id); if(c)c.disabled=true; }
+}
+</script>
+<script>
+"use strict";
+/* ============ renderers ============ */
+const app=document.getElementById("app");
+function tagsHTML(def){
+  let t=`<span class="tag mod">${esc(def.mod)}</span>`;
+  if(def.extension) t+=`<span class="tag">Extension · scored separately</span>`;
+  if(def.bonus) t+=`<span class="tag bonus">Bonus · can't hurt you</span>`;
+  if(def.type==="write") t+=`<span class="tag write">You write the Swift</span>`;
+  if(def.type==="parsons") t+=`<span class="tag write">Build the code</span>`;
+  if(def.type==="builder") t+=`<span class="tag write">Capstone builder</span>`;
+  return t;
+}
+function cardShell(def){
+  const sec=document.createElement("section"); sec.className="card"; sec.id="card-"+def.id;
+  sec.innerHTML=`<span class="pts">${def.bonus?"+":""}${def.points} pts</span>${tagsHTML(def)}
+    <h3>${esc(def.title)}</h3>
+    <div class="prompt">${def.prompt||""}</div>
+    ${def.code?`<pre class="code"><code>${hl(def.code)}</code></pre>`:""}
+    <div id="body-${def.id}"></div>
+    <div id="notes-${def.id}"></div>
+    ${(def.hint1||def.hint2)?`<div class="row no-print">
+      ${def.hint1?`<button class="small" id="hintbtn1-${def.id}" onclick="useHint('${def.id}',1)">Hint 1 (free)</button>`:""}
+      ${def.hint2?`<button class="small" id="hintbtn2-${def.id}" onclick="useHint('${def.id}',2)">Hint 2 (free, bigger nudge)</button>`:""}
+    </div>
+    ${def.hint1?`<div class="hintbox" id="hint1-${def.id}"><strong>Hint 1:</strong> ${def.hint1}</div>`:""}
+    ${def.hint2?`<div class="hintbox" id="hint2-${def.id}"><strong>Hint 2:</strong> ${def.hint2}</div>`:""}`:""}
+    <div class="row no-print"><button class="primary" id="check-${def.id}" onclick="checkItem('${def.id}')">${def.checkLabel||"Commit &amp; check"}</button>
+    <span class="mini" id="tries-${def.id}"></span></div>
+    <div class="feedback" id="fb-${def.id}"></div>`;
+  return sec;
+}
+function sectionHeader(sec){
+  const d=document.createElement("div"); d.innerHTML=`<h2 style="margin:26px 4px 4px">${esc(sec.title)}</h2><p class="mini" style="margin:0 4px">${sec.desc||""}</p>`; return d;
+}
+function renderSection(sec){
+  registerSection(sec); app.appendChild(sectionHeader(sec));
+  for(const def of sec.items){ registerItem(def); app.appendChild(cardShell(def)); buildBody(def); }
+}
+function choicesHTML(id,partIdx,choices){
+  return `<div class="choices" id="choices-${id}-${partIdx}">`+choices.map((c,i)=>
+    `<button class="choice" data-lock="${id}" onclick="pickChoice('${id}',${partIdx},${i},this)"><span>○</span><span>${c}</span></button>`).join("")+`</div>`;
+}
+const picks={}; // id -> {partIdx: choiceIndex}
+function pickChoice(id,partIdx,i,btn){
+  if(itemState(id).done) return;
+  picks[id]=picks[id]||{}; picks[id][partIdx]=i;
+  $$( "#choices-"+id+"-"+partIdx+" .choice").forEach((b,j)=>{ b.classList.toggle("sel",j===i); b.querySelector("span").textContent=j===i?"●":"○"; });
+}
+function buildBody(def){
+  const body=$("#body-"+def.id); if(!body) return;
+  if(def.type==="mc"){ body.innerHTML=choicesHTML(def.id,0,def.choices); }
+  else if(def.type==="multi"){
+    body.innerHTML=def.parts.map((p,pi)=>`<div style="margin:14px 0"><p><strong>Part ${pi+1}.</strong> ${p.prompt||""}</p>
+      ${p.code?`<pre class="code"><code>${hl(p.code)}</code></pre>`:""}
+      ${p.type==="typed"?`<input type="text" class="typed" data-lock="${def.id}" id="typed-${def.id}-${pi}" placeholder="${esc(p.placeholder||"type here")}"> ${esc(p.suffix||"")}`
+        : choicesHTML(def.id,pi,p.choices)}</div>`).join("");
+  }
+  else if(def.type==="typed"){
+    body.innerHTML=def.fields.map((f,fi)=>`<p>${f.label} <input type="text" class="typed" data-lock="${def.id}" id="typed-${def.id}-${fi}" placeholder="${esc(f.placeholder||"")}"> ${esc(f.suffix||"")}</p>`).join("");
+  }
+  else if(def.type==="write"){
+    body.innerHTML=`${def.before||""}<textarea class="codein" data-lock="${def.id}" id="code-${def.id}" spellcheck="false">${esc(def.starter||"")}</textarea>
+      <p class="mini">Spacing doesn't matter. Equivalent correct Swift is accepted. Your code is saved into your results.</p>`;
+    const ta=$("#code-"+def.id); ta.addEventListener("input",()=>{ itemState(def.id).code=ta.value; save(); });
+  }
+  else if(def.type==="parsons"){
+    const order=def.lines.map((_,i)=>i); // deterministic shuffle
+    let seed=[...def.id].reduce((a,c)=>a+c.charCodeAt(0),0);
+    for(let i=order.length-1;i>0;i--){ seed=(seed*31+7)%997; const j=seed%(i+1); [order[i],order[j]]=[order[j],order[i]]; }
+    const all=def.lines.map((t,i)=>({t,correct:i})); if(def.distractor) all.push({t:def.distractor,correct:-1});
+    const bankOrder=[...all]; for(let i=bankOrder.length-1;i>0;i--){ seed=(seed*31+13)%997; const j=seed%(i+1); [bankOrder[i],bankOrder[j]]=[bankOrder[j],bankOrder[i]]; }
+    body.innerHTML=`<p class="mini">Tap a line to move it into your program (tap again in the program to send it back). Keyboard: Tab to a line, press Enter. One line below is a distractor — a real program won't use it.</p>
+      <div class="zone-label">Line bank</div><div class="parsons-bank" id="bank-${def.id}">
+      ${bankOrder.map((o,k)=>`<button class="parsons-line" data-lock="${def.id}" data-correct="${o.correct}" onclick="parsonsMove('${def.id}',this)">${esc(o.t)}</button>`).join("")}</div>
+      <div class="zone-label">Your program</div><div class="parsons-zone" id="zone-${def.id}"></div>`;
+  }
+  else if(def.type==="debug"){
+    body.innerHTML=`<p><strong>Step 1:</strong> tap the line that causes the problem.</p>`+
+      def.lines.map((l,i)=>`<button class="debugline" data-lock="${def.id}" onclick="pickDebugLine('${def.id}',${i},this)">${esc(l)}</button>`).join("")+
+      `<p style="margin-top:12px"><strong>Step 2:</strong> pick the fix.</p>`+choicesHTML(def.id,0,def.fixes);
+  }
+  else if(def.type==="builder"){
+    body.innerHTML=def.groups.map((g,gi)=>`<div style="margin:14px 0"><p><strong>${esc(g.label)}</strong></p>${choicesHTML(def.id,gi,g.options)}</div>`).join("")+
+      `<div class="phone" aria-label="Simulated phone preview"><div class="notch"></div><div class="screen" id="phone-${def.id}"></div></div>
+       <p class="mini" style="text-align:center">Simulated preview — fixed outcomes for the choices above.</p>
+       <div class="zone-label">Live checklist (feedback only — your choices are what's graded)</div><ul class="checklist" id="checklist-${def.id}"></ul>`;
+    updateBuilder(def.id);
+  }
+  else if(def.type==="custom"){ CUSTOM_BUILD[def.custom](def,body); }
+}
+function parsonsMove(id,btn){
+  if(itemState(id).done) return;
+  const bank=$("#bank-"+id), zone=$("#zone-"+id);
+  if(btn.parentElement===bank){ zone.appendChild(btn); btn.classList.add("inzone"); }
+  else { bank.appendChild(btn); btn.classList.remove("inzone"); }
+}
+let debugPick={};
+function pickDebugLine(id,i,btn){
+  if(itemState(id).done) return; debugPick[id]=i;
+  $$("#body-"+id+" .debugline").forEach((b,j)=>b.classList.toggle("sel",j===i));
+}
+function updateBuilder(id){
+  const def=ITEMS[id]; const sel=picks[id]||{};
+  const phone=$("#phone-"+id); if(phone&&def.preview) phone.innerHTML=def.preview(sel);
+  const cl=$("#checklist-"+id);
+  if(cl) cl.innerHTML=def.groups.map((g,gi)=>{ const ok=sel[gi]===g.answer; const chosen=sel[gi]!==undefined;
+    return `<li class="${chosen?(ok?"ok":"no"):""}">${chosen?(ok?"✓":"✗"):"•"} ${esc(g.checkText)}</li>`; }).join("");
+}
+/* generic check dispatcher */
+function checkItem(id){
+  const def=ITEMS[id]; const st=itemState(id); if(st.done) return;
+  if(def.type==="mc"){
+    const sel=(picks[id]||{})[0]; if(sel===undefined){ note(id,"Pick an answer first — commit to a prediction, then check."); return; }
+    grade(id, sel===def.answer?1:0, "chose: "+stripTags(def.choices[sel]));
+  }
+  else if(def.type==="multi"){
+    let got=0,log=[];
+    def.parts.forEach((p,pi)=>{
+      if(p.type==="typed"){ const raw=$("#typed-"+id+"-"+pi).value; const ok=acceptMatch(raw,p.accept); if(ok)got++; log.push(`part${pi+1}:${ok?"✓":"✗ '"+raw+"'"}`); }
+      else { const sel=(picks[id]||{})[pi]; const ok=sel===p.answer; if(ok)got++; log.push(`part${pi+1}:${ok?"✓":"✗"}`); }
+    });
+    if(log.some(l=>l.includes("undefined"))) {}
+    grade(id, got/def.parts.length, log.join(" "));
+  }
+  else if(def.type==="typed"){
+    let got=0,log=[];
+    def.fields.forEach((f,fi)=>{ const raw=$("#typed-"+id+"-"+fi).value; const ok=acceptMatch(raw,f.accept); if(ok)got++; log.push(`${f.short}:${ok?"✓":"✗ '"+raw+"'"}`); });
+    grade(id, got/def.fields.length, log.join(" "));
+  }
+  else if(def.type==="write"){
+    const ta=$("#code-"+id); const res=CHECKERS[def.checker](ta.value);
+    st.code=ta.value;
+    note(id,res.notes);
+    grade(id, res.fraction, "code: "+ta.value.replace(/\n/g," ⏎ "));
+  }
+  else if(def.type==="parsons"){
+    const zone=$$("#zone-"+id+" .parsons-line");
+    if(zone.length===0){ note(id,"Move lines into Your program first."); return; }
+    let posOK=0; zone.forEach((b,i)=>{ if(parseInt(b.dataset.correct)===i) posOK++; });
+    const exact = zone.length===def.lines.length && zone.every((b,i)=>parseInt(b.dataset.correct)===i);
+    grade(id, exact?1:posOK/def.lines.length, "order: "+zone.map(b=>b.dataset.correct).join(","));
+  }
+  else if(def.type==="debug"){
+    const line=debugPick[id]; const fix=(picks[id]||{})[0];
+    if(line===undefined||fix===undefined){ note(id,"Do both steps: tap the buggy line AND pick a fix."); return; }
+    const frac=(line===def.bugLine?0.5:0)+(fix===def.fixAnswer?0.5:0);
+    $$("#body-"+id+" .debugline").forEach((b,j)=>{ if(j===def.bugLine) b.classList.add("correct"); });
+    grade(id, frac, `line:${line} fix:${stripTags(def.fixes[fix])}`);
+  }
+  else if(def.type==="builder"){
+    const sel=picks[id]||{};
+    if(Object.keys(sel).length<def.groups.length){ note(id,"Choose one option in every group first — the checklist shows what's still open."); return; }
+    let got=0; def.groups.forEach((g,gi)=>{ if(sel[gi]===g.answer) got++; });
+    grade(id, got/def.groups.length, "builder groups correct: "+got+"/"+def.groups.length);
+    updateBuilder(id);
+  }
+  else if(def.type==="custom"){ CUSTOM_CHECK[def.custom](def); }
+  const t=$("#tries-"+id); const st2=itemState(id);
+  if(t) t.textContent = st2.done? "" : (triesLeft(id)>0? triesLeft(id)+" try left":"");
+}
+function note(id,html){ const n=$("#notes-"+id); if(n) n.innerHTML=`<div class="feedback show info">${html}</div>`; }
+function stripTags(s){ const d=document.createElement("div"); d.innerHTML=s; return d.textContent; }
+/* builder picks also refresh preview */
+const _pick=pickChoice;
+pickChoice=function(id,partIdx,i,btn){ _pick(id,partIdx,i,btn); if(ITEMS[id]&&ITEMS[id].type==="builder") updateBuilder(id); };
+
+/* ============ progress / summary / export ============ */
+function totals(){
+  let core=0,coreDone=0,ext=0,extMax=0,bonus=0,attempted=0,doneCount=0,totalItems=0;
+  for(const id in ITEMS){ const def=ITEMS[id], st=state.items[id]; totalItems++;
+    if(st&&st.attempts>0)attempted++; if(st&&st.done)doneCount++;
+    if(def.extension) extMax+=def.points;
+    if(!st) continue;
+    if(def.bonus) bonus+=st.awarded; else if(def.extension) ext+=st.awarded; else core+=st.awarded;
+  }
+  return {core:Math.round(core*100)/100,ext:Math.round(ext*100)/100,bonus:Math.round(bonus*100)/100,attempted,doneCount,totalItems};
+}
+function renderProgress(){
+  const t=totals();
+  $("#progressFill").style.width=Math.min(100,t.core)+"%";
+  $("#progressText").textContent=`${t.doneCount} of ${t.totalItems} items finished`;
+  $("#scoreBox").textContent = t.extMax>0 ? `Core: ${t.core} / 100 · Ext: ${t.ext} / ${t.extMax} · Bonus: +${t.bonus}` : `Score: ${t.core} / 100 · Bonus: +${t.bonus}`;
+  const fs=$("#finalScore"); if(fs) fs.textContent=`Score: ${t.core} / 100`+(t.bonus>0?` · Bonus: +${t.bonus}`:"");
+  const sg=$("#sectionScores");
+  if(sg){ sg.innerHTML=SECTIONS.map(sec=>{ let got=0,max=0; for(const def of sec.items){ if(def.bonus)continue; max+=def.points; const st=state.items[def.id]; if(st)got+=st.awarded; }
+    return `<div class="scorecell"><span class="mini">${esc(sec.title)}</span><b>${Math.round(got*100)/100} / ${max}</b></div>`; }).join(""); }
+}
+function renderSummary(){
+  renderProgress();
+  const list=$("#summaryList"); if(!list) return;
+  const missed=[];
+  for(const sec of SECTIONS) for(const def of sec.items){ const st=state.items[def.id];
+    if(st&&st.attempts>0&&(st.bestFraction||0)<1) missed.push({def,st});
+  }
+  if(!missed.length){ list.innerHTML=`<p class="mini">Nothing missed yet — or nothing attempted yet. Items you attempt will be summarized here.</p>`; return; }
+  list.innerHTML=missed.map(({def,st})=>`<div class="feedback show info"><strong>${esc(def.title)}</strong> — ${st.awarded} / ${def.points} pts after ${st.attempts} ${st.attempts===1?"try":"tries"}${st.hint1||st.hint2?" · used a hint":""}.<br><span class="mini">Revisit: ${esc(def.revisit)}</span></div>`).join("");
+  const ps=$("#printSummary");
+  if(ps) ps.innerHTML="<h3>Results summary</h3>"+list.innerHTML;
+}
+function resultsText(){
+  const t=totals(); const lines=[];
+  lines.push("Discrete Mathematics — Homework 2 (Modules 6, 7, 8, 9)");
+  lines.push("Name: "+(state.name||"(not entered)"));
+  lines.push("Exported: "+new Date().toLocaleString());
+  lines.push(`Score (Modules 6-9): ${t.core} / 100`);
+  lines.push(`Module 4 extension: ${t.ext} / 25`);
+  lines.push(`Bonus: +${t.bonus}`);
+  lines.push("");
+  for(const sec of SECTIONS){ lines.push("== "+sec.title+" ==");
+    for(const def of sec.items){ const st=state.items[def.id];
+      if(!st||st.attempts===0){ lines.push(`- ${def.title}: not attempted (0/${def.points})`); continue; }
+      lines.push(`- ${def.title}: ${st.awarded}/${def.points} pts, ${st.attempts} ${st.attempts===1?"try":"tries"}, hints: ${st.hint1?"1":"-"}${st.hint2?"+2":""}`);
+      if(st.firstAnswer) lines.push(`    first answer: ${st.firstAnswer}`);
+      if(st.code) lines.push(`    submitted code:\n      ${st.code.replace(/\n/g,"\n      ")}`);
+      if(st.answers&&st.answers.length>1) lines.push(`    all attempts: ${st.answers.join(" | ")}`);
+    } lines.push("");
+  }
+  return lines.join("\n");
+}
+function downloadResults(){
+  state.name=$("#studentName").value; save();
+  const blob=new Blob([resultsText()],{type:"text/plain"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="discrete-math-homework-2-results-"+(state.name||"student").replace(/\s+/g,"-").toLowerCase()+".txt"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function copyBackup(){
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  if(navigator.clipboard) navigator.clipboard.writeText(code).then(()=>alert("Backup code copied. Keep it somewhere safe — pasting it into Restore brings your work back on any device."));
+  else prompt("Copy your backup code:",code);
+}
+function restoreBackup(){
+  const code=prompt("Paste your backup code:"); if(!code) return;
+  try{ state=JSON.parse(decodeURIComponent(escape(atob(code.trim())))); save(); location.reload(); }
+  catch(e){ alert("That code didn't work — check you pasted the whole thing."); }
+}
+function resetAll(){ if(confirm("Erase all answers and scores on this device and start over?")){ localStorage.removeItem(LS_KEY); location.reload(); } }
+</script>
+
+<script>
+"use strict";
+/* STUDENT EDITION — self-grading uses salted hash checks; this file contains no readable answer key. */
+
+function sha256hex(ascii){function rr(v,a){return (v>>>a)|(v<<(32-a));}
+var maxWord=Math.pow(2,32),i,j,result='';var words=[],asciiBitLength=ascii.length*8;
+var hash=sha256hex.h=sha256hex.h||[],k=sha256hex.k=sha256hex.k||[];
+var primeCounter=k.length,isComposite={};
+for(var candidate=2;primeCounter<64;candidate++){if(!isComposite[candidate]){
+for(i=0;i<313;i+=candidate){isComposite[i]=candidate;}
+hash[primeCounter]=(Math.pow(candidate,.5)*maxWord)|0;k[primeCounter++]=(Math.pow(candidate,1/3)*maxWord)|0;}}
+ascii+='\x80';while(ascii.length%64-56)ascii+='\x00';
+for(i=0;i<ascii.length;i++){var code=ascii.charCodeAt(i);if(code>255)return sha256hex(unescape(encodeURIComponent(ascii)));
+words[i>>2]|=code<<((3-i)%4)*8;}
+words[words.length]=(asciiBitLength/maxWord)|0;words[words.length]=(asciiBitLength);
+for(j=0;j<words.length;){var w=words.slice(j,j+=16);var oldHash=hash;hash=hash.slice(0,8);
+for(i=0;i<64;i++){var w15=w[i-15],w2=w[i-2];var a=hash[0],e=hash[4];
+var temp1=hash[7]+(rr(e,6)^rr(e,11)^rr(e,25))+((e&hash[5])^((~e)&hash[6]))+k[i]
++(w[i]=(i<16)?w[i]:(w[i-16]+(rr(w15,7)^rr(w15,18)^(w15>>>3))+w[i-7]+(rr(w2,17)^rr(w2,19)^(w2>>>10)))|0);
+var temp2=(rr(a,2)^rr(a,13)^rr(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+hash=[(temp1+temp2)|0].concat(hash);hash[4]=(hash[4]+temp1)|0;}
+for(i=0;i<8;i++){hash[i]=(hash[i]+oldHash[i])|0;}}
+for(i=0;i<8;i++){for(j=3;j+1;j--){var b=(hash[i]>>(j*8))&255;result+=((b<16)?0:'')+b.toString(16);}}
+return result;}
+const HKEY=(...p)=>sha256hex("hwkey-v1|"+p.join("|"));
+
+const DM_LABS={ venn:{}, tt:{}, growth:{} };
+const VENN_CIRCLES=[];
+const REGION_NAMES=[];
+
+function setCanon(s){
+  const parts=String(s).replace(/[{}]/g,"").split(/[,\s]+/).map(x=>x.trim()).filter(Boolean);
+  if(!parts.length) return "";
+  const numeric=parts.every(x=>/^-?\d+$/.test(x));
+  parts.sort(numeric? (a,b)=>Number(a)-Number(b) : undefined);
+  return parts.join(",");
+}
+const SIEVE={};
+function sieveClick(id,n){
+  const s=SIEVE[id]||(SIEVE[id]={marks:{}});
+  const cur=s.marks[n];
+  if(!cur) s.marks[n]='prime'; else if(cur==='prime') s.marks[n]='comp'; else delete s.marks[n];
+  const b=document.getElementById('sieve-'+id+'-'+n);
+  if(b){ const m=s.marks[n];
+    b.style.background = m==='prime' ? '#14532d' : m==='comp' ? '#5b2333' : '';
+    b.style.borderColor = m==='prime' ? '#22c55e' : m==='comp' ? '#f43f5e' : '';
+    b.textContent = n + (m==='prime'?' ✓':m==='comp'?' ✗':'');
+  }
+}
+const EULER={};
+function eulerToggle(id,i){
+  const s=EULER[id]; if(!s) return;
+  if(s.flags.has(i)) s.flags.delete(i); else s.flags.add(i);
+  const c=document.getElementById('ev-'+id+'-'+i), t=document.getElementById('evf-'+id+'-'+i);
+  if(c) c.setAttribute('stroke', s.flags.has(i)?'#fbbf24':'#8ea2ff');
+  if(t) t.textContent = s.flags.has(i)?'ODD':'';
+}
+function eulerPick(id,oi){
+  const s=EULER[id]; if(!s) return; s.choice=oi;
+  document.querySelectorAll(`[id^="ec-${id}-"]`).forEach(b=>b.classList.remove('sel'));
+  const b=document.getElementById('ec-'+id+'-'+oi); if(b) b.classList.add('sel');
+}
+
+const CUSTOM_BUILD={ sieveLab: function sieveLab(def, body){
+    SIEVE[def.id]={marks:{}};
+    let cells='';
+    for(let n=2;n<=40;n++) cells+=`<button class="small" id="sieve-${def.id}-${n}" style="min-width:52px;margin:2px" onclick="sieveClick('${def.id}',${n})">${n}</button>`;
+    body.innerHTML=`<p class="mini">Tap a number to cycle it: <em>unmarked</em> → <strong style="color:#4ade80">✓ PRIME</strong> → <strong style="color:#fb7185">✗ COMPOSITE</strong> → unmarked. Classify <strong>every</strong> number from 2 to 40 — an unmarked cell counts as unclassified. Half the item's credit rides on the primes and half on the composites. (Work it like Eratosthenes: 2 is prime, cross out its multiples starting at 2² = 4; then 3, crossing from 9; then 5, crossing from 25. What's left standing is prime.)</p><div>${cells}</div>`;
+  }, eulerAudit: function eulerAudit(def, body){
+    EULER[def.id]={flags:new Set(), choice:-1};
+    const pos={}; def.nodes.forEach(nd=>pos[nd.k]=[nd.x,nd.y]);
+    let lines='';
+    def.edges.forEach(e=>{ const a=pos[def.nodes[e[0]].k], b=pos[def.nodes[e[1]].k]; lines+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#5b6b95" stroke-width="3"/>`; });
+    let dots='';
+    def.nodes.forEach((nd,i)=>{ dots+=`<g onclick="eulerToggle('${def.id}',${i})" style="cursor:pointer"><circle id="ev-${def.id}-${i}" cx="${nd.x}" cy="${nd.y}" r="17" fill="#182238" stroke="#8ea2ff" stroke-width="2"/><text x="${nd.x}" y="${nd.y+5}" fill="#eef1ff" font-size="14" text-anchor="middle" font-weight="700">${nd.k}</text><text id="evf-${def.id}-${i}" x="${nd.x}" y="${nd.y-24}" fill="#fbbf24" font-size="12" text-anchor="middle"></text></g>`; });
+    body.innerHTML=`<p class="mini">Step 1: work out each vertex's degree, then <strong>tap the vertices whose degree is ODD</strong> to flag them (tap again to unflag). Step 2: pick the verdict below.</p>
+      <svg viewBox="0 0 360 250" style="width:100%;max-width:430px;background:#0d1322;border:1px solid #2a3557;border-radius:14px">${lines}${dots}</svg>
+      <p style="margin-top:10px"><strong>Step 2 — the verdict:</strong></p>
+      <div class="choices">${def.options.map((o,oi)=>`<button class="choice" id="ec-${def.id}-${oi}" onclick="eulerPick('${def.id}',${oi})">○ ${esc(o)}</button>`).join("")}</div>`;
+  } };
+const CUSTOM_CHECK={
+    sieveLab(def){ const s=SIEVE[def.id]||{marks:{}}; const P=new Set(def.phashes), C=new Set(def.chashes); let pc=0, cc=0;
+      for(let n=2;n<=40;n++){ const m=s.marks[n]; if(m==='prime' && P.has(HKEY('sieve',def.id,n,'prime'))) pc++; if(m==='comp' && C.has(HKEY('sieve',def.id,n,'comp'))) cc++; }
+      grade(def.id, 0.5*(pc/12)+0.5*(cc/27), "sieve classification: "+pc+"/12 primes, "+cc+"/27 composites"); },
+    eulerAudit(def){ const s=EULER[def.id]||{flags:new Set(), choice:-1}; if(s.choice<0){ note(def.id,"Pick a verdict in Step 2 as well as flagging the odd-degree vertices."); return; }
+      let ok=0; def.nodes.forEach((nd,i)=>{ if(HKEY('odd',def.id,i,s.flags.has(i)?1:0)===def.ohashes[i]) ok++; });
+      const frac=(5*(ok/def.nodes.length)+2*(HKEY('mc',def.id,0,s.choice)===def.ahash?1:0))/7;
+      grade(def.id, frac, "odd-degree flags: "+ok+"/"+def.nodes.length); }
+};
+const DEFS={"nq1":{"id":"nq1","mod":"Module 06 · Numbers","type":"typed","points":4,"secondTryCredit":true,"title":"Division algorithm + how far to test","prompt":"<p>Two reading-the-theorem checks:<\/p>","fields":[{"short":"q","label":"The division algorithm writes 137 = 12q + r with 0 ≤ r &lt; 12. The quotient q is","ahashes":["b7eed810725642f020e1e7631b79afc1235cd92a44a5deed2f62d0e51c9045f1"]},{"short":"r","label":"…and the remainder r is","ahashes":["e40e9fe48e3edc3be3ee314cd083aadcbf4e59783f2f1f7e24b012397773e074","4ae19f79e02343dc6caec93bfa4c8cd4859cc186b25856ef9a9b0a3de59aaad2"]},{"short":"largest prime","label":"To decide whether 221 is prime by trial division, you only test primes up to √221 ≈ 14.9. The largest prime you must actually try is","ahashes":["974aceb4ac2e84a8f9b34d3061e49a0add5f815188c4c32751b2d3c12eac6e3b"]}],"hint1":"137 ÷ 12 = 11 remainder… count it out: 12 × 11 = 132. For 221: list the primes up to 14.9 — 2, 3, 5, 7, 11, 13 — the last one is your answer.","hint2":"If a composite n had a factor bigger than √n, its partner factor would be smaller than √n — so finding nothing by √n settles it.","explain":"<strong>q = 11, r = 5<\/strong> (12 × 11 + 5 = 137, and 5 < 12 as required). And trial division stops at √n: any factor larger than √n must pair with one smaller than √n, which you'd already have found. For 221 the largest prime to try is <strong>13<\/strong> — and indeed 221 = 13 × 17, so the test catches it at the last step.","revisit":"Module 06 · 'Divisibility and the division algorithm' and 'Primes and unique factorization'."},"nq2":{"id":"nq2","mod":"Module 06 · Numbers","type":"custom","custom":"sieveLab","points":7,"secondTryCredit":true,"title":"Lab: run the sieve to 40","prompt":"<p>Eratosthenes' sieve, by hand. Classify every number from 2 to 40 as prime or composite:<\/p>","hint1":"There are exactly 12 primes between 2 and 40. Start with 2 (prime), cross out 4, 6, 8, …; then 3 (prime), cross out 9, 15, 21, …; then 5, crossing from 25.","hint2":"The primes are 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37. Everything else in the grid is composite. Watch the near-misses: 1 is not in the grid; 49 is outside it; 27, 33, 35, 39 are composite.","explain":"<strong>The sieve leaves 12 primes standing: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37.<\/strong> Crossing always starts at p² — smaller multiples of p were already removed by smaller primes. Everything not crossed and not prime-seeded is composite (27 numbers).","revisit":"Module 06 · 'Lab: the Sieve of Eratosthenes'.","phashes":["cd226135b8b121ba80b48fad1ce4b4f500d54093902e4a2e644a24176e1184f4","7ddecf16ff5828b1e05506b2f93b8c0b9489a613dd43fa54d4e29a0bf3479f75","4a9309541f95979e8903a98c59447ae02fbf1d9d9d2f5493bd5a174bb1514902","fb5c229f9aec7cc6fe578c1593d1a42c101c7340fe02a9bb97bddd4fcc0ecbc7","5b61614fed4ae5b7e7e43f0a6f235753d0873d26f30cd68975312acac8163f64","ac3eb2fae1799ee3ea2ec1f5f649eb3040ccece7d8f9c056950b9fd89e4412ba","930016771719de1077dff249064c203d65e7a0b6fc6d395d8958cbb85bfdc6b3","3dfbb1dd7525643c92d34d69ce67a843efe991ae5bc6673cb9be4cfdf264ee08","fd7f29d038ca0483d78541278719e9d25c12a649fea20c31357905e99d3a3e15","bcd8e03ccc66bf2a05eca781ccdc93488a88391c8b8267027fe9ba4b2b4a2300","ed5ca2a4f8fa477d6350756f9a8aecff8e373cffb86d8fbe7a99ae1b98366889","41308ab8d027bfc6c22b4633d77be21958f1943799c1ce64e40baa5d106c20ec"],"chashes":["c043db69ce569caf73992345f31b88c610e634a3d5d88d3f5e89a1b7786cd1e5","c1268b68275a80a8690bc2edcc8b8158069eeac6628f92880f068ba06e71f447","e9aed9eb21812c5289adf7ce0680cccdb72324948f11cc46bad953ee2efe6ba5","2d40a021ee5bb9a724519d56d1f46dce792e7d64d432cf472ce5c875facae5b3","b2c4fa754aa23bbe3d1fa6bffd2573b1118ce5bdc60ded2c2843778d11129808","61a3b51af4ee6ea035a9b95c8d9714db0270fa7808e79a3375b323b658e9e7ad","1693603470198442f41fe98df38883392945f8f7cd76871beedc8fd87e2ee80e","7f97a1b26064dc534a81d974065311c2913d5feefaf9cb21ed913e307e5052aa","167f584ae197d05c9f57f1134d8cfe741e557cc48c04e021b04b05adbf49d7c4","0e100c2b26e1e1fbefdf5c023579a518a5a493e84e90a7ded2a90835e2bfef8a","c3d8bba74e097b89f60d55d143831ac7e4108e424f4e52745d95196d22a1a925","8e696b3f34b6d906737ba11b7328f2b1ee7faf3d56913a5923572288954f95d6","1db37d49f95db6223847a4691691b0cfc24bc9a74ef459776539ee4c491d3d04","32b98559741aca2a9ab2f2e746f81d7db60fccd18cc0d8aef764bec93c08e166","3873fe66f8076fa19c9e181e2afbe29ad045283cb0986c3f5677e416222b8ba6","56ebf7019a595470d6f78974a649fd0f1450d598fc72fae7dc245f9ff1de3e41","8e42def5e7399ed24cb2b0ddd31722166b9b3063d69753851a3f28002ccfc742","19bea6c3a3bccdff9f5e2f336ca6327eea95e0902eb6b58547b34c8190779328","bfbd7e2858594008395698afab5b12c476cc541c30891f4bec5cd957217ff597","ac450c3724c88bc2a42c7e4cabf5dfd5d2122ff35ec42201c303366b68103916","c627a44768cb9a7cd8d423797d83a857cfcf648a1306afb89ef59e79f616d737","2dbe2b25ed144531cd1a4ccbc17124b3f94a3979858f7d1fe4b2d5dcc651cad3","62ec20d0df8d6f07853f1f89b3ed714be719eb091830c1349675e012c89710e4","a82acfeb8c18e8ccbaba8dc5897211f01d15c9facdca1286ef1038159a462cd9","645ea4f087707cf48198b9bc2df7a09913eac181d3431610f11025bd1615e04e","219d169c8a25d73c196f8c237f6a56886a4a5f529b817113752a6ef74582a5a1","6cf65f41f1520c705cebb9509e3d73fa6010ad7cfefb2988c22221e9db852eba"]},"nq3":{"id":"nq3","mod":"Module 06 · Numbers","type":"typed","points":6,"secondTryCredit":true,"title":"Euclid does the heavy lifting","prompt":"<p>Run Euclid's algorithm on 252 and 198 (252 = 1×198 + 54; 198 = 3×54 + 36; 54 = 1×36 + 18; 36 = 2×18 + 0), then use the identity gcd(a,b) × lcm(a,b) = a × b:<\/p>","fields":[{"short":"gcd","label":"gcd(252, 198) =","ahashes":["f232c118a1f47032d5b2deeafa257bcdcb49a132ba8e120899148438d0aaed3b"]},{"short":"lcm","label":"lcm(252, 198) = (252 × 198) / gcd =","ahashes":["479dea5ae88c54c784e54a3172758f2cbb2a46650048401d0d4d8509e7278347","77ac50593fe3da2106c3407e304e808e47c3a7ef287b3f8dd293ff4d7f59f724"]}],"hint1":"The gcd is the last nonzero remainder in the chain — read it off the steps given. For the lcm, don't list multiples: divide the product by the gcd.","hint2":"252 × 198 = 49,896. Divide by 18.","explain":"<strong>gcd = 18<\/strong> (the last nonzero remainder) and <strong>lcm = 49,896 / 18 = 2,772<\/strong>. The identity gcd × lcm = a × b is what makes the lcm a one-line computation instead of a listing exercise.","revisit":"Module 06 · 'GCD, LCM, and Euclid's algorithm' and its worked example."},"nq4":{"id":"nq4","mod":"Module 06 · Numbers","type":"multi","points":4,"secondTryCredit":true,"title":"Who has an inverse mod 12?","prompt":"<p>Modular inverses exist exactly when they should. Predict both:<\/p>","parts":[{"prompt":"Which of these numbers has <strong>no<\/strong> inverse modulo 12?","choices":["5","7","9","11"],"ahash":"c1f4e49bd7e0e73cc4e06aae80840663be00d57903a64adfe64a4bcf26635072"},{"prompt":"An inverse of a modulo m exists exactly when gcd(a, m) equals:","choices":["1","0","m","a"],"ahash":"207e4c20e8bd7063cd1f8fe561c78be3815ef97ca637df9cccfefbd16258a84e"}],"hint1":"Check gcds with 12: gcd(5,12)=1, gcd(7,12)=1, gcd(11,12)=1 — one of the four shares a real factor with 12.","hint2":"9 and 12 share the factor 3, so the multiples of 9 mod 12 cycle through {9, 6, 3, 0} and never reach 1.","explain":"<strong>9 has no inverse mod 12<\/strong>, because gcd(9, 12) = 3 ≠ 1: its multiples only ever hit multiples of 3. The other three are all coprime to 12, and the rule is exact — <strong>an inverse exists if and only if gcd(a, m) = 1<\/strong>.","revisit":"Module 06 · 'Modular arithmetic and inverses'."},"nq5":{"id":"nq5","mod":"Module 06 · Numbers","type":"typed","points":4,"secondTryCredit":true,"title":"Fast powers, by squaring","prompt":"<p>Compute by repeated squaring (13 = 8 + 4 + 1, so 3¹³ = 3⁸ · 3⁴ · 3¹, reducing mod 17 at every step):<\/p>","fields":[{"short":"3^13 mod 17","label":"3¹³ mod 17 =","ahashes":["4db2e2e9b7731b3a42319c94dc1642eb62c83bb6d5c614e88c27543838f60d10"]}],"hint1":"3² = 9. 3⁴ = 9² = 81 mod 17 = 13. 3⁸ = 13² = 169 mod 17 = 16. Now combine 3⁸ · 3⁴ · 3¹ mod 17.","hint2":"16 × 13 = 208 mod 17 = 4; then 4 × 3 = 12.","explain":"<strong>3¹³ mod 17 = 12.<\/strong> The squaring ladder (3, 9, 13, 16) keeps every number below 17², and the binary expansion of 13 picks exactly which rungs to multiply. This is the engine inside RSA.","revisit":"Module 06 · 'Number bases and fast powers' and 'Worked example: 5^11 mod 13 by repeated squaring'."},"bq1":{"id":"bq1","mod":"Module 06 · Numbers","type":"mc","points":2,"bonus":true,"secondTryCredit":true,"title":"BONUS: find the inverse","prompt":"<p>The inverse of 7 modulo 26 (so that 7 · x ≡ 1 mod 26) is:<\/p>","choices":["15","3","19","7"],"hint1":"Test the candidates: multiply each by 7 and reduce mod 26. Only one product is 1 more than a multiple of 26.","hint2":"7 × 15 = 105 = 4 × 26 + 1.","explain":"<strong>15<\/strong> — 7 × 15 = 105 ≡ 1 (mod 26). This is the exact computation at the heart of RSA key generation.","revisit":"Module 06 · 'Worked example: the inverse of 7 modulo 26'.","ahash":"441f037da6a7c2ca9a1afbe51cc20c62929d060586c1442fba5f17e385a564f4"},"cq1":{"id":"cq1","mod":"Module 07 · Counting","type":"multi","points":5,"secondTryCredit":true,"title":"Multiply, add, or subtract the overlap?","prompt":"<p>Three situations, three different rules. Pick the count for each:<\/p>","parts":[{"prompt":"A capsule wardrobe: 4 shirts, 3 pairs of pants, 2 hats — one of each makes an outfit. How many outfits?","choices":["24","9","14","36"],"ahash":"8195ca14acf3495cab0f38a78cb1f15ef5f6ac145bdf4e3ea9f47649c7cf3a62"},{"prompt":"Lunch is ONE item from either the grill menu (7 items) or the deli menu (5 different items). How many possible lunches?","choices":["12","35","7","5"],"ahash":"7616962545301c517eb7e3fa4c073d36fc6cd1c28857efd12c076b6682f782aa"},{"prompt":"How many integers from 1 to 60 are divisible by 2 or by 3?","choices":["40","50","30","60"],"ahash":"aa577290f5ce2d5eac7cbfa9ca7d9fbe32d6d9231e50dd26e1f2b01dbcd445bc"}],"hint1":"Independent choices in sequence → multiply. One choice from disjoint menus → add. 'Or' with an overlap → add both, then subtract the double-counted overlap once.","hint2":"Part 3: ⌊60/2⌋ = 30, ⌊60/3⌋ = 20, overlap (divisible by 6) = 10. 30 + 20 − 10.","explain":"<strong>24 outfits<\/strong> (product rule: 4×3×2), <strong>12 lunches<\/strong> (sum rule: 7+5 disjoint options), and <strong>40 integers<\/strong> by inclusion–exclusion: 30 + 20 − 10, where the 10 numbers divisible by 6 were counted twice and must be subtracted back once.","revisit":"Module 07 · 'The product rule and the sum rule' and 'Inclusion–exclusion'."},"cq2":{"id":"cq2","mod":"Module 07 · Counting","type":"typed","points":6,"secondTryCredit":true,"title":"Medals vs committees","prompt":"<p>The same numbers, two different questions — order is the whole difference:<\/p>","fields":[{"short":"P(8,3)","label":"8 runners, gold / silver / bronze medals (order matters): P(8, 3) =","ahashes":["b32c6b8e57742b6f821114ffc5a34fb4c0f145e9ab25a11995d043a2c477f550"]},{"short":"C(10,4)","label":"A committee of 4 chosen from 10 people (order does not matter): C(10, 4) =","ahashes":["a78744f153128a4d4af483c1e591973a10403aa66f7744e19483ed8ad3038523"]}],"hint1":"Medals: 8 × 7 × 6. Committee: start from the ordered count 10 × 9 × 8 × 7, then divide by the 4! orderings of each committee.","hint2":"C(10,4) = (10×9×8×7)/(4×3×2×1) = 5040/24.","explain":"<strong>P(8,3) = 336<\/strong> — each ordering of the three medalists is a different outcome. <strong>C(10,4) = 210<\/strong> — a committee is the same committee in any order, so the 4! = 24 arrangements of each set collapse into one.","revisit":"Module 07 · 'Permutations and combinations' and 'Worked example: ordered picks collapse into committees'."},"cq3":{"id":"cq3","mod":"Module 07 · Counting","type":"typed","points":5,"secondTryCredit":true,"title":"PEPPER, rearranged","prompt":"<p>PEPPER has 6 letters: P appears 3 times, E appears 2 times, R once. How many distinct arrangements of its letters are there?<\/p>","fields":[{"short":"arrangements","label":"Distinct arrangements =","ahashes":["7470ba756875f9d80bd221d1ba2f073a6aa21ebc161377460ffe04f281c5f752"]}],"hint1":"Start with 6! arrangements of six distinct letters, then divide by the internal rearrangements of each repeated letter: 3! for the P's and 2! for the E's.","hint2":"720 / (6 × 2) = 720 / 12.","explain":"<strong>6! / (3! · 2!) = 720 / 12 = 60.<\/strong> Repeated letters are interchangeable, so each distinct arrangement was counted once for every way of shuffling the identical letters among themselves — divide those duplicates away.","revisit":"Module 07 · 'Repetition: multisets and stars and bars' (the BANANA pattern)."},"cq4":{"id":"cq4","mod":"Module 07 · Counting","type":"multi","points":5,"secondTryCredit":true,"title":"Identical tasks, and a three-set overlap","prompt":"<p>Part 1 is stars and bars; Parts 2–3 are a three-set inclusion–exclusion:<\/p>","parts":[{"prompt":"7 identical background tasks are distributed among 4 distinct servers (a server may get zero). How many distributions? Type the number.","type":"typed","short":"distributions","ahashes":["d8f77acf5f01cf93f3787d82fe10ecc49e31d4ae103b397be61331aee1c4f8c1"]},{"prompt":"100 students: 40 take Math, 35 take CS, 30 take Physics; 15 take Math∩CS, 12 take Math∩Physics, 10 take CS∩Physics, and 5 take all three. How many take at least one of the three?","choices":["73","105","63","68"],"ahash":"8afed340dfcc95f619e8a20d218bea6dcbbb84e699f7ddaa82b7c83224825511"},{"prompt":"…and how many take none of the three?","choices":["27","37","25","32"],"ahash":"8451fe0df7096f50248a28db3bdc5befb119fbe8626801f639a021e42e9c1603"}],"hint1":"Part 1: 7 stars, 4 − 1 = 3 bars → C(7+3, 3). Parts 2–3: add the singles, subtract the pairwise overlaps, then ADD BACK the triple overlap — it was subtracted too many times. 'None' is what's left of 100.","hint2":"Union = 40 + 35 + 30 − 15 − 12 − 10 + 5 = 73. None = 100 − 73.","explain":"<strong>Part 1: C(10, 3) = 120<\/strong> — stars and bars turns identical items into distinct boxes into choosing bar positions. <strong>Part 2: 73<\/strong> in at least one course: the triple-counted 5 students were added 3 times, subtracted 3 times, and must be added back once. <strong>Part 3: 27<\/strong> in none.","revisit":"Module 07 · 'Repetition: multisets and stars and bars' and 'Inclusion–exclusion'."},"cq5":{"id":"cq5","mod":"Module 07 · Counting","type":"multi","points":4,"secondTryCredit":true,"title":"A binomial coefficient, and a guarantee","prompt":"<p>Two closing punches from the module:<\/p>","parts":[{"prompt":"In the expansion of (2x + 1)⁵, what is the coefficient of x³? (Careful: the term is C(5,3) · (2x)³ · 1².)","choices":["80","10","40","20"],"ahash":"9903838694cb5bbaf5b4708eb26a21ec6c0889fc005a5b587dc81e020057f71d"},{"prompt":"What is the smallest group of people that guarantees at least 3 of them share a birth month?","choices":["25","13","24","36"],"ahash":"f892218b0d0c04d3c81942a15bc9251dd398757668048c08d66ecfd164767759"}],"hint1":"Part 1: C(5,3) = 10 picks which factors donate the x — and each donated x brings its 2 with it: 10 × 2³. Part 2: worst case first — 2 people in each of the 12 months, then one more breaks the tie.","hint2":"Part 2's worst case is 24 people with NO month reaching 3. The 25th person forces it.","explain":"<strong>Part 1: 80<\/strong> — C(5,3) × 2³ = 10 × 8; forgetting the 2³ is the classic miss. <strong>Part 2: 25<\/strong> — by the generalized pigeonhole principle, 2 × 12 + 1 people force some month to hold at least 3.","revisit":"Module 07 · 'The Binomial Theorem' and 'Lab: the pigeonhole principle'."},"rq1":{"id":"rq1","mod":"Module 08 · Recurrences","type":"typed","points":6,"secondTryCredit":true,"title":"Hanoi, and a tripling recurrence","prompt":"<p>Two recurrences, computed exactly:<\/p>","fields":[{"short":"Hanoi T(7)","label":"The Tower of Hanoi satisfies T(n) = 2T(n−1) + 1 with T(0) = 0, whose closed form is 2ⁿ − 1. The minimum number of moves for 7 disks: T(7) =","ahashes":["04291aae9f4b16ed5d7504dd8f70533e33409a44b5f8d11a9af3938a462a50a2"]},{"short":"T(4)","label":"For T(n) = 3T(n−1) with T(0) = 2, iterating up: T(4) =","ahashes":["fbaeacd6c3fdd4745b344decc1a35a1a2c2e3c58dc82327e5c607983134dcadb"]}],"hint1":"Hanoi: 2⁷ − 1. Tripling: T(1) = 6, T(2) = 18, T(3) = 54, T(4) = …","hint2":"2 × 3⁴ = 2 × 81.","explain":"<strong>T(7) = 127 moves<\/strong> — the closed form 2ⁿ − 1 falls straight out of iterating Hanoi. And tripling from 2 gives <strong>T(4) = 2 · 3⁴ = 162<\/strong>: a constant-ratio recurrence is just a power in disguise.","revisit":"Module 08 · 'Three classic recurrences' and 'Lab: the Tower of Hanoi'."},"rq2":{"id":"rq2","mod":"Module 08 · Recurrences","type":"parsons","points":5,"title":"Order the solution: characteristic equation","prompt":"<p>Solve a(n) = 5a(n−1) − 6a(n−2), with a(0) = 2 and a(1) = 5, by the characteristic-equation method. Put the computation steps in order (one line doesn't belong):<\/p>","lines":["Factor: (x − 2)(x − 3) = 0, so the roots are x = 2 and x = 3","General solution: a(n) = A·2ⁿ + B·3ⁿ","Solve the pair: A = 1 and B = 1","a(0) = 2 gives A + B = 2; a(1) = 5 gives 2A + 3B = 5","Closed form: a(n) = 2ⁿ + 3ⁿ","Try a(n) = xⁿ: the characteristic equation is x² − 5x + 6 = 0"],"distractor":"Closed form: a(n) = 2ⁿ · 3ⁿ","hint1":"The method has a fixed skeleton: assume a power, get a polynomial, factor it, write the general solution as a combination of root-powers, then let the initial conditions pin down the constants.","hint2":"Sanity check the ending: a(2) should be 5·5 − 6·2 = 13, and 2² + 3² = 13. The product 2ⁿ · 3ⁿ = 6ⁿ gives 36 — that's the imposter.","explain":"<strong>x² − 5x + 6 = (x−2)(x−3)<\/strong>, roots 2 and 3, so a(n) = A·2ⁿ + B·3ⁿ. The initial conditions give A + B = 2 and 2A + 3B = 5, hence A = B = 1 and <strong>a(n) = 2ⁿ + 3ⁿ<\/strong> — verified at n = 2 (13 = 13). Distinct roots, one term per root, constants from the initial conditions: that's the whole order-2 machine.","revisit":"Module 08 · 'Linear homogeneous recurrences of order 2' and 'Lab: characteristic-equation solver'.","prank":[1,2,4,3,5,0]},"rq3":{"id":"rq3","mod":"Module 08 · Recurrences","type":"multi","points":6,"secondTryCredit":true,"title":"Recurrences inside algorithms","prompt":"<p>Three reads on algorithm recurrences:<\/p>","parts":[{"prompt":"Merge sort on n elements satisfies T(n) = 2T(n/2) + n. Its growth is:","choices":["Θ(n log n)","Θ(n²)","Θ(n)","Θ(2ⁿ)"],"ahash":"f5f975e1c93e0be0a5ed8c65a88d505bfae8bd10911f0eaff9bb48433a407be0"},{"prompt":"Draw the recursion tree for that recurrence at n = 8: the levels are n = 8, then 4, then 2, then 1. How many levels are there in total? Type the number.","type":"typed","short":"levels","ahashes":["c9e4754166b21308b5328f4efb162d89a83b325a476fec15c7329fc51a4cb6ab"]},{"prompt":"Why is the naive recursive Fibonacci function so slow?","choices":["It recomputes the same subproblems over and over — the call tree repeats massively","Recursion itself is always exponential","Python cannot optimize any recursion","It uses too many base cases"],"ahash":"856b766923674c05061ac30517adae971242519540190de644bd07c4508e0e02"}],"hint1":"Merge sort: each level of the tree costs n in total merging, and there are log₂n + 1 levels. Part 2 is just counting the levels listed. Part 3: look at the fib(5) tree in the next item — fib(3) and fib(2) appear again and again.","hint2":"Total merge-sort work = (cost per level) × (number of levels) = n × (log n + 1).","explain":"<strong>Merge sort is Θ(n log n)<\/strong>: every tree level costs n total, and halving gives log₂n + 1 levels (4 levels at n = 8). <strong>Naive Fibonacci is slow because it recomputes<\/strong> — the same subproblems recur exponentially many times; memoization collapses the tree to one computation per distinct subproblem.","revisit":"Module 08 · 'Recurrences hiding inside algorithms', 'Recursion trees and the master theorem', 'Code: naive versus memoized Fibonacci'."},"rq4":{"id":"rq4","mod":"Module 08 · Recurrences","type":"typed","points":4,"secondTryCredit":true,"title":"Anatomy of the fib(5) call tree","prompt":"<p>The naive <code class=\"inline\">fib<\/code> (base cases fib(0) and fib(1)) makes this call tree for fib(5). Count carefully:<\/p>\n<pre class=\"code\"><code>fib(5)\n├─ fib(4)\n│  ├─ fib(3)\n│  │  ├─ fib(2)\n│  │  │  ├─ fib(1)\n│  │  │  └─ fib(0)\n│  │  └─ fib(1)\n│  └─ fib(2)\n│     ├─ fib(1)\n│     └─ fib(0)\n└─ fib(3)\n   ├─ fib(2)\n   │  ├─ fib(1)\n   │  └─ fib(0)\n   └─ fib(1)<\/code><\/pre>","fields":[{"short":"total calls","label":"Total function calls (every node in the tree):","ahashes":["8468cab8c47182fcff7b26ef8eb9d592a1350a93cfb8e5de6db507d9c63b8008"]},{"short":"fib(2) calls","label":"How many times is fib(2) invoked?","ahashes":["be14b4db67e89a15b0a38433f8bd823a14730ab59d7a802eb361590a20c416b8"]},{"short":"calls saved","label":"Memoization computes each distinct subproblem (fib(0)…fib(5) — 6 of them) exactly once. How many of the 15 calls does memoization save?","ahashes":["00f21c888dbd1744e54c19b70c831868e91577336a9106683609a8a92f4a5a96"]}],"hint1":"Count the tree row by row: 1 + 2 + 4 + 5 + 3. fib(2) heads three separate subtrees.","hint2":"Saved = total calls − distinct subproblems = 15 − 6.","explain":"<strong>15 total calls<\/strong>, with <strong>fib(2) invoked 3 times<\/strong> (and fib(1) 5 times, fib(0) 3 times). Only 6 distinct subproblems exist, so memoization saves <strong>9 of the 15 calls<\/strong> — and the saving grows exponentially with n. That gap between the tree and the distinct-subproblem count IS the naive algorithm's cost.","revisit":"Module 08 · 'Lab: Fibonacci call tree and memoization'."},"rq5":{"id":"rq5","mod":"Module 08 · Recurrences","type":"typed","points":4,"secondTryCredit":true,"title":"Bit strings with no consecutive 1s","prompt":"<p>Let a(n) count the binary strings of length n with no two consecutive 1s. (Reason: such a string ends in 0 — preceded by any valid string of length n−1 — or ends in 01 — preceded by any valid string of length n−2. So a(n) = a(n−1) + a(n−2), with a(0) = 1 (the empty string) and a(1) = 2 (0, 1).)<\/p>","fields":[{"short":"a(6)","label":"Iterating the recurrence: a(6) =","ahashes":["959e195c23c036344f47e486940d53426a548f98e0e0fd12e75f6b32956605d1"]}],"hint1":"a(2) = 3, a(3) = 5, a(4) = 8 — you have seen this sequence before. Keep going two more steps.","hint2":"a(5) = 13, a(6) = a(5) + a(4).","explain":"<strong>a(6) = 21.<\/strong> The sequence 1, 2, 3, 5, 8, 13, 21 is the Fibonacci recurrence wearing a counting costume — which is why this recurrence shows up everywhere combinatorics meets recursion.","revisit":"Module 08 · 'What is a recurrence relation?' and 'Solving by iteration, then proving it by induction' (computation only here)."},"gq1":{"id":"gq1","mod":"Module 09 · Graphs","type":"multi","points":5,"secondTryCredit":true,"title":"The handshake theorem","prompt":"<p>Warm up with degrees:<\/p>","parts":[{"prompt":"A graph has five vertices with degrees 3, 3, 2, 2, 2. How many edges does it have? Type the number.","type":"typed","short":"edges","ahashes":["e62717cef13721c5cde8aba125aac89d90e865c211dcac044b6528956b6ca63e"]},{"prompt":"Could there be a graph with five vertices that ALL have degree 3?","choices":["No — the degree sum would be 15, which is odd, and every degree sum must be even","Yes — 5 vertices of degree 3 is the Petersen graph","Yes — degrees are independent of each other","No — degree 3 needs at least 10 vertices"],"ahash":"66fbb6127b250b2306c63f991ebbe7c8554414629a2071a0e91e84e49cad7805"}],"hint1":"Part 1: the handshake theorem — the degree sum counts every edge twice. Part 2: what must always be true of a degree sum?","hint2":"Sum of degrees = 2|E|. An odd sum is not 'unusual', it is impossible — it would mean half an edge.","explain":"<strong>6 edges<\/strong>: (3+3+2+2+2)/2 = 12/2. And <strong>no<\/strong> all-degree-3 graph on 5 vertices exists: its degree sum 15 is odd, but every edge contributes exactly 2 to the sum, so the sum — and the number of odd-degree vertices — must be even.","revisit":"Module 09 · 'Degree, the handshake theorem, and special graphs'."},"gq2":{"id":"gq2","mod":"Module 09 · Graphs","type":"custom","custom":"eulerAudit","points":7,"secondTryCredit":true,"title":"Lab: the Euler audit","prompt":"<p>Audit this connected graph for an Euler trail:<\/p>","nodes":[{"k":"A","x":60,"y":55},{"k":"B","x":170,"y":35},{"k":"C","x":115,"y":130},{"k":"D","x":255,"y":55},{"k":"E","x":310,"y":135},{"k":"F","x":55,"y":205}],"edges":[[0,1],[1,2],[2,0],[1,3],[3,4],[4,1],[2,5]],"options":["An Euler circuit — an every-edge trail that starts and ends at the same vertex","An Euler path that must start at one odd-degree vertex and end at the other","An Euler path that can start at any vertex","Neither — more than two vertices have odd degree","Neither — the sum of the degrees is odd"],"hint1":"Degrees first: count the edges touching each vertex. A=2, B=4 — keep going around the graph. Euler's theorem: 0 odd vertices → circuit; exactly 2 → a path pinned to those two vertices.","hint2":"C touches B, A and F (degree 3). F touches only C (degree 1). Everyone else is even.","explain":"<strong>Degrees: A2, B4, C3, D2, E2, F1 — exactly two odd vertices, C and F.<\/strong> Euler's theorem then promises an Euler path, and it must start at one odd vertex and end at the other (C to F). Zero odd vertices would have meant a circuit; four or more (like Königsberg) would have meant neither.","revisit":"Module 09 · 'Paths, connectedness, and Euler cycles' and 'Lab: the bridges of Königsberg'.","ohashes":["b224bbec6890244d5fdfcd16dac53efa8b3745888df04f7f0d3dd05cd1c44a6a","9176ca0974ffe98d5f17d269d2b5a0d73c74f11f8a6faa64e3ef18aa9421365b","9de5669765706627b4068e8bd13153b08c5e51e287d9c0f9e1cf32fc2da00c38","89ec2e58b88e116fdcbbb3c129df66cde42b1c5d6b0eda6025b948a3734b533f","68c9c093fe786a1fa5142e765b926b08740bbce5228ecae631bb9b2a39f0c9c7","1077c6f9af15ae718e42e7abfb585558f94585215948b39753045002e735e145"],"ahash":"125ef739f0b9cf751b66ec6af3b9093c6b619dada9f69397945d7ff6cb2c99f7"},"gq3":{"id":"gq3","mod":"Module 09 · Graphs","type":"multi","points":5,"secondTryCredit":true,"title":"BFS layers, and how to store a giant graph","prompt":"<p>Graph for Parts 1–2 — edges: S–A, S–B, A–C, B–D, C–E, D–E. Breadth-first search starts at S and visits in layers of distance:<\/p>","parts":[{"prompt":"What is the distance (in edges) from S to E? Type the number.","type":"typed","short":"dist(S,E)","ahashes":["be14b4db67e89a15b0a38433f8bd823a14730ab59d7a802eb361590a20c416b8"]},{"prompt":"How many vertices sit at distance exactly 2 from S? Type the number.","type":"typed","short":"layer 2 size","ahashes":["d8da1562bdf03810e78c2d9279054ca593246fa987a1947142828c6683729101"]},{"prompt":"A social network has 100 million users, each with about 200 friends (sparse, enormous). The representation that fits is:","choices":["An adjacency list — storage grows with the edges that actually exist","An adjacency matrix — one row per user is fine","A single edge array sorted by weight","An Euler tour"],"ahash":"3154212590f7888ac6f81f35c4fb15e5184dd4b4acdfed1801d9b25f2326bc63"}],"hint1":"Layers: L0 = {S}, L1 = {A, B}, L2 = {C, D}, L3 = {E}. Part 3: a matrix for 10⁸ users needs 10¹⁶ cells; a list stores ~200 entries per user.","hint2":"E is reached through C or D, both at distance 2 — so E is at distance 3, and it's the only vertex there.","explain":"<strong>E is at distance 3<\/strong> and <strong>layer 2 holds exactly 2 vertices (C and D)<\/strong> — BFS on an unweighted graph finds true shortest-path distances, one layer at a time. And for a sparse graph at that scale, the <strong>adjacency list<\/strong> is the only sane representation: memory proportional to real edges, not to all possible pairs.","revisit":"Module 09 · 'Representing a graph in a computer', 'Lab: breadth-first versus depth-first search', 'Worked example: breadth-first search order and layers'."},"gq4":{"id":"gq4","mod":"Module 09 · Graphs","type":"multi","points":4,"secondTryCredit":true,"title":"Faces, and Euler ≠ Hamilton","prompt":"<p>Two famous names that students constantly swap:<\/p>","parts":[{"prompt":"A connected planar graph drawn without crossings has 10 vertices and 15 edges. Counting the outer face, how many faces does the drawing have?","choices":["7","5","17","3"],"ahash":"194abad396462afcbc4c1133ae218a7dc21fa4f2b82af20a4cd68053f6a20740"},{"prompt":"The clean distinction between the two cycle types is:","choices":["A Hamiltonian cycle visits every VERTEX exactly once; an Euler circuit uses every EDGE exactly once","An Euler circuit visits every vertex; a Hamiltonian cycle uses every edge","Both must visit every vertex exactly once","A Hamiltonian cycle may repeat edges freely"],"ahash":"f858d1531ebab2519d1f7adc8c80330bf4862b4cf6d2ba9c2666f8f2ccacb919"}],"hint1":"Part 1: Euler's formula V − E + F = 2. Part 2: name the objects — one is about vertices, the other about edges; the surnames are the only similarity.","hint2":"F = 2 − V + E = 2 − 10 + 15.","explain":"<strong>F = 7 faces<\/strong> (including the exterior) by V − E + F = 2. And the distinction: <strong>Hamilton = vertices<\/strong> (visit each once), <strong>Euler = edges<\/strong> (traverse each once). Mixing them up is the module's most expensive confusion — they have different theorems, different tests, different difficulty.","revisit":"Module 09 · 'Isomorphism and planar graphs' and 'Hamiltonian cycles and the traveling salesperson'."},"gq5":{"id":"gq5","mod":"Module 09 · Graphs","type":"multi","points":4,"secondTryCredit":true,"title":"Coloring, and where Dijkstra breaks","prompt":"<p>Last two judgment calls of the module:<\/p>","parts":[{"prompt":"What is the chromatic number of a 5-cycle (a pentagon graph: 5 vertices in a ring)?","choices":["3","2","5","4"],"ahash":"cb8f7a1199e92c26fca54e12c08f13b678f5a0b09aa7aac42c0d3caa65525a37"},{"prompt":"Why does Dijkstra's algorithm fail when some edge weights are negative?","choices":["It finalizes a vertex's distance greedily — a later path through a negative edge could still improve it, so settled distances can be wrong","Negative weights make the graph disconnected","The priority queue cannot store negative numbers","It loops forever on any negative edge"],"ahash":"d6dfccd8e6691c1ef1d60dee92a656418671597d639e8e31e69bda9f38f5e5e2"}],"hint1":"Part 1: try 2 colors around an odd ring — the last vertex collides with both neighbors. Part 2: Dijkstra's correctness rests on 'the smallest unsettled distance can never improve later' — one negative edge breaks exactly that promise.","hint2":"Even cycles are 2-colorable; odd cycles need a third color somewhere. Dijkstra doesn't crash on negatives — worse, it can silently return wrong answers.","explain":"<strong>The 5-cycle needs 3 colors<\/strong> — two colors alternate fine until the ring closes on an odd count. And <strong>Dijkstra's greedy step is the failure<\/strong>: it settles the nearest vertex permanently, which is only safe when no future path can be cheaper — a negative edge is precisely a cheaper-later path.","revisit":"Module 09 · 'Worked example: coloring a graph' and 'Worked example: Dijkstra shortest distances from A'."},"bq2":{"id":"bq2","mod":"Module 09 · Graphs","type":"mc","points":2,"bonus":true,"secondTryCredit":true,"title":"BONUS: both theorems, one graph","prompt":"<p>Two triangles share a single vertex (a figure-eight: 5 vertices, 6 edges). Which statement about it is true?<\/p>","choices":["It has an Euler circuit (every vertex has even degree) but no Hamiltonian cycle","It has a Hamiltonian cycle but no Euler circuit","It has both an Euler circuit and a Hamiltonian cycle","It has neither"],"hint1":"Degrees: the shared vertex has degree 4, the others degree 2 — all even. But any cycle visiting every vertex would have to pass through the shared vertex twice to reach both triangles.","hint2":"Euler asks about edges and parity. Hamilton asks about visiting vertices — and a cut vertex you must reuse is fatal to it.","explain":"<strong>Euler circuit yes, Hamiltonian cycle no.<\/strong> All degrees are even (4, 2, 2, 2, 2), so an Euler circuit exists. But a Hamiltonian cycle can't pass through the shared vertex twice, and there's no other way to reach both triangles — the two theorems really are independent.","revisit":"Module 09 · 'Paths, connectedness, and Euler cycles' and 'Hamiltonian cycles'.","ahash":"5c35f271ec822c7ebbec4fc297c0b4a313c8b953de4790f6b7f2f100c6ff1c21"}};
+renderSection({id:"numbers",title:"Module 06 · Integers & Number Theory",desc:"Divisibility, primes, Euclid's algorithm, and modular arithmetic. 25 points.",items:["nq1","nq2","nq3","nq4","nq5","bq1"].map(x=>DEFS[x])});
+renderSection({id:"counting",title:"Module 07 · Counting & the Binomial Theorem",desc:"Product and sum rules, inclusion–exclusion, permutations and combinations, stars and bars, Pascal's triangle, pigeonhole. 25 points.",items:["cq1","cq2","cq3","cq4","cq5"].map(x=>DEFS[x])});
+renderSection({id:"recurrences",title:"Module 08 · Recurrence Relations",desc:"Iterating recurrences, the Tower of Hanoi, characteristic equations, recursion trees, and why naive Fibonacci explodes. 25 points.",items:["rq1","rq2","rq3","rq4","rq5"].map(x=>DEFS[x])});
+renderSection({id:"graphs",title:"Module 09 · Graphs",desc:"Degrees and the handshake theorem, Euler paths, representations, BFS, planarity, coloring, and Dijkstra. 25 points.",items:["gq1","gq2","gq3","gq4","gq5","bq2"].map(x=>DEFS[x])});
+
+function acceptMatch(raw, field){
+  const cands = [norm(raw), setCanon(raw)];
+  return cands.some(c=>field.ahashes.includes(HKEY('typed', c)));
+}
+function checkItem(id){
+  const def=ITEMS[id]; const st=itemState(id); if(st.done) return;
+  if(def.type==="mc"){
+    const sel=(picks[id]||{})[0]; if(sel===undefined){ note(id,"Pick an answer first — commit to a prediction, then check."); return; }
+    grade(id, HKEY('mc',id,0,sel)===def.ahash?1:0, "chose: "+stripTags(def.choices[sel]));
+  }
+  else if(def.type==="multi"){
+    let got=0,log=[];
+    def.parts.forEach((p,pi)=>{
+      if(p.type==="typed"){ const raw=$("#typed-"+id+"-"+pi).value; const ok=acceptMatch(raw,p); if(ok)got++; log.push('part'+(pi+1)+':'+(ok?"✓":"✗ '"+raw+"'")); }
+      else { const sel=(picks[id]||{})[pi]; const ok=sel!==undefined&&HKEY('mc',id,pi,sel)===p.ahash; if(ok)got++; log.push('part'+(pi+1)+':'+(ok?"✓":"✗")); }
+    });
+    grade(id, got/def.parts.length, log.join(" "));
+  }
+  else if(def.type==="typed"){
+    let got=0,log=[];
+    def.fields.forEach((f,fi)=>{ const raw=$("#typed-"+id+"-"+fi).value; const ok=acceptMatch(raw,f); if(ok)got++; log.push(f.short+':'+(ok?"✓":"✗ '"+raw+"'")); });
+    grade(id, got/def.fields.length, log.join(" "));
+  }
+  else if(def.type==="write"){
+    const ta=$("#code-"+id); const res=CHECKERS[def.checker](ta.value);
+    st.code=ta.value; note(id,res.notes);
+    grade(id, res.fraction, "code: "+ta.value.replace(/\n/g," ⏎ "));
+  }
+  else if(def.type==="parsons"){
+    const zone=$$("#zone-"+id+" .parsons-line");
+    if(zone.length===0){ note(id,"Move lines into Your program first."); return; }
+    const expected=def.lines.map((t,si)=>[def.prank[si],t]).sort((a,b)=>a[0]-b[0]).map(x=>x[1].replace(/\s+/g," ").trim());
+    let posOK=0; zone.forEach((b,i)=>{ if(b.textContent.replace(/\s+/g," ").trim()===expected[i]) posOK++; });
+    const exact = zone.length===def.lines.length && posOK===def.lines.length;
+    grade(id, exact?1:posOK/def.lines.length, "order placed");
+  }
+  else if(def.type==="debug"){
+    const line=debugPick[id]; const fix=(picks[id]||{})[0];
+    if(line===undefined||fix===undefined){ note(id,"Do both steps: tap the buggy line AND pick a fix."); return; }
+    const lineOK = HKEY('line',id,line)===def.lhash, fixOK = HKEY('fix',id,fix)===def.fhash;
+    const frac=(lineOK?0.5:0)+(fixOK?0.5:0);
+    $$("#body-"+id+" .debugline").forEach((b,j)=>{ if(HKEY('line',id,j)===def.lhash) b.classList.add("correct"); });
+    grade(id, frac, 'line:'+line+' fix:'+stripTags(def.fixes[fix]));
+  }
+  else if(def.type==="builder"){
+    const sel=picks[id]||{};
+    if(Object.keys(sel).length<def.groups.length){ note(id,"Choose one option in every group first — the checklist shows what's still open."); return; }
+    let got=0; def.groups.forEach((g,gi)=>{ if(HKEY('grp',id,gi,sel[gi])===g.ahash) got++; });
+    grade(id, got/def.groups.length, "builder groups correct: "+got+"/"+def.groups.length);
+    updateBuilder(id);
+  }
+  else if(def.type==="custom"){ CUSTOM_CHECK[def.custom](def); }
+  const t=$("#tries-"+id); const st2=itemState(id);
+  if(t) t.textContent = st2.done? "" : (triesLeft(id)>0? triesLeft(id)+" try left":"");
+}
+
+
+
+(function init(){
+  const nameEl=$("#studentName");
+  if(state.name) nameEl.value=state.name;
+  nameEl.addEventListener("input",()=>{ state.name=nameEl.value; save(); });
+  for(const id in ITEMS){
+    const st=state.items[id]; if(!st||st.attempts===0) continue;
+    const def=ITEMS[id];
+    if(def.type==="write"&&st.code){ const ta=$("#code-"+id); if(ta) ta.value=st.code; }
+    if(st.hint1){ const b=$("#hint1-"+id); if(b)b.classList.add("show"); }
+    if(st.hint2){ const b=$("#hint2-"+id); if(b)b.classList.add("show"); }
+    if(st.attempts>0) renderItemFeedback(id, st.bestFraction||0, st.awarded);
+    const t=$("#tries-"+id); if(t&&!st.done&&triesLeft(id)>0) t.textContent=triesLeft(id)+" try left";
+  }
+  renderProgress(); renderSummary();
+})();
+
+</script>
+</body>
+</html>
